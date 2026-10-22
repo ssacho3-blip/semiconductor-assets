@@ -1669,6 +1669,256 @@
     };
   }
 
+  // =========================================================================
+  // BrainDeck v5.6 REA Master Upgrade — Event Fold, Summary Sheet, Exam Print, Audio Loop
+  // =========================================================================
+  const DEFAULT_FSRS5_PARAMS = [
+    0.40255, 1.18385, 3.17300, 15.69105, 7.19490,
+    0.53450, 1.46040, 0.00460, 1.54575, 0.11920,
+    1.01925, 1.93950, 0.11000, 0.29605, 2.26980,
+    0.23150, 2.98980, 0.51655, 0.66210,
+  ];
+  const DAY_MS_V56 = 86400000;
+
+  function quantize1e6(x) {
+    return Math.round(Number(x) * 1000000) / 1000000;
+  }
+
+  function clampV56(val, lo, hi) {
+    return Math.max(lo, Math.min(hi, val));
+  }
+
+  function foldReviewEvents(events, params) {
+    const w = Array.isArray(params) && params.length >= 19 ? params.map(Number) : DEFAULT_FSRS5_PARAMS;
+    const rawList = Array.isArray(events) ? events.slice() : [];
+    const ordered = rawList.sort((a, b) => {
+      const dt = Number(a.ts_ms) - Number(b.ts_ms);
+      if (dt !== 0) return dt;
+      return String(a.event_id).localeCompare(String(b.event_id));
+    });
+
+    const seenIdem = new Set();
+    const voidedIds = new Set();
+    const deduped = [];
+
+    for (let i = 0; i < ordered.length; i += 1) {
+      const ev = ordered[i] || {};
+      const eid = String(ev.event_id || "").trim();
+      const ikey = String(ev.idem_key || "").trim();
+      if (!eid || !ikey) throw new Error("event_id and idem_key must be non-empty");
+      if (seenIdem.has(ikey)) continue;
+      seenIdem.add(ikey);
+      if (ev.kind === "VOID") {
+        if (ev.voids) voidedIds.add(String(ev.voids));
+        continue;
+      }
+      deduped.push(ev);
+    }
+
+    let s = 0.0;
+    let d = 0.0;
+    let due_ms = 0;
+    let last_ts_ms = null;
+    let reps = 0;
+    let lapses = 0;
+
+    for (let i = 0; i < deduped.length; i += 1) {
+      const ev = deduped[i];
+      if (voidedIds.has(String(ev.event_id))) continue;
+      if (ev.kind === "CRAM") continue;
+
+      const g = Number(ev.rating || 3);
+      const now_ms = Number(ev.ts_ms);
+
+      if (reps === 0 || last_ts_ms === null || s <= 0.0) {
+        s = quantize1e6(Math.max(0.1, w[g - 1]));
+        const d0 = w[4] - Math.exp(w[5] * (g - 1)) + 1.0;
+        d = quantize1e6(clampV56(d0, 1.0, 10.0));
+        reps = 1;
+        last_ts_ms = now_ms;
+        const ivlDays = Math.max(1, Math.round(s));
+        due_ms = now_ms + ivlDays * DAY_MS_V56;
+        continue;
+      }
+
+      const elapsedDays = Math.max(0.0, (now_ms - last_ts_ms) / DAY_MS_V56);
+      const rNow = quantize1e6(Math.pow(1.0 + (19.0 / 81.0) * (elapsedDays / Math.max(0.1, s)), -0.5));
+
+      const d0Good = w[4] - Math.exp(w[5] * 2.0) + 1.0;
+      const deltaD = -w[6] * (g - 3.0);
+      const dPrime = d + deltaD * ((10.0 - d) / 9.0);
+      const dNext = quantize1e6(clampV56(w[7] * d0Good + (1.0 - w[7]) * dPrime, 1.0, 10.0));
+
+      let sNext = s;
+      if (elapsedDays < 1.0 && ev.kind === "REVIEW_AHEAD") {
+        sNext = quantize1e6(clampV56(s * Math.exp(w[17] * (g - 3.0 + w[18])), 0.1, 36500.0));
+        if (g === 1) lapses += 1;
+      } else if (g === 1) {
+        lapses += 1;
+        const sFail =
+          w[11] *
+          Math.pow(dNext, -w[12]) *
+          (Math.pow(s + 1.0, w[13]) - 1.0) *
+          Math.exp(w[14] * (1.0 - rNow));
+        sNext = quantize1e6(clampV56(Math.min(s, sFail), 0.1, 36500.0));
+      } else {
+        const hardPenalty = g === 2 ? w[15] : 1.0;
+        const easyBonus = g === 4 ? w[16] : 1.0;
+        const inc =
+          Math.exp(w[8]) *
+          (11.0 - dNext) *
+          Math.pow(s, -w[9]) *
+          (Math.exp(w[10] * (1.0 - rNow)) - 1.0) *
+          hardPenalty *
+          easyBonus;
+        sNext = quantize1e6(clampV56(s * (1.0 + inc), 0.1, 36500.0));
+      }
+
+      s = sNext;
+      d = dNext;
+      reps += 1;
+      last_ts_ms = now_ms;
+      const ivlDays = g === 1 ? 1 : Math.max(1, Math.round(s));
+      due_ms = now_ms + ivlDays * DAY_MS_V56;
+    }
+
+    return { s, d, due_ms, last_ts_ms, reps, lapses };
+  }
+
+  function buildSummarySheetView(cards, maskMode = "red_filter") {
+    const list = Array.isArray(cards) ? cards : [];
+    const rows = list.map((c, idx) => {
+      const ext = extractTargetAndExplanation(c.front_text || c.rendered_question, c.back_text || c.rendered_answer, c.target_answer, c.extra_explanation);
+      return {
+        index: idx + 1,
+        card_id: c.card_id,
+        question: String(c.rendered_question || c.front_text || "").replace(/\{\{c\d+::([^:}]+)(?:::[^}]+)?\}\}/g, "[ $1 ]"),
+        clean_answer: ext.targetAnswer || String(c.rendered_answer || c.back_text || ""),
+        extra: ext.extraExplanation || "",
+        lapses: Number(c.lapses || 0),
+      };
+    });
+    return {
+      mask_mode: maskMode || "red_filter",
+      total_rows: rows.length,
+      rows,
+    };
+  }
+
+  function buildPrintableExamSheet(cards, title = "BrainDeck 2단 실전 쪽지시험지", seed = 20261022) {
+    const list = Array.isArray(cards) ? cards.slice() : [];
+    let s = Number(seed) || 20261022;
+    function nextRand() {
+      s = (s * 1664525 + 1013904223) % 4294967296;
+      return s / 4294967296;
+    }
+    for (let i = list.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(nextRand() * (i + 1));
+      const tmp = list[i];
+      list[i] = list[j];
+      list[j] = tmp;
+    }
+    const items = list.map((c, idx) => {
+      const ext = extractTargetAndExplanation(c.front_text || c.rendered_question, c.back_text || c.rendered_answer, c.target_answer, c.extra_explanation);
+      const qText = String(c.rendered_question || c.front_text || "").replace(/\{\{c\d+::[^:}]+(?:::([^}]+))?\}\}/g, " [ ______ ] ");
+      return {
+        number: idx + 1,
+        card_id: c.card_id,
+        question: qText,
+        answer: ext.targetAnswer || String(c.rendered_answer || c.back_text || ""),
+        explanation: ext.extraExplanation || "",
+      };
+    });
+
+    const qRowsHtml = items
+      .map(
+        (it) =>
+          `<div style="break-inside:avoid;margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed #cbd5e1;">
+            <div style="font-weight:700;font-size:13px;color:#0f172a;">${it.number}. ${it.question}</div>
+            <div style="margin-top:6px;font-size:12px;color:#64748b;">정답: ________________________</div>
+          </div>`
+      )
+      .join("");
+
+    const ansRowsHtml = items
+      .map(
+        (it) =>
+          `<div style="font-size:12px;margin-bottom:4px;"><strong>${it.number}번:</strong> <span style="color:#be123c;font-weight:700;">${it.answer}</span> ${
+            it.explanation ? `<span style="color:#64748b;">(${it.explanation})</span>` : ""
+          }</div>`
+      )
+      .join("");
+
+    const printable_html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${title}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif; padding: 24px; color: #0f172a; }
+        .header { display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 18px; }
+        .two-col { column-count: 2; column-gap: 28px; }
+        .ans-page { page-break-before: always; margin-top: 32px; padding-top: 16px; border-top: 2px solid #0f172a; }
+        @media print { .no-print { display: none; } }
+      </style></head><body>
+      <div class="no-print" style="margin-bottom:16px;display:flex;gap:10px;">
+        <button onclick="window.print()" style="padding:10px 18px;background:#1b64da;color:#fff;border:none;border-radius:10px;font-weight:800;cursor:pointer;">🖨️ 인쇄 / PDF 저장</button>
+      </div>
+      <div class="header">
+        <div><h1 style="margin:0;font-size:20px;">📝 ${title}</h1><div style="font-size:12px;color:#475569;margin-top:4px;">BrainDeck v5.6 2단 실전 쪽지시험지 (총 ${items.length}문항)</div></div>
+        <div style="font-size:13px;">이름: ____________ &nbsp; 점수: _____ / ${items.length}</div>
+      </div>
+      <div class="two-col">${qRowsHtml}</div>
+      <div class="ans-page">
+        <h2 style="font-size:16px;margin:0 0 12px 0;">🔑 빠른 채점 정답 및 해설지</h2>
+        <div class="two-col">${ansRowsHtml}</div>
+      </div>
+      </body></html>`;
+
+    return {
+      title,
+      column_count: 2,
+      items,
+      question_sheet: items,
+      answer_key: items,
+      printable_html,
+    };
+  }
+
+  function buildCommuteAudioScript(cards, thinkSeconds = 3) {
+    const list = Array.isArray(cards) ? cards : [];
+    const waitSec = Math.max(1, Math.min(10, Number(thinkSeconds) || 3));
+    const tracks = list.map((c, idx) => {
+      const ext = extractTargetAndExplanation(c.front_text || c.rendered_question, c.back_text || c.rendered_answer, c.target_answer, c.extra_explanation);
+      return {
+        index: idx + 1,
+        card_id: c.card_id,
+        prompt_tts: String(c.rendered_question || c.front_text || "").replace(/\[[^\]]+\]/g, "빈칸"),
+        pause_seconds: waitSec,
+        answer_tts: ext.targetAnswer || String(c.rendered_answer || c.back_text || ""),
+      };
+    });
+    return {
+      think_seconds: waitSec,
+      total_tracks: tracks.length,
+      tracks,
+    };
+  }
+
+  function chunkMicroSprints(cards, sprintSize = 7) {
+    const list = Array.isArray(cards) ? cards : [];
+    const sz = Math.max(3, Math.min(15, Number(sprintSize) || 7));
+    const totalSprints = Math.max(1, Math.ceil(list.length / sz));
+    const sprints = [];
+    for (let i = 0; i < list.length; i += sz) {
+      const idx = Math.floor(i / sz) + 1;
+      const chunk = list.slice(i, i + sz);
+      sprints.push({
+        sprint_index: idx,
+        total_sprints: totalSprints,
+        cards: chunk,
+        checkpoint_label: `🏁 스프린트 ${idx} / ${totalSprints} (${chunk.length}장)`,
+      });
+    }
+    return sprints;
+  }
+
   return {
     formatRetentionBadge,
     formatLeechBadge,
@@ -1701,6 +1951,12 @@
     resolveAllowedRatings,
     deduplicateSessionSiblings,
     createStandaloneEngine,
+    quantize1e6,
+    foldReviewEvents,
+    buildSummarySheetView,
+    buildPrintableExamSheet,
+    buildCommuteAudioScript,
+    chunkMicroSprints,
   };
 });
 
