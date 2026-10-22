@@ -677,18 +677,27 @@
       delete state.sessionWrongCardMap[cid];
     }
 
-    const res = await apiPost("/api/review", { card_id: card.card_id, rating: safeRating });
+    const res = state.isCramSandbox
+      ? { ok: true, standalone: true, card_id: card.card_id, rating: safeRating, scheduled_label: "CRAM 무오염 (FSRS 유지)", memory: { stability: card.stability } }
+      : await apiPost("/api/review", { card_id: card.card_id, rating: safeRating });
     if (res && res.ok) {
-      const stab = (res.memory && res.memory.stability) ?? res.stability ?? 0;
-      const nextLbl = res.scheduled_label || `${Number(res.scheduled_days || 0).toFixed(1)}d`;
+      const stab = (res.memory && res.memory.stability) ?? res.stability ?? card.stability ?? 0;
+      const nextLbl = state.isCramSandbox
+        ? "🧪 CRAM 샌드박스 (장기기억 S 보존)"
+        : res.scheduled_label || `${Number(res.scheduled_days || 0).toFixed(1)}d`;
       showUxToast(
-        `✅ 평가 반영 완료 (S: ${Number(stab).toFixed(1)}d · 다음 복습 +${nextLbl})`,
+        `✅ 평가 반영 완료 (S: ${Number(stab).toFixed(1)}d · ${nextLbl})`,
         "emerald",
-        "↩️ 방금 평가 취소 (Z)",
-        () => undoLastReview()
+        state.isCramSandbox ? "" : "↩️ 방금 평가 취소 (Z)",
+        state.isCramSandbox ? null : () => undoLastReview()
       );
     }
-    await refreshDashboardAndQueue();
+    if (state.isCramSandbox) {
+      state.currentIndex = (state.currentIndex + 1) % Math.max(1, state.dueCards.length);
+      renderCurrentCard();
+    } else {
+      await refreshDashboardAndQueue();
+    }
   }
 
   async function requestInteractiveQuiz(forcedSubmode = "") {
@@ -2136,6 +2145,162 @@
     if (syncBtn) {
       syncBtn.addEventListener("click", () => syncOfflineVault(true));
     }
+
+    // v5.6 REA Utilities Binding
+    let summaryMaskAll = true;
+    function renderSummarySheetPanel() {
+      const panel = el("summary-sheet-panel");
+      const rowsBox = el("summary-sheet-rows");
+      if (!panel || !rowsBox) return;
+      const cards = state.dueCards.length > 0 ? state.dueCards : state.rawDueCards;
+      const sheet =
+        vm && typeof vm.buildSummarySheetView === "function"
+          ? vm.buildSummarySheetView(cards, summaryMaskAll ? "red_filter" : "reveal_all")
+          : { rows: [] };
+      rowsBox.textContent = "";
+      sheet.rows.forEach((r) => {
+        const rowEl = document.createElement("div");
+        rowEl.style.cssText =
+          "display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:0.83rem;";
+        const qSpan = document.createElement("div");
+        qSpan.style.cssText = "flex:1;font-weight:700;color:#191f28;";
+        qSpan.textContent = `${r.index}. ${r.question}`;
+        const aBtn = document.createElement("button");
+        aBtn.type = "button";
+        let masked = summaryMaskAll;
+        function syncMaskStyle() {
+          if (masked) {
+            aBtn.style.cssText =
+              "padding:5px 12px;border-radius:8px;background:#be123c;color:#be123c;border:1px solid #be123c;font-weight:800;min-width:95px;user-select:none;";
+            aBtn.title = "탭하여 셀로판지 걷어내기";
+          } else {
+            aBtn.style.cssText =
+              "padding:5px 12px;border-radius:8px;background:#fff0f0;color:#be123c;border:1px solid #fecdd3;font-weight:800;min-width:95px;";
+          }
+          aBtn.textContent = r.clean_answer;
+        }
+        syncMaskStyle();
+        aBtn.addEventListener("click", () => {
+          masked = !masked;
+          syncMaskStyle();
+        });
+        rowEl.appendChild(qSpan);
+        rowEl.appendChild(aBtn);
+        rowsBox.appendChild(rowEl);
+      });
+    }
+
+    const btnOpenSummary = el("btn-open-summary-sheet");
+    if (btnOpenSummary) {
+      btnOpenSummary.addEventListener("click", () => {
+        const panel = el("summary-sheet-panel");
+        if (!panel) return;
+        const willShow = panel.style.display === "none";
+        panel.style.display = willShow ? "block" : "none";
+        if (willShow) renderSummarySheetPanel();
+      });
+    }
+    const btnSummaryToggleAll = el("btn-summary-toggle-all");
+    if (btnSummaryToggleAll) {
+      btnSummaryToggleAll.addEventListener("click", () => {
+        summaryMaskAll = !summaryMaskAll;
+        renderSummarySheetPanel();
+      });
+    }
+    const btnSummaryClose = el("btn-summary-close");
+    if (btnSummaryClose) {
+      btnSummaryClose.addEventListener("click", () => {
+        const panel = el("summary-sheet-panel");
+        if (panel) panel.style.display = "none";
+      });
+    }
+
+    const btnPrintExam = el("btn-print-exam-sheet");
+    if (btnPrintExam) {
+      btnPrintExam.addEventListener("click", () => {
+        const cards = state.dueCards.length > 0 ? state.dueCards : state.rawDueCards;
+        if (!cards.length) {
+          showUxToast("⚠️ 인쇄할 카드가 없습니다.", "amber");
+          return;
+        }
+        const doc =
+          vm && typeof vm.buildPrintableExamSheet === "function"
+            ? vm.buildPrintableExamSheet(cards, "BrainDeck 2단 실전 쪽지시험지", Date.now() % 100000)
+            : null;
+        if (doc && doc.printable_html) {
+          const w = window.open("", "_blank");
+          if (w) {
+            w.document.open();
+            w.document.write(doc.printable_html);
+            w.document.close();
+          } else {
+            showUxToast("🖨️ 팝업 차단됨 — 브라우저 팝업을 허용해 주세요.", "amber");
+          }
+        }
+      });
+    }
+
+    let audioLoopTimer = null;
+    const btnAudioLoop = el("btn-commute-audio-loop");
+    if (btnAudioLoop) {
+      btnAudioLoop.addEventListener("click", () => {
+        if (audioLoopTimer) {
+          clearTimeout(audioLoopTimer);
+          audioLoopTimer = null;
+          if (window.speechSynthesis) window.speechSynthesis.cancel();
+          btnAudioLoop.textContent = "🎧 통학 오디오 루프";
+          btnAudioLoop.classList.remove("btn-primary");
+          showUxToast("⏹️ 통학 오디오 루프를 종료했습니다.", "accent");
+          return;
+        }
+        const cards = state.dueCards.length > 0 ? state.dueCards : state.rawDueCards;
+        if (!cards.length) return;
+        const script =
+          vm && typeof vm.buildCommuteAudioScript === "function"
+            ? vm.buildCommuteAudioScript(cards, 3)
+            : { tracks: [] };
+        let tIdx = 0;
+        btnAudioLoop.textContent = "⏹️ 오디오 루프 중지";
+        btnAudioLoop.classList.add("btn-primary");
+        showUxToast("🎧 통학 오디오 루프 시작 (질문 ➔ 3초 생각 ➔ 정답)", "emerald");
+
+        function playNextTrack() {
+          if (!audioLoopTimer && tIdx > 0) return;
+          const tr = script.tracks[tIdx % script.tracks.length];
+          tIdx += 1;
+          if (window.speechSynthesis && typeof SpeechSynthesisUtterance !== "undefined") {
+            const uQ = new SpeechSynthesisUtterance(tr.prompt_tts);
+            uQ.lang = "ko-KR";
+            window.speechSynthesis.speak(uQ);
+            audioLoopTimer = setTimeout(() => {
+              const uA = new SpeechSynthesisUtterance(`정답은 ${tr.answer_tts}`);
+              uA.lang = "ko-KR";
+              window.speechSynthesis.speak(uA);
+              audioLoopTimer = setTimeout(playNextTrack, 3200);
+            }, (tr.pause_seconds || 3) * 1000 + 2200);
+          }
+        }
+        audioLoopTimer = setTimeout(playNextTrack, 100);
+      });
+    }
+
+    const btnCramSandbox = el("btn-toggle-cram-sandbox");
+    if (btnCramSandbox) {
+      btnCramSandbox.addEventListener("click", () => {
+        state.isCramSandbox = !state.isCramSandbox;
+        btnCramSandbox.textContent = state.isCramSandbox
+          ? "🧪 무오염 벼락치기(CRAM): ON"
+          : "🧪 무오염 벼락치기(CRAM): OFF";
+        if (state.isCramSandbox) {
+          btnCramSandbox.classList.add("btn-primary");
+          showUxToast("🧪 무오염 벼락치기 ON: 아무리 많이 반복해도 FSRS 장기기억 간격(S)이 오염되지 않습니다.", "emerald");
+        } else {
+          btnCramSandbox.classList.remove("btn-primary");
+          showUxToast("📚 정규 FSRS 학습 모드로 복귀했습니다.", "accent");
+        }
+      });
+    }
+
     loadBrainPackStoreAndBind();
     loadCatalogAndBind();
     refreshDashboardAndQueue();
