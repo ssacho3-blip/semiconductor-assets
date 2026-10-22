@@ -33,6 +33,7 @@
       dontKnow: false,
     },
     studyFilterMode: "all", // "all" | "wrong_only" | "marked_only"
+    questionTypeFilter: "all", // "all" | "vocab" | "grammar" | "hanja" | "history_sci"
     shuffleMode: "interleaved", // "interleaved" | "sequential"
     sessionWrongCardIds: [],
     sessionWrongCardMap: {},
@@ -281,30 +282,32 @@
     }
     if (path.startsWith("/api/quiz/interactive-options")) {
       const card = currentCard();
+      const fullPool =
+        Array.isArray(state.rawDueCards) && state.rawDueCards.length > 0
+          ? state.rawDueCards
+          : state.dueCards || [];
+      if (vm && typeof vm.buildTypeMatchedQuizOptions === "function") {
+        const matched = vm.buildTypeMatchedQuizOptions(card, fullPool, 4);
+        return {
+          ok: true,
+          standalone: true,
+          mode: "multiple_choice",
+          question_type: matched.question_type,
+          question_facet: matched.question_facet,
+          question_facet_label: matched.question_facet,
+          target_answer: matched.target_answer,
+          options: matched.options,
+          tap_blocks: matched.tap_blocks,
+        };
+      }
       const target = (card && (card.target_answer || card.rendered_answer)) || "정답";
-      const poolAnswers = (state.dueCards || [])
-        .map((c) => String(c.target_answer || c.rendered_answer || "").trim())
-        .filter((a) => a && a !== target);
-      const fallbackDistractors = ["소개하다", "함무라비 법전", "공유 결합", "배울 학", "강화도 조약", "의무적인"].filter(
-        (d) => d !== target
-      );
-      const distractors = [];
-      poolAnswers.concat(fallbackDistractors).forEach((cand) => {
-        if (distractors.length < 3 && !distractors.includes(cand)) {
-          distractors.push(cand);
-        }
-      });
-      const options = [target].concat(distractors);
-      // Deterministic rotation based on card_id so target isn't always #1
-      const shift = Number((card && card.card_id) || 1) % options.length;
-      const rotated = options.slice(shift).concat(options.slice(0, shift));
       return {
         ok: true,
         standalone: true,
         mode: "multiple_choice",
-        question_facet: "핵심 개념 인출",
+        question_facet: "📘 단어 뜻·어휘",
         target_answer: target,
-        options: rotated,
+        options: [target, "소개하다", "가장 좋아하는", "전통적인"].slice(0, 4),
         tap_blocks: String(target).split(/\s+/).filter(Boolean),
       };
     }
@@ -405,6 +408,25 @@
     } else {
       candidateQueue = activeRaw;
     }
+
+    if (vm && typeof vm.computeQuestionTypeCounts === "function") {
+      const tCounts = vm.computeQuestionTypeCounts(candidateQueue);
+      const bAll = el("btn-qtype-all");
+      const bVocab = el("btn-qtype-vocab");
+      const bGram = el("btn-qtype-grammar");
+      const bHanja = el("btn-qtype-hanja");
+      const bHist = el("btn-qtype-history_sci");
+      if (bAll) bAll.textContent = `🗂️ 전체 유형 (${tCounts.all})`;
+      if (bVocab) bVocab.textContent = `📘 단어·어휘만 (${tCounts.vocab})`;
+      if (bGram) bGram.textContent = `📐 문법·구문만 (${tCounts.grammar})`;
+      if (bHanja) bHanja.textContent = `漢字 한자·성어만 (${tCounts.hanja})`;
+      if (bHist) bHist.textContent = `🏛️ 역사·과학·전공 (${tCounts.history_sci})`;
+    }
+
+    if (vm && typeof vm.filterStudyQueueByQuestionType === "function" && state.questionTypeFilter !== "all") {
+      candidateQueue = vm.filterStudyQueueByQuestionType(candidateQueue, state.questionTypeFilter);
+    }
+
     if (vm && typeof vm.interleaveAndShuffleStudyQueue === "function" && state.shuffleMode !== "sequential") {
       state.dueCards = vm.interleaveAndShuffleStudyQueue(candidateQueue, state.shuffleMode);
     } else {
@@ -513,6 +535,14 @@
       btnMark.style.color = isMarked ? "var(--amber)" : "var(--muted)";
     }
 
+    const qTypeObj =
+      vm && typeof vm.classifyCardQuestionType === "function"
+        ? vm.classifyCardQuestionType(card)
+        : { badge_label: card.note_type === "cloze" ? "📘 빈칸 추론" : "📘 핵심 인출", short_label: "개념" };
+    const qtypeBadgeEl = el("card-qtype-badge");
+    if (qtypeBadgeEl) {
+      qtypeBadgeEl.textContent = qTypeObj.badge_label;
+    }
     const typeLabel = card.note_type === "cloze" ? "빈칸 추론" : "핵심 인출";
     el("card-meta").textContent = `${card.deck_name} · #${state.currentIndex + 1}/${state.dueCards.length} · ${typeLabel}`;
     const rPct = ((Number(card.retrievability) || 1) * 100).toFixed(1);
@@ -720,9 +750,10 @@
 
     const header = document.createElement("div");
     header.style.cssText = "font-weight:700;color:var(--accent);";
+    const facetBadge = res.question_facet_label || (res.question_type && res.question_type.badge_label) || res.question_facet || "동종 유형 보기";
     header.textContent =
       activeSubmode === "multiple_choice"
-        ? `🎯 [1단계: 4지선다 객관식 · ${res.question_facet}] 알맞은 정답 보기를 선택하세요:`
+        ? `🎯 [1단계: 4지선다 객관식 · ${facetBadge} 전용 보기] 알맞은 정답을 선택하세요:`
         : `🧩 [2단계: 순서 배열 탭 블록 조립] 아래 구문 조각을 순서대로 눌러 정답을 완성하세요:`;
     topBar.appendChild(header);
 
@@ -1075,6 +1106,34 @@
     document.querySelectorAll(".study-filter-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         setStudyFilterMode(btn.getAttribute("data-filter") || "all");
+      });
+    });
+
+    // Gate T43: Question-Type Filter Buttons (All / Vocab / Grammar / Hanja / History-Sci)
+    function setQuestionTypeFilter(qtype) {
+      state.questionTypeFilter = qtype || "all";
+      document.querySelectorAll(".study-qtype-btn").forEach((b) => {
+        if (b.getAttribute("data-qtype") === state.questionTypeFilter) {
+          b.classList.add("btn-primary");
+        } else {
+          b.classList.remove("btn-primary");
+        }
+      });
+      applyStudyFilter();
+      renderCurrentCard();
+    }
+    document.querySelectorAll(".study-qtype-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const qtype = btn.getAttribute("data-qtype") || "all";
+        setQuestionTypeFilter(qtype);
+        const labelMap = {
+          all: "🗂️ 전체 유형 통합 출제 모드 (4지선다 보기는 각 문제 유형별로 자동 분리됩니다)",
+          vocab: "📘 단어·어휘 문제만 모아 풀기 모드",
+          grammar: "📐 문법·어법 문제만 모아 풀기 모드",
+          hanja: "漢字 한자·사자성어 문제만 모아 풀기 모드",
+          history_sci: "🏛️ 역사·과학·전공 개념 문제만 모아 풀기 모드",
+        };
+        showUxToast(labelMap[qtype] || labelMap.all, "accent");
       });
     });
 
