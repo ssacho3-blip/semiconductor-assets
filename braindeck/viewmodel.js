@@ -1076,12 +1076,14 @@
         { id: "m1_u1_2", unit_id: "kr.mid1.eng.donga_yoon.2022:U01", term: "favorite", answer: "가장 좋아하는", pos: "형용사", sentence: "My {{c1::favorite::가장 좋아하는}} subject is PE.", explain: "favorite subject (가장 좋아하는 과목)" },
         { id: "m1_u1_3", unit_id: "kr.mid1.eng.donga_yoon.2022:U01", term: "instrument", answer: "악기", pos: "명사", sentence: "Do you play any musical {{c1::instrument::악기}}?", explain: "musical instrument (악기)" },
         { id: "m1_u1_4", unit_id: "kr.mid1.eng.donga_yoon.2022:U01", term: "together", answer: "함께", pos: "부사", sentence: "We eat lunch {{c1::together::함께}} every day.", explain: "do ~ together (함께 ~하다)" },
-        { id: "m1_u1_5", unit_id: "kr.mid1.eng.donga_yoon.2022:U01", term: "be good at ~", answer: "~을 잘하다", pos: "숙어", sentence: "She {{c1::is good at::~을 잘하다}} playing basketball.", explain: "전치사 at 뒤에는 명사/동명사(-ing)가 옵니다." },
-        { id: "m1_u2_1", unit_id: "kr.mid1.eng.donga_yoon.2022:U02", term: "delicious", answer: "맛있는", pos: "형용사", sentence: "This traditional soup smells really {{c1::delicious::맛있는}}.", explain: "감각동사 smell + 형용사 보어" },
-        { id: "m1_u2_2", unit_id: "kr.mid1.eng.donga_yoon.2022:U02", term: "popular", answer: "인기 있는", pos: "형용사", sentence: "K-pop is very {{c1::popular::인기 있는}} around the world.", explain: "be popular with (~에게 인기가 있다)" },
-        { id: "m1_u2_3", unit_id: "kr.mid1.eng.donga_yoon.2022:U02", term: "traditional", answer: "전통적인", pos: "형용사", sentence: "Hanbok is Korean {{c1::traditional::전통적인}} clothing.", explain: "tradition(전통) + -al(형용사 접미사)" },
-        { id: "m1_u3_1", unit_id: "kr.mid1.eng.donga_yoon.2022:U03", term: "volunteer", answer: "자원봉사하다", pos: "동사", sentence: "We {{c1::volunteer::자원봉사하다}} at the animal shelter.", explain: "자원봉사자(명사) / 자원봉사하다(동사)" },
-        { id: "m1_u4_1", unit_id: "kr.mid1.eng.donga_yoon.2022:U04", term: "ancient", answer: "고대의", pos: "형용사", sentence: "They visited an {{c1::ancient::고대의}} palace in Rome.", explain: "반의어: modern (현대의)" },
+        { id: "m1_u1_5", unit_id: "kr.mid1.eng.donga_yoon.2022:U01", term: "be good at ~", answer: "~을 잘하다", pos: "숙어", role: "core_vocab", sentence: "She {{c1::is good at::~을 잘하다}} playing basketball.", explain: "전치사 at 뒤에는 명사/동명사(-ing)가 옵니다." },
+        { id: "m1_u1_g1", unit_id: "kr.mid1.eng.donga_yoon.2022:U01", term: "[Lesson 1 핵심문법] 3인칭 단수 일반동사 부정문", answer: "doesn't (does not) + 동사원형", prompt: "[Lesson 1 핵심문법] 주어가 3인칭 단수(he/she/it)일 때 일반동사 현재형 부정문의 올바른 형태는?", role: "key_grammar", sentence: "He {{c1::doesn't play::3인칭 단수 부정문}} computer games on weekdays.", explain: "주어가 3인칭 단수일 때 doesn't 뒤에는 반드시 동사원형을 씁니다." },
+        { id: "m1_u2_1", unit_id: "kr.mid1.eng.donga_yoon.2022:U02", term: "delicious", answer: "맛있는", pos: "형용사", role: "core_vocab", sentence: "This traditional soup smells really {{c1::delicious::맛있는}}.", explain: "감각동사 smell + 형용사 보어" },
+        { id: "m1_u2_2", unit_id: "kr.mid1.eng.donga_yoon.2022:U02", term: "popular", answer: "인기 있는", pos: "형용사", role: "core_vocab", sentence: "K-pop is very {{c1::popular::인기 있는}} around the world.", explain: "be popular with (~에게 인기가 있다)" },
+        { id: "m1_u2_3", unit_id: "kr.mid1.eng.donga_yoon.2022:U02", term: "traditional", answer: "전통적인", pos: "형용사", role: "core_vocab", sentence: "Hanbok is Korean {{c1::traditional::전통적인}} clothing.", explain: "tradition(전통) + -al(형용사 접미사)" },
+        { id: "m1_u2_g1", unit_id: "kr.mid1.eng.donga_yoon.2022:U02", term: "[Lesson 2 핵심문법] 현재진행형 어순", answer: "am / are / is + 동사원형-ing", prompt: "[Lesson 2 핵심문법] '지금 ~하고 있는 중이다'를 나타내는 현재진행형의 올바른 문법 형태는?", role: "key_grammar", sentence: "They {{c1::are making::현재진행형}} songpyeon together now.", explain: "be동사(am/are/is) + 동사원형-ing" },
+        { id: "m1_u3_1", unit_id: "kr.mid1.eng.donga_yoon.2022:U03", term: "volunteer", answer: "자원봉사하다", pos: "동사", role: "core_vocab", sentence: "We {{c1::volunteer::자원봉사하다}} at the animal shelter.", explain: "자원봉사자(명사) / 자원봉사하다(동사)" },
+        { id: "m1_u4_1", unit_id: "kr.mid1.eng.donga_yoon.2022:U04", term: "ancient", answer: "고대의", pos: "형용사", role: "core_vocab", sentence: "They visited an {{c1::ancient::고대의}} palace in Rome.", explain: "반의어: modern (현대의)" },
       ],
     },
     {
@@ -1090,14 +1092,15 @@
       subject_code: "eng",
       unlocked: true,
       units: [
-        { unit_id: "kr.mid2.eng.donga_yoon.2022:U01", unit_code: "Lesson 1", unit_title: "Express Yourself", page_start: 10, page_end: 29, entry_count: 4 },
+        { unit_id: "kr.mid2.eng.donga_yoon.2022:U01", unit_code: "Lesson 1", unit_title: "Express Yourself", page_start: 10, page_end: 29, entry_count: 5 },
         { unit_id: "kr.mid2.eng.donga_yoon.2022:U02", unit_code: "Lesson 2", unit_title: "Eat Right, Be Happy", page_start: 30, page_end: 49, entry_count: 4 },
       ],
       entries: [
-        { id: "m2_u1_1", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "communicate", answer: "의사소통하다", pos: "동사", sentence: "We {{c1::communicate::의사소통하다}} with friends through emojis.", explain: "communicate with (~와 소통하다)" },
-        { id: "m2_u1_2", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "experience", answer: "경험하다", pos: "동사", sentence: "Traveling helps you {{c1::experience::경험하다}} new cultures.", explain: "경험(명사) / 경험하다(동사)" },
-        { id: "m2_u2_1", unit_id: "kr.mid2.eng.donga_yoon.2022:U02", term: "balanced", answer: "균형 잡힌", pos: "형용사", sentence: "Eating a {{c1::balanced::균형 잡힌}} diet is important for health.", explain: "a balanced diet (균형 잡힌 식단)" },
-        { id: "m2_u2_2", unit_id: "kr.mid2.eng.donga_yoon.2022:U02", term: "nutrient", answer: "영양소", pos: "명사", sentence: "Vegetables contain essential {{c1::nutrients::영양소}}.", explain: "nutrition(영양) / nutrient(영양소)" },
+        { id: "m2_u1_1", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "communicate", answer: "의사소통하다", pos: "동사", role: "core_vocab", sentence: "We {{c1::communicate::의사소통하다}} with friends through emojis.", explain: "communicate with (~와 소통하다)" },
+        { id: "m2_u1_2", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "experience", answer: "경험하다", pos: "동사", role: "core_vocab", sentence: "Traveling helps you {{c1::experience::경험하다}} new cultures.", explain: "경험(명사) / 경험하다(동사)" },
+        { id: "m2_u1_g1", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "[Lesson 1 핵심문법] 감각동사 + 형용사", answer: "감각동사(look/sound/smell/taste/feel) + 형용사 보어", prompt: "[Lesson 1 핵심문법] 감각동사(look, sound, smell, taste, feel) 뒤에 보어로 반드시 와야 하는 품사는?", role: "key_grammar", sentence: "That idea sounds {{c1::great::감각동사+형용사}}! (부사 greatly 불가)", explain: "감각동사 뒤에는 부사(-ly)가 아니라 형용사 보어가 옵니다." },
+        { id: "m2_u2_1", unit_id: "kr.mid2.eng.donga_yoon.2022:U02", term: "balanced", answer: "균형 잡힌", pos: "형용사", role: "core_vocab", sentence: "Eating a {{c1::balanced::균형 잡힌}} diet is important for health.", explain: "a balanced diet (균형 잡힌 식단)" },
+        { id: "m2_u2_2", unit_id: "kr.mid2.eng.donga_yoon.2022:U02", term: "nutrient", answer: "영양소", pos: "명사", role: "core_vocab", sentence: "Vegetables contain essential {{c1::nutrients::영양소}}.", explain: "nutrition(영양) / nutrient(영양소)" },
       ],
     },
     {
@@ -1272,24 +1275,26 @@
   function expandStandaloneItemByDifficulty(item, sourceTag, difficultyLevel) {
     const diff = String(difficultyLevel || "standard").toLowerCase();
     const conceptTag = `concept:${item.id}`;
-    const baseTags = [sourceTag, conceptTag];
+    const roleTag = `role:${item.role || "core_vocab"}`;
+    const baseTags = [sourceTag, conceptTag, roleTag];
     const explainSuffix = item.explain ? `\n\n💡 해설: ${item.explain}` : "";
+    const isGrammar = item.role === "key_grammar";
 
     const lv1Front = item.prompt
-      ? `🌱 [Lv.1 핵심 개념] ${item.prompt}`
+      ? `${isGrammar ? "📐 [핵심 문법]" : "🌱 [Lv.1 핵심 개념]"} ${item.prompt}`
       : `🌱 [Lv.1 기초 인지] '${item.term}'의 뜻·의미는 무엇인가요?`;
     const lv1Back = `${item.answer}${explainSuffix}`;
 
     const lv2Front = item.sentence
-      ? `📘 [Lv.2 문맥 빈칸] ${item.sentence}`
+      ? `${isGrammar ? "📐 [문법 문맥 빈칸]" : "📘 [Lv.2 문맥 빈칸]"} ${item.sentence}`
       : `📘 [Lv.2 핵심 빈칸] ${item.prompt || item.term} ➔ {{c1::${item.answer}}}`;
-    const lv2Back = `${item.term} — ${item.answer}${explainSuffix}`;
+    const lv2Back = isGrammar ? `${item.answer}${explainSuffix}` : `${item.term} — ${item.answer}${explainSuffix}`;
 
-    const isFactPrompt = Boolean(item.prompt && item.term === item.answer);
+    const isFactPrompt = Boolean(item.prompt && (item.term === item.answer || isGrammar));
     const lv3Front = isFactPrompt
-      ? `🔥 [Lv.3 심화 서술 인출] ${item.prompt}`
+      ? `${isGrammar ? "📐 [심화 문법 인출]" : "🔥 [Lv.3 심화 서술 인출]"} ${item.prompt}`
       : `🔥 [Lv.3 역방향 능동 산출] 뜻·정의가 '${item.answer}'에 해당하는 정확한 용어/표현을 쓰시오.`;
-    const lv3Back = `${item.term}${explainSuffix}`;
+    const lv3Back = isFactPrompt ? `${item.answer}${explainSuffix}` : `${item.term}${explainSuffix}`;
 
     const cLv1 = {
       front_text: lv1Front,
@@ -1919,6 +1924,267 @@
     return sprints;
   }
 
+  // =========================================================================
+  // Gate T43: Type-Homogeneous 4-Choice Distractor Isolation & Question-Type Filter
+  // =========================================================================
+  const TYPE_FALLBACK_DISTRACTOR_BANK = {
+    eng_vocab_meaning: [
+      "소개하다",
+      "가장 좋아하는",
+      "악기",
+      "함께",
+      "맛있는",
+      "전통적인",
+      "자원봉사하다",
+      "의무적인",
+      "준수하다",
+      "경험하다",
+    ],
+    eng_vocab_word: [
+      "introduce",
+      "favorite",
+      "instrument",
+      "together",
+      "delicious",
+      "traditional",
+      "volunteer",
+      "mandatory",
+      "comply",
+      "communicate",
+    ],
+    eng_grammar: [
+      "doesn't (does not) + 동사원형",
+      "am / are / is + 동사원형-ing (현재진행형)",
+      "감각동사(look/sound/smell/taste/feel) + 형용사 보어",
+      "have / has + 과거분사(p.p.) (현재완료)",
+      "조동사(will/can/must) + 동사원형",
+      "전치사(at/in/of) + 동명사(-ing)",
+      "주격 관계대명사 who / which / that + 불완전 절",
+    ],
+    hanja_hun_eum: [
+      "배울 학",
+      "학교 교",
+      "날 생",
+      "나라 국",
+      "백성 민",
+      "가르칠 교",
+      "집 가",
+      "마음 심",
+      "이룰 성",
+      "믿을 신",
+    ],
+    hanja_char: ["學", "校", "生", "國", "民", "敎", "家", "心", "成", "信"],
+    idiom: ["대기만성 (大器晩成)", "역지사지 (易地思之)", "유비무환 (有備無患)", "일석이조 (一石二鳥)", "우공이산 (愚公移山)"],
+    history: ["강화도 조약", "함무라비 법전", "훈민정음", "경국대전", "갑신정변", "동학 농민 운동", "독립협회", "3·1 운동"],
+    science: ["공유 결합", "이온 결합", "활성화 에너지", "미토콘드리아", "옴의 법칙 (V = IR)", "원자성·일관성·격리성·지속성"],
+    ko_dictation: ["맑고 따뜻합니다", "할머니께 썼습니다", "조용히 읽어요", "깨끗이 씻어요", "같이 걸어요"],
+  };
+
+  function classifyCardQuestionType(card) {
+    const c = card || {};
+    const front = String(c.front_text || c.rendered_question || "").trim();
+    const back = String(c.back_text || c.rendered_answer || "").trim();
+    const ext = extractTargetAndExplanation(front, back, c.target_answer, c.extra_explanation);
+    const target = String(ext.targetAnswer || back).trim();
+    const rawTags = c.tags || [];
+    const tagStr = (Array.isArray(rawTags) ? rawTags.join(" ") : String(rawTags)).toLowerCase();
+
+    const hasCjk = /[\u4e00-\u9fff]/.test(front + " " + target);
+    const isAsciiTarget = Boolean(target) && /^[A-Za-z\s~'.,?!-]+$/.test(target) && /[A-Za-z]/.test(target);
+
+    if (
+      tagStr.includes("role:key_grammar") ||
+      tagStr.includes("grammar") ||
+      front.includes("핵심문법") ||
+      front.includes("[문법") ||
+      front.includes("핵심 문법") ||
+      front.includes("문법 빈칸") ||
+      front.includes("어법") ||
+      target.includes("동사원형") ||
+      target.includes("과거분사") ||
+      target.includes("현재분사") ||
+      target.includes("형용사 보어") ||
+      target.includes("관계대명사") ||
+      target.includes("현재진행형")
+    ) {
+      return {
+        category_key: "grammar",
+        facet_key: "eng_grammar",
+        badge_label: "📐 영문법·어법",
+        short_label: "문법",
+      };
+    }
+
+    if (tagStr.includes("idiom") || front.includes("사자성어") || front.includes("고사성어")) {
+      return {
+        category_key: "hanja",
+        facet_key: "idiom",
+        badge_label: "📜 사자성어",
+        short_label: "한자·성어",
+      };
+    }
+
+    if (tagStr.includes("hanja") || front.includes("[한자") || hasCjk) {
+      if (target.length <= 2 && /[\u4e00-\u9fff]/.test(target)) {
+        return {
+          category_key: "hanja",
+          facet_key: "hanja_char",
+          badge_label: "漢字 한자 자형",
+          short_label: "한자·성어",
+        };
+      }
+      return {
+        category_key: "hanja",
+        facet_key: "hanja_hun_eum",
+        badge_label: "漢字 한자 훈음",
+        short_label: "한자·성어",
+      };
+    }
+
+    if (tagStr.includes("dictation") || front.includes("받아쓰기") || front.includes("맞춤법")) {
+      return {
+        category_key: "vocab",
+        facet_key: "ko_dictation",
+        badge_label: "✏️ 맞춤법·받아쓰기",
+        short_label: "단어·어휘",
+      };
+    }
+
+    if (
+      tagStr.includes("hist") ||
+      tagStr.includes("khist") ||
+      front.includes("한국사") ||
+      front.includes("세계사") ||
+      front.includes("조약") ||
+      front.includes("법전") ||
+      front.includes("왕조")
+    ) {
+      return {
+        category_key: "history_sci",
+        facet_key: "history",
+        badge_label: "🏛️ 역사 개념",
+        short_label: "역사·과학·전공",
+      };
+    }
+
+    if (
+      tagStr.includes("sci") ||
+      tagStr.includes("law") ||
+      tagStr.includes("cert-it") ||
+      front.includes("결합") ||
+      front.includes("에너지") ||
+      front.includes("트랜잭션") ||
+      front.includes("헌법") ||
+      front.includes("법칙")
+    ) {
+      return {
+        category_key: "history_sci",
+        facet_key: "science",
+        badge_label: "🔬 과학·전공 개념",
+        short_label: "역사·과학·전공",
+      };
+    }
+
+    if (isAsciiTarget) {
+      return {
+        category_key: "vocab",
+        facet_key: "eng_vocab_word",
+        badge_label: "🔤 영단어 스펠링·빈칸",
+        short_label: "단어·어휘",
+      };
+    }
+
+    return {
+      category_key: "vocab",
+      facet_key: "eng_vocab_meaning",
+      badge_label: "📘 단어 뜻·어휘",
+      short_label: "단어·어휘",
+    };
+  }
+
+  function filterStudyQueueByQuestionType(cards, categoryKey = "all") {
+    const list = Array.isArray(cards) ? cards : [];
+    const key = String(categoryKey || "all").trim().toLowerCase();
+    if (!key || key === "all") return list.slice();
+    return list.filter((c) => {
+      const qtype = classifyCardQuestionType(c);
+      return qtype.category_key === key || qtype.facet_key === key;
+    });
+  }
+
+  function computeQuestionTypeCounts(cards) {
+    const list = Array.isArray(cards) ? cards : [];
+    const counts = {
+      all: list.length,
+      vocab: 0,
+      grammar: 0,
+      hanja: 0,
+      history_sci: 0,
+    };
+    list.forEach((c) => {
+      const cat = classifyCardQuestionType(c).category_key;
+      if (Object.prototype.hasOwnProperty.call(counts, cat)) {
+        counts[cat] += 1;
+      }
+    });
+    return counts;
+  }
+
+  function buildTypeMatchedQuizOptions(card, deckCards, requiredOptions = 4) {
+    const c = card || {};
+    const qtype = classifyCardQuestionType(c);
+    const facetKey = qtype.facet_key;
+    const front = String(c.front_text || c.rendered_question || "").trim();
+    const back = String(c.back_text || c.rendered_answer || "").trim();
+    const ext = extractTargetAndExplanation(front, back, c.target_answer, c.extra_explanation);
+    const targetAnswer = String(ext.targetAnswer || back || "정답").trim();
+
+    const cid = Number(c.card_id || 0);
+    const distractors = [];
+    const seenNorm = new Set([targetAnswer.toLowerCase()]);
+
+    const pool = Array.isArray(deckCards) ? deckCards : [];
+    for (let i = 0; i < pool.length; i += 1) {
+      const other = pool[i] || {};
+      if (Number(other.card_id || -1) === cid && cid !== 0) continue;
+      const otherQtype = classifyCardQuestionType(other);
+      if (otherQtype.facet_key !== facetKey) continue;
+      const oFront = String(other.front_text || other.rendered_question || "").trim();
+      const oBack = String(other.back_text || other.rendered_answer || "").trim();
+      const oExt = extractTargetAndExplanation(oFront, oBack, other.target_answer, other.extra_explanation);
+      const cand = String(oExt.targetAnswer || oBack).trim();
+      if (!cand) continue;
+      const norm = cand.toLowerCase();
+      if (seenNorm.has(norm)) continue;
+      seenNorm.add(norm);
+      distractors.push(cand);
+      if (distractors.length >= requiredOptions - 1) break;
+    }
+
+    const fallbackPool = TYPE_FALLBACK_DISTRACTOR_BANK[facetKey] || TYPE_FALLBACK_DISTRACTOR_BANK.eng_vocab_meaning;
+    for (let i = 0; i < fallbackPool.length; i += 1) {
+      if (distractors.length >= requiredOptions - 1) break;
+      const cand = fallbackPool[i];
+      const norm = cand.toLowerCase();
+      if (seenNorm.has(norm)) continue;
+      seenNorm.add(norm);
+      distractors.push(cand);
+    }
+
+    const rawOptions = [targetAnswer].concat(distractors.slice(0, Math.max(0, requiredOptions - 1)));
+    const shift = Math.abs(cid || 1) % Math.max(1, rawOptions.length);
+    const rotated = rawOptions.slice(shift).concat(rawOptions.slice(0, shift));
+
+    return {
+      ok: true,
+      question_type: qtype,
+      question_facet: qtype.badge_label,
+      target_answer: targetAnswer,
+      options: rotated,
+      tap_blocks: targetAnswer.split(/\s+/).filter(Boolean),
+    };
+  }
+
   return {
     formatRetentionBadge,
     formatLeechBadge,
@@ -1957,6 +2223,10 @@
     buildPrintableExamSheet,
     buildCommuteAudioScript,
     chunkMicroSprints,
+    classifyCardQuestionType,
+    filterStudyQueueByQuestionType,
+    computeQuestionTypeCounts,
+    buildTypeMatchedQuizOptions,
   };
 });
 
