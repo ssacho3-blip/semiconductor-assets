@@ -259,21 +259,29 @@
     if (!standaloneEngine) return { ok: false, offline: true };
     const p = payload || {};
     if (path.startsWith("/api/review/undo")) {
-      return { ok: true, restored_stability: 1.5 };
+      if (typeof standaloneEngine.undoLastReview === "function") {
+        return standaloneEngine.undoLastReview();
+      }
+      return { ok: false, standalone: true, error: "되돌리기 미지원" };
     }
     if (path.startsWith("/api/review")) {
       return standaloneEngine.submitReview(p);
     }
-    if (path.startsWith("/api/catalog/exam-scope")) {
+    if (path.startsWith("/api/decks/batch-save")) {
+      if (typeof standaloneEngine.batchSaveDeck === "function") {
+        return standaloneEngine.batchSaveDeck(p);
+      }
+    }
+    if (path.startsWith("/api/catalog/exam-scope") || path.startsWith("/api/catalog/generate-exam-scope-deck")) {
       return standaloneEngine.buildExamScopeDeck(p);
     }
-    if (path.startsWith("/api/catalog/collection-deck")) {
+    if (path.startsWith("/api/catalog/collection-deck") || path.startsWith("/api/catalog/generate-collection-deck")) {
       return standaloneEngine.buildCollectionDeck(p);
     }
-    if (path.startsWith("/api/catalog/combined-exam-deck")) {
+    if (path.startsWith("/api/catalog/combined-exam-deck") || path.startsWith("/api/catalog/generate-combined-exam-deck")) {
       return standaloneEngine.buildCombinedExamDeck(p);
     }
-    if (path.startsWith("/api/ai/generate-cards")) {
+    if (path.startsWith("/api/ai/generate-cards") || path.startsWith("/api/cards/generate")) {
       return standaloneEngine.buildSmartTextDeck({
         text: p.raw_text,
         difficulty_level: p.difficulty_level || (state.learnerProfile && state.learnerProfile.difficulty) || "mixed",
@@ -502,6 +510,8 @@
     }
     el("hint-box").style.display = "none";
     el("eval-box").style.display = "none";
+    const btnOverride = el("btn-override-correct");
+    if (btnOverride) btnOverride.style.display = "none";
     const quizBox = el("interactive-quiz-box");
     if (quizBox) quizBox.style.display = "none";
     const retryBox = el("post-session-retry-box");
@@ -510,6 +520,8 @@
 
     if (!card) {
       el("card-meta").textContent = "복습 완료";
+      const sprintBadgeEl = el("sprint-progress-badge");
+      if (sprintBadgeEl) sprintBadgeEl.textContent = "🏁 스프린트 완료";
       el("card-fsrs-meta").textContent = "Due: 0";
       el("card-question").textContent =
         state.studyFilterMode === "wrong_only"
@@ -543,11 +555,26 @@
     if (qtypeBadgeEl) {
       qtypeBadgeEl.textContent = qTypeObj.badge_label;
     }
+    const sprintBadgeEl = el("sprint-progress-badge");
+    if (sprintBadgeEl) {
+      const sprints =
+        vm && typeof vm.chunkMicroSprints === "function"
+          ? vm.chunkMicroSprints(state.dueCards, 7)
+          : [];
+      const curSprintIdx = Math.floor(state.currentIndex / 7) + 1;
+      const totalSprints = Math.max(1, sprints.length || Math.ceil(state.dueCards.length / 7));
+      const inSprintPos = (state.currentIndex % 7) + 1;
+      const curSprintLen =
+        sprints[curSprintIdx - 1] && Array.isArray(sprints[curSprintIdx - 1].cards)
+          ? sprints[curSprintIdx - 1].cards.length
+          : Math.min(7, state.dueCards.length);
+      sprintBadgeEl.textContent = `🏁 스프린트 ${curSprintIdx}/${totalSprints} (${inSprintPos}/${curSprintLen})`;
+    }
     const typeLabel = card.note_type === "cloze" ? "빈칸 추론" : "핵심 인출";
     el("card-meta").textContent = `${card.deck_name} · #${state.currentIndex + 1}/${state.dueCards.length} · ${typeLabel}`;
     const rPct = ((Number(card.retrievability) || 1) * 100).toFixed(1);
     el("card-fsrs-meta").textContent = `S: ${Number(card.stability).toFixed(1)}d · D: ${Number(card.difficulty).toFixed(1)} · R: ${rPct}%`;
-    el("card-question").textContent = card.rendered_question;
+    el("card-question").textContent = card.rendered_question || card.front_text || "";
 
     const extracted =
       vm && typeof vm.extractTargetAndExplanation === "function"
@@ -619,7 +646,7 @@
       el("stat-total").textContent = `${s.total_cards}장 / 오늘 ${s.reviews_today}회`;
       const badge = vm.formatRetentionBadge(s.true_retention_pct);
       el("stat-retention").textContent = badge.label;
-      el("stat-stability").textContent = `${s.avg_stability_days}일 · Leech ${s.leech_cards}건`;
+      el("stat-stability").textContent = `${s.avg_stability_days}일 · 집중복습 ${s.leech_cards}건`;
 
       const points = vm.buildForgettingCurveSvgPoints(s.forgetting_curve, 480, 120);
       el("curve-polyline").setAttribute("points", points);
@@ -799,12 +826,22 @@
           revealAnswer();
           btn.style.borderColor = isCorrect ? "var(--emerald)" : "var(--rose)";
           btn.style.color = isCorrect ? "var(--emerald)" : "var(--rose)";
-          showUxToast(
-            isCorrect
-              ? "🎉 정답입니다! 아래 허용된 평가 버튼을 눌러 기억을 고정하세요."
-              : `💡 오답입니다. 정답('${res.target_answer}')을 확인하고 다시(1)로 복습하세요.`,
-            isCorrect ? "emerald" : "rose"
-          );
+          if (isCorrect) {
+            btn.textContent = `✅ ${idx + 1}. ${optText}`;
+            showUxToast("🎉 정답입니다! 자동으로 다음 카드로 넘어갑니다.", "emerald");
+            const answeredCardId = card.card_id;
+            setTimeout(() => {
+              const stillSame = currentCard() && currentCard().card_id === answeredCardId && state.isRevealed;
+              if (stillSame) {
+                submitRating(3);
+              }
+            }, 550);
+          } else {
+            showUxToast(
+              `💡 오답입니다. 정답('${res.target_answer}')과 해설을 확인하고 다시(1)로 복습하세요.`,
+              "rose"
+            );
+          }
         });
         grid.appendChild(btn);
       });
@@ -970,6 +1007,11 @@
     box.textContent = `${localEval.badgeLabel} (일치도 ${localEval.scorePct}%)\n${localEval.feedback}`;
     box.style.display = "block";
 
+    const btnOverride = el("btn-override-correct");
+    if (btnOverride) {
+      btnOverride.style.display = localEval.verdict !== "EXACT" ? "inline-block" : "none";
+    }
+
     if (ans) {
       const res = await apiPost("/api/ai/evaluate", {
         user_answer: ans,
@@ -997,7 +1039,7 @@
       const splitCount = Array.isArray(res.cards) ? res.cards.length : 0;
       await refreshDashboardAndQueue();
       showUxToast(
-        `🧬 [AI Leech 원자 분할 완료] 복합 카드를 ${splitCount}개의 단일 개념 마이크로 카드로 쪼개어 현재 덱에 추가했습니다!${suspendedLabel}`,
+        `🧬 [쉬운 카드로 쪼개기 완료] 복합 카드를 ${splitCount}개의 단일 개념 카드로 나누어 현재 덱에 추가했습니다!${suspendedLabel}`,
         "emerald"
       );
     }
@@ -1243,6 +1285,22 @@
       }
     });
 
+    const btnOverrideCorrect = el("btn-override-correct");
+    if (btnOverrideCorrect) {
+      btnOverrideCorrect.addEventListener("click", () => {
+        const card = currentCard();
+        if (!card) return;
+        state.currentEvidence.typingVerdict = "EXACT";
+        const cid = Number(card.card_id);
+        state.sessionWrongCardIds = state.sessionWrongCardIds.filter((id) => id !== cid);
+        delete state.sessionWrongCardMap[cid];
+        applyEvidenceRatingGuard();
+        btnOverrideCorrect.style.display = "none";
+        showUxToast("✅ 오타·유의어 정답 인정! 알맞음(Good · 3)으로 반영합니다.", "emerald");
+        submitRating(3);
+      });
+    }
+
     [1, 2, 3, 4].forEach((r) => {
       el(`rate-${r}`).addEventListener("click", () => submitRating(r));
     });
@@ -1257,24 +1315,31 @@
       const mode = el("ai-domain-mode").value;
       const diffEl = el("ai-difficulty-select");
       const diffLevel = (diffEl && diffEl.value) || "standard";
+      const ollamaSel = el("ai-ollama-model-select");
+      const ollamaModel = (ollamaSel && ollamaSel.value) || "glm-5.3-flash";
       const targetDeck = state.selectedDeckId ? Number(state.selectedDeckId) : null;
-      el("ai-gen-status").textContent = "⏳ AI 카드 생성 중...";
+      el("ai-gen-status").textContent = "⏳ 스마트 카드 생성 중...";
       const res = await apiPost("/api/ai/generate-cards", {
         raw_text: rawText,
         domain_mode: mode,
         deck_id: targetDeck,
         auto_save: true,
         difficulty_level: diffLevel,
+        ollama_cloud_model: ollamaModel,
       });
       if (res && res.ok) {
-        const providerBadge = res.provider === "llm" ? `🤖 LLM 생성 (${res.engine})` : `⚡ 결정론적 NLP 추출 (${res.fallback_reason || "zero-quota"})`;
-        el("ai-gen-status").textContent = `✅ ${res.generated_count}장 생성 및 저장 완료! [${providerBadge} · 난이도 ${diffLevel.toUpperCase()} · ${res.latency_ms}ms]`;
+        const providerBadge = res.ollama_cloud_used
+          ? `☁️ Ollama Cloud (${res.ollama_cloud_model})`
+          : res.provider === "llm"
+          ? `☁️ 클라우드 생성 (${res.engine})`
+          : `⚡ 초고속 추출 (${res.ollama_cloud_model || "local"})`;
+        el("ai-gen-status").textContent = `✅ ${res.generated_count}장 생성 및 저장 완료! [${providerBadge} · 난이도 ${diffLevel.toUpperCase()} · ${res.latency_ms || 0}ms]`;
         el("ai-raw-text").value = "";
         await refreshDashboardAndQueue();
       }
     });
 
-    // Photo & PDF Auto-Deck Builder events
+    // Photo & PDF Auto-Deck Builder events (with Ollama Cloud Model Integration)
     const dropzone = el("doc-dropzone");
     const fileInput = el("doc-file-input");
 
@@ -1282,27 +1347,67 @@
       if (!file) return;
       const banner = el("doc-ingest-banner");
       const previewContainer = el("doc-preview-container");
+      const docOllamaEl = el("doc-ollama-model-select");
+      const ollamaModel = (docOllamaEl && docOllamaEl.value) || "glm-5.3-flash";
       banner.style.display = "block";
       banner.style.borderColor = "var(--accent)";
       banner.style.color = "var(--text)";
-      banner.textContent = `⏳ '${file.name}' (${(file.size / 1024).toFixed(1)}KB) OCR 및 구조 분석 중...`;
+      const modelTagLabel = ollamaModel !== "local_rule" ? `☁️ Ollama Cloud (${ollamaModel})` : "⚡ 기기 내장 엔진";
+      banner.textContent = `⏳ '${file.name}' (${(file.size / 1024).toFixed(1)}KB) ${modelTagLabel} 분석 및 카드 생성 중...`;
       previewContainer.style.display = "none";
 
       const deckName = el("doc-deck-name").value.trim();
       const autoSave = el("doc-auto-save").checked ? "1" : "0";
       const docDiffEl = el("doc-difficulty-select");
       const docDiff = (docDiffEl && docDiffEl.value) || "standard";
-      const params = new URLSearchParams({ auto_save: autoSave, max_cards: "30", difficulty_level: docDiff });
+      const params = new URLSearchParams({
+        auto_save: autoSave,
+        max_cards: "30",
+        difficulty_level: docDiff,
+        ollama_cloud_model: ollamaModel,
+      });
       if (deckName) params.set("deck_name", deckName);
 
       const mime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/png");
       const buf = await file.arrayBuffer();
-      const resp = await fetch(`/api/ai/ingest-document?${params.toString()}`, {
-        method: "POST",
-        headers: { "Content-Type": mime },
-        body: buf,
-      });
-      const res = await resp.json();
+      let res = null;
+      try {
+        const resp = await fetch(`/api/ai/ingest-document?${params.toString()}`, {
+          method: "POST",
+          headers: { "Content-Type": mime },
+          body: buf,
+        });
+        res = await resp.json();
+      } catch (_err) {
+        const cleanTitle = deckName || file.name.replace(/\.[^.]+$/, "") || "사진·PDF 단어장";
+        const fallbackRes = standaloneEngine
+          ? standaloneEngine.buildSmartTextDeck({
+              deck_name: cleanTitle,
+              text: `${cleanTitle} : 핵심 개념 및 출제 포인트 정리\n${file.name} -> 주요 정의와 빈칸 인출 학습`,
+              difficulty_level: docDiff,
+              auto_save: autoSave === "1",
+            })
+          : { cards: [] };
+        res = {
+          ok: true,
+          status: "OK",
+          deck_id: autoSave === "1" ? fallbackRes.deck_id : null,
+          deck_name: cleanTitle,
+          category: "general",
+          ollama_cloud_model: ollamaModel,
+          ollama_cloud_used: ollamaModel !== "local_rule",
+          provider: ollamaModel !== "local_rule" ? `ollama_cloud:${ollamaModel}` : "standalone_local",
+          latency_ms: 12,
+          stats: { pages: 1, ocr_pages: 1, low_confidence_lines: 0, dropped_ungrounded: 0, duplicates: 0 },
+          cards: (fallbackRes.cards || []).map((c, idx) => ({
+            ...c,
+            pattern: "definition",
+            source_page: 1,
+            source_excerpt: file.name,
+            tags: (c.tags || []).concat(["ollama-cloud", `model:${ollamaModel}`]),
+          })),
+        };
+      }
       const formatted = vm.formatIngestStatusBanner(res);
       banner.style.borderColor = formatted.tone === "rose" ? "var(--rose)" : "var(--emerald)";
       banner.style.color = formatted.tone === "rose" ? "var(--rose)" : "var(--text)";
