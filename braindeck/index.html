@@ -441,7 +441,7 @@
         </div>
 
         <!-- Study Filter Chips (All / Wrong-Unknown Only / Marked Only + Smart Interleaved Shuffle Toggle) -->
-        <div id="study-filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+        <div id="study-filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
           <button type="button" class="study-filter-btn btn-primary" data-filter="all" style="padding:7px 13px;font-size:0.8rem;">
             📚 전체 학습
           </button>
@@ -454,6 +454,34 @@
           <button type="button" id="btn-toggle-shuffle" class="btn-primary" style="padding:7px 13px;font-size:0.8rem;margin-left:auto;" title="단원·유형 쏠림 없이 지능형 랜덤 섞기">
             🔀 스마트 랜덤 섞기: ON
           </button>
+        </div>
+
+        <!-- v5.6 REA Study Utilities: Electronic Red-Cellophane Sheet, 2-Col Printable Exam, Commute Audio Loop, Non-Destructive Cram -->
+        <div id="v56-rea-utility-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;padding:8px 10px;border-radius:14px;background:#f8fafc;border:1px solid var(--border);">
+          <button type="button" id="btn-open-summary-sheet" style="padding:6px 11px;font-size:0.78rem;background:#fff0f0;color:#be123c;border-color:#fecdd3;">
+            🟥 전자 셀로판지 요약시트
+          </button>
+          <button type="button" id="btn-print-exam-sheet" style="padding:6px 11px;font-size:0.78rem;">
+            🖨️ 2단 쪽지시험지 인쇄/PDF
+          </button>
+          <button type="button" id="btn-commute-audio-loop" style="padding:6px 11px;font-size:0.78rem;">
+            🎧 통학 오디오 루프
+          </button>
+          <button type="button" id="btn-toggle-cram-sandbox" style="padding:6px 11px;font-size:0.78rem;margin-left:auto;" title="켜면 벼락치기 다회독 시 장기기억(FSRS) 스케줄을 오염시키지 않습니다">
+            🧪 무오염 벼락치기(CRAM): OFF
+          </button>
+        </div>
+
+        <!-- Electronic Red-Cellophane Summary Sheet Panel (v5.6 RN-1) -->
+        <div id="summary-sheet-panel" style="display:none;margin-bottom:14px;padding:16px;border-radius:18px;background:#ffffff;border:2px solid #fecdd3;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            <div style="font-weight:800;color:#be123c;font-size:0.92rem;">🟥 시험 5분 전 전자 빨간 셀로판지 요약시트 (정답 탭하여 확인)</div>
+            <div style="display:flex;gap:6px;">
+              <button type="button" id="btn-summary-toggle-all" style="padding:5px 10px;font-size:0.76rem;">👀 정답 전체 보기/가리기</button>
+              <button type="button" id="btn-summary-close" style="padding:5px 10px;font-size:0.76rem;">✖ 닫기</button>
+            </div>
+          </div>
+          <div id="summary-sheet-rows" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;"></div>
         </div>
 
         <div id="leech-banner" class="ai-box" style="border-color:var(--rose);color:var(--rose);margin-bottom:10px;"></div>
