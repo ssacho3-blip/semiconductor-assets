@@ -214,11 +214,11 @@
   }
 
   const OLLAMA_CLOUD_MODELS = [
-    { id: "glm-5.3-flash", label: "☁️ Ollama Cloud · GLM-5.3 Flash (초고속 핵심 카드)", recommended: true },
-    { id: "deepseek-v4.1-flash", label: "☁️ Ollama Cloud · DeepSeek-v4.1 Flash (정밀 빈칸·문맥)", recommended: false },
-    { id: "gemma4:31b", label: "☁️ Ollama Cloud · Gemma-4 31B (시각·표·문서 정밀 분석)", recommended: false },
-    { id: "glm-5.3", label: "☁️ Ollama Cloud · GLM-5.3 (심화·전공 서술 카드)", recommended: false },
-    { id: "local_rule", label: "⚡ 기기 내장 초고속 엔진 (오프라인 · 0초)", recommended: false },
+    { id: "glm-5.3-flash", label: "✨ 스마트 자동 생성 (추천 · 초고속 핵심 카드)", recommended: true },
+    { id: "deepseek-v4.1-flash", label: "✨ 스마트 자동 생성 (정밀 빈칸·문맥)", recommended: false },
+    { id: "gemma4:31b", label: "✨ 스마트 자동 생성 (시각·표·문서 정밀 분석)", recommended: false },
+    { id: "glm-5.3", label: "✨ 스마트 자동 생성 (심화·전공 서술 카드)", recommended: false },
+    { id: "local_rule", label: "⚡ 오프라인 빠른 생성 (기기 내장 · 0초)", recommended: false },
   ];
 
   function isOllamaCloudModelBlocked(modelName) {
@@ -242,21 +242,23 @@
     const st = res.stats || {};
     const cat = formatCategoryBadge(res.category);
     const savedMsg = res.deck_id ? ` · 덱 즉시 저장 완료(#${res.deck_id})` : " · 미리보기 검수 대기";
-    const cloudBadge =
-      res.ollama_cloud_model && res.ollama_cloud_model !== "local_rule"
-        ? ` · ☁️ Ollama Cloud (${res.ollama_cloud_model})`
-        : "";
+    const engineDecision = resolveSmartAiEngine({
+      manualOverride: res.ollama_cloud_model || "auto",
+      offlineOnly: res.ollama_cloud_model === "local_rule",
+    });
+    const engineBadge = engineDecision.ui_label ? ` · ${engineDecision.ui_label}` : "";
     return {
       status: "OK",
       tone: "emerald",
-      title: `✅ [${cat.label}] '${res.deck_name}' — ${cards.length}장 추출${savedMsg}${cloudBadge}`,
-      summary: `총 ${st.pages || 1}쪽 (OCR ${st.ocr_pages || 0}쪽) · 저신뢰 제외 ${st.low_confidence_lines || 0}줄 · 근거미달 폐기 ${st.dropped_ungrounded || 0}장 · 중복제거 ${st.duplicates || 0}장 · 엔진: ${res.provider || "local"} (${res.latency_ms || 0}ms)`,
+      title: `✅ [${cat.label}] '${res.deck_name}' — ${cards.length}장 추출${savedMsg}${engineBadge}`,
+      summary: `총 ${st.pages || 1}쪽 (OCR ${st.ocr_pages || 0}쪽) · 저신뢰 제외 ${st.low_confidence_lines || 0}줄 · 근거미달 폐기 ${st.dropped_ungrounded || 0}장 · 중복제거 ${st.duplicates || 0}장 · 엔진: ${engineDecision.ui_label || "스마트 자동 생성"} (${res.latency_ms || 0}ms)`,
       canSave: !res.deck_id && cards.length > 0,
     };
   }
 
   const STORE_CATEGORY_LABELS = {
     all: "전체 브레인팩",
+    moe_curriculum: "📚 교육부 필수(9종)",
     starter_free: "🎁 무료 기본",
     k12_textbook: "🏫 중·고등 내신 교과서",
     hanja_history: "漢字 한자·한국사",
@@ -268,21 +270,27 @@
     const list = Array.isArray(packs) ? packs : [];
     const cat = String(categoryFilter || "all").trim();
     if (!cat || cat === "all") return list;
+    if (cat === "moe_curriculum") {
+      return list.filter((p) => p && String(p.pack_id || "").startsWith("pack.moe."));
+    }
     return list.filter((p) => p && p.category === cat);
   }
 
   function formatStorePackCard(pack) {
     const p = pack || {};
     const isUnlocked = Boolean(p.unlocked || p.is_free_starter);
+    const priceKrw = Number(p.price_krw) || 0;
+    const rawPriceLabel = p.price_label || (priceKrw === 0 ? "무료 기본 탑재" : `₩${priceKrw.toLocaleString("ko-KR")}`);
     return {
       packId: String(p.pack_id || ""),
       title: String(p.title || ""),
       subtitle: String(p.subtitle || ""),
       badgeLabel: String(p.badge_label || "BrainPack"),
-      priceLabel: isUnlocked ? "✅ 앱 내 장착됨" : `🛒 구매 및 즉시 장착 (${p.price_label || "유료"})`,
+      priceKrw,
+      priceLabel: isUnlocked ? "✅ 앱 내 장착됨" : `🛒 구매 및 즉시 장착 (${rawPriceLabel})`,
       unlocked: isUnlocked,
       tone: isUnlocked ? "emerald" : "indigo",
-      estimatedCountLabel: `수록 문항 약 ${Number(p.estimated_card_count) || 20}장`,
+      estimatedCountLabel: `수록 문항 약 ${Number(p.estimated_card_count || p.estimated_cards) || 24}장`,
       features: Array.isArray(p.features) ? p.features : [],
       sampleCards: Array.isArray(p.sample_cards) ? p.sample_cards : [],
     };
@@ -1388,16 +1396,309 @@
     },
     {
       collection_id: "moe-math:core-formulas",
-      level_label: "교육부 수학과 학년별 필수 공식 (방정식·피타고라스·삼각비·함수)",
-      item_count: 5,
+      level_label: "교육부 수학과 학년별 필수 공식 (방정식·피타고라스·삼각비·수열·미분)",
+      item_count: 7,
       unlocked: true,
       items: [
-        { id: "math_01", term: "피타고라스 정리", "answer": "a² + b² = c²", role: "core_concept", prompt: "직각삼각형에서 직각을 낀 두 변의 길이를 a, b라 하고 빗변의 길이를 c라 할 때 성립하는 피타고라스 정리 관계식은?", sentence: "직각삼각형의 피타고라스 정리 공식은 {{c1::a² + b² = c²::피타고라스 정리}}이다.", explain: "대표 피타고라스 수: (3, 4, 5), (5, 12, 13), (8, 15, 17)" },
-        { id: "math_02", term: "이차방정식의 근의 공식", "answer": "x = (-b ± √(b² - 4ac)) / 2a", role: "core_concept", prompt: "이차방정식 ax² + bx + c = 0 (a ≠ 0)의 해를 구하는 근의 공식은?", sentence: "이차방정식의 해는 {{c1::x = (-b ± √(b² - 4ac)) / 2a::근의 공식}}이다.", explain: "판별식 D = b² - 4ac > 0(서로 다른 두 실근), D = 0(중근), D < 0(허근)" },
-        { id: "math_03", term: "근과 계수의 관계", "answer": "α + β = -b/a, αβ = c/a", role: "core_concept", prompt: "이차방정식 ax² + bx + c = 0의 두 근을 α, β라 할 때 두 근의 합(α + β)과 곱(αβ)은?", sentence: "이차방정식 두 근의 합과 곱은 {{c1::α + β = -b/a, αβ = c/a::근과 계수의 관계}}이다.", explain: "이차방정식 인수분해 항등식 비교로 유도" },
-        { id: "math_04", term: "삼각함수 제곱 관계", "answer": "sin²θ + cos²θ = 1", role: "core_concept", prompt: "단위원 위에서 임의의 각 θ에 대하여 항상 성립하는 사인(sin θ)과 코사인(cos θ)의 제곱의 합 공식은?", sentence: "삼각함수 기본 항등식에 의해 {{c1::sin²θ + cos²θ = 1::삼각함수 제곱 공식}}이 성립한다.", explain: "tan θ = sin θ / cos θ" },
-        { id: "math_05", term: "원의 방정식 표준형", "answer": "(x - a)² + (y - b)² = r²", role: "core_concept", prompt: "좌표평면 위에서 중심이 (a, b)이고 반지름이 r인 원의 방정식 표준형은?", sentence: "중심이 (a, b)이고 반지름이 r인 원의 방정식은 {{c1::(x - a)² + (y - b)² = r²::원의 방정식}}이다.", explain: "중심이 원점 (0, 0)이면 x² + y² = r²" },
+        { id: "math_01", term: "피타고라스 정리", answer: "a² + b² = c²", role: "core_concept", prompt: "직각삼각형에서 직각을 낀 두 변의 길이를 a, b라 하고 빗변의 길이를 c라 할 때 성립하는 피타고라스 정리 관계식은?", sentence: "직각삼각형의 피타고라스 정리 공식은 {{c1::a² + b² = c²::피타고라스 정리}}이다.", explain: "대표 피타고라스 수: (3, 4, 5), (5, 12, 13), (8, 15, 17)" },
+        { id: "math_02", term: "이차방정식의 근의 공식", answer: "x = (-b ± √(b² - 4ac)) / 2a", role: "core_concept", prompt: "이차방정식 ax² + bx + c = 0 (a ≠ 0)의 해를 구하는 근의 공식은?", sentence: "이차방정식의 해는 {{c1::x = (-b ± √(b² - 4ac)) / 2a::근의 공식}}이다.", explain: "판별식 D = b² - 4ac > 0(서로 다른 두 실근), D = 0(중근), D < 0(허근)" },
+        { id: "math_03", term: "근과 계수의 관계", answer: "α + β = -b/a, αβ = c/a", role: "core_concept", prompt: "이차방정식 ax² + bx + c = 0의 두 근을 α, β라 할 때 두 근의 합(α + β)과 곱(αβ)은?", sentence: "이차방정식 두 근의 합과 곱은 {{c1::α + β = -b/a, αβ = c/a::근과 계수의 관계}}이다.", explain: "이차방정식 인수분해 항등식 비교로 유도" },
+        { id: "math_04", term: "삼각함수 제곱 관계", answer: "sin²θ + cos²θ = 1", role: "core_concept", prompt: "단위원 위에서 임의의 각 θ에 대하여 항상 성립하는 사인(sin θ)과 코사인(cos θ)의 제곱의 합 공식은?", sentence: "삼각함수 기본 항등식에 의해 {{c1::sin²θ + cos²θ = 1::삼각함수 제곱 공식}}이 성립한다.", explain: "tan θ = sin θ / cos θ" },
+        { id: "math_05", term: "원의 방정식 표준형", answer: "(x - a)² + (y - b)² = r²", role: "core_concept", prompt: "좌표평면 위에서 중심이 (a, b)이고 반지름이 r인 원의 방정식 표준형은?", sentence: "중심이 (a, b)이고 반지름이 r인 원의 방정식은 {{c1::(x - a)² + (y - b)² = r²::원의 방정식}}이다.", explain: "중심이 원점 (0, 0)이면 x² + y² = r²" },
+        { id: "math_06", term: "등차수열의 일반항", answer: "aₙ = a + (n - 1)d", role: "core_concept", prompt: "첫째항이 a이고 공차가 d인 등차수열의 제n항(일반항 aₙ)을 구하는 공식은?", sentence: "첫째항이 a, 공차가 d인 등차수열의 일반항은 {{c1::aₙ = a + (n - 1)d::등차수열 일반항}}이다.", explain: "등차수열의 합: Sₙ = n(a + l)/2 = n{2a + (n-1)d}/2" },
+        { id: "math_07", term: "미분계수(순간변화율)와 도함수", answer: "f'(a) = lim(h→0) [f(a+h) - f(a)] / h", role: "core_concept", prompt: "함수 y = f(x)에서 x = a에서의 미분계수(순간변화율, 접선의 기울기) f'(a)의 정의식은?", sentence: "함수 f(x)의 x = a에서의 미분계수는 {{c1::f'(a) = lim(h→0) [f(a+h) - f(a)] / h::순간변화율·접선의 기울기}}로 정의된다.", explain: "다항함수 미분법: y = xⁿ 이면 y' = n·xⁿ⁻¹" },
       ],
+    },
+  ];
+
+  const STANDALONE_STORE_PACKS = [
+    {
+      pack_id: "pack.free.starter_k12",
+      title: "🎁 [무료 기본] 초등 받아쓰기·기초 영단어 & 한자 8급 입문 브레인팩",
+      subtitle: "앱 설치 즉시 기본 탑재되는 무료 스타터 데이터팩 (본인 사진/PDF 업로드 무제한 무료 포함)",
+      category: "starter_free",
+      age_tier: "all",
+      price_krw: 0,
+      is_free_starter: true,
+      link_kind: "collection",
+      primary_ref_id: "hanja-grade:8geup",
+      covered_ref_ids: ["hanja-grade:8geup", "ko-dictation:grade1-2", "moe-eng:elementary"],
+      estimated_card_count: 20,
+      badge_label: "무료 기본 탑재",
+      features: ["어문회 8급 기초 한자 + 초등 받아쓰기 기본 내장", "사진·PDF 업로드 무제한 무료"],
+      sample_cards: [{ front: "韓", back: "나라 한 (부수: 韋 · 17획)", tag: "hanja_8geup" }],
+    },
+    {
+      pack_id: "pack.moe.eng.elem34",
+      title: "📘 [교육부 1 · 초등 3~4] 초등 3~4학년 기초 필수 영단어 브레인팩",
+      subtitle: "2022 개정 교육과정 초등 3~4학년군 기본 어휘표 · 생활·학교·자연·동작 필수 영단어",
+      category: "k12_textbook",
+      age_tier: "junior",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "moe-eng:elem-3-4",
+      covered_ref_ids: ["moe-eng:elem-3-4"],
+      estimated_card_count: 36,
+      badge_label: "교육부 초등 3~4",
+      features: ["초등 3~4학년 기초 필수 영단어(morning, weather, borrow 등)", "Lv.1~3 단계별 카드 & 예문 해설"],
+      sample_cards: [{ front: "weather", back: "날씨 — How is the weather today?", tag: "초등 3~4" }],
+    },
+    {
+      pack_id: "pack.moe.eng.elem56",
+      title: "📘 [교육부 2 · 초등 5~6] 초등 5~6학년 필수 영단어 800 핵심 브레인팩",
+      subtitle: "2022 개정 교육과정 초등 5~6학년군 필수 영단어 800 핵심 어휘 & 의사소통 표현",
+      category: "k12_textbook",
+      age_tier: "junior",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "moe-eng:elementary",
+      covered_ref_ids: ["moe-eng:elementary"],
+      estimated_card_count: 36,
+      badge_label: "교육부 초등 5~6",
+      features: ["초등 5~6학년 필수 영단어 800 핵심(library, museum, vacation, between 등)", "중학 진학 전 필수 마스터"],
+      sample_cards: [{ front: "museum", back: "박물관, 미술관 — We visited the science museum.", tag: "초등 5~6" }],
+    },
+    {
+      pack_id: "pack.moe.eng.mid1200",
+      title: "📘 [교육부 3 · 중학교] 중학교 1~3학년 필수 영단어 1,200 & 내신 8대 핵심 영문법 브레인팩",
+      subtitle: "2022 개정 중학 필수 영단어 1,200 핵심 + 현재완료·관계대명사·감각동사 등 내신 8대 영문법",
+      category: "k12_textbook",
+      age_tier: "teen",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "moe-eng:middle-1200",
+      covered_ref_ids: ["moe-eng:middle-1200"],
+      estimated_card_count: 36,
+      badge_label: "교육부 중학 영단어·문법",
+      features: ["중학 필수 영단어 1,200 핵심 + 내신 8대 핵심 영문법 동시 수록", "단어·문법 분리형 4지선다"],
+      sample_cards: [{ front: "[중학 핵심문법] 감각동사(look/smell/taste) 뒤 보어 품사는?", back: "형용사 (부사 -ly 불가)", tag: "중학 영문법" }],
+    },
+    {
+      pack_id: "pack.moe.eng.high_csat",
+      title: "🎓 [교육부 4 · 고교·수능] 고등학교·수능 필수 학술 어휘 브레인팩",
+      subtitle: "2022 개정 고등학교 공통영어 및 평가원 모의고사·수능 최빈출 추상·학술 어휘",
+      category: "k12_textbook",
+      age_tier: "teen",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "moe-eng:high-csat",
+      covered_ref_ids: ["moe-eng:high-csat"],
+      estimated_card_count: 30,
+      badge_label: "교육부 고교·수능",
+      features: ["평가원·수능 최빈출 학술 어휘(hypothesis, empirical, correlation, cognitive 등)", "반의어·파생어 해설"],
+      sample_cards: [{ front: "empirical", back: "경험적인, 실증적인 (↔ theoretical 이론적인)", tag: "수능 학술" }],
+    },
+    {
+      pack_id: "pack.moe.kor.orthography_lit",
+      title: "🇰🇷 [교육부 5 · 국어] 초·중·고 국어 한글 맞춤법·표준어 규정 & 필수 문학 개념어 브레인팩",
+      subtitle: "자주 틀리는 한글 맞춤법(며칠/금세/되·돼/로서·로써) & 내신·수능 필수 문학 개념어",
+      category: "k12_textbook",
+      age_tier: "all",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "moe-kor:orthography-lit",
+      covered_ref_ids: ["moe-kor:orthography-lit"],
+      estimated_card_count: 24,
+      badge_label: "교육부 국어·문학",
+      features: ["한글 맞춤법·표준어 규정 혼동 어휘 & 필수 문학 개념어(역설법, 객관적 상관물 등)"],
+      sample_cards: [{ front: "'오늘이 몇 월 [ ___ ]이지?' 바른 맞춤법 표기는?", back: "며칠 ('몇일'은 틀린 표기)", tag: "한글 맞춤법" }],
+    },
+    {
+      pack_id: "pack.moe.hanja.mid1800",
+      title: "漢字 [교육부 6 · 한문] 중·고교 한문 교육부 기초한자 1,800 핵심 브레인팩",
+      subtitle: "교육부 고시 한문 교육용 기초한자 1,800자 핵심(중등 900·고등 900) & 교과서 필수 성어",
+      category: "hanja_history",
+      age_tier: "all",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "moe-hanja-1800:middle",
+      covered_ref_ids: ["moe-hanja-1800:middle"],
+      estimated_card_count: 30,
+      badge_label: "교육부 한자 1,800",
+      features: ["교육부 고시 중·고교 기초한자 1,800 핵심 훈음·부수·획수 & 사자성어(온고지신 등)"],
+      sample_cards: [{ front: "溫故知新 (온고지신)", back: "옛것을 익히고 그것을 미루어 새것을 안다", tag: "기초한자 1800" }],
+    },
+    {
+      pack_id: "pack.moe.hist.essential",
+      title: "🏛️ [교육부 7 · 한국사] 한국사 시대별 필수 연표·사건 브레인팩",
+      subtitle: "2022 개정 초·중·고 한국사 시대별 필수 연표·조약·개혁·유네스코 세계유산 총정리",
+      category: "hanja_history",
+      age_tier: "all",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "khist:essential",
+      covered_ref_ids: ["khist:essential"],
+      estimated_card_count: 30,
+      badge_label: "교육부 한국사 연표",
+      features: ["시대별 핵심 사건·조약·개혁·문화재 연표 총정리"],
+      sample_cards: [{ front: "1876년 체결된 조선 최초의 근대적 조약이자 불평등 조약은?", back: "강화도 조약 (조일수호조규)", tag: "한국사 연표" }],
+    },
+    {
+      pack_id: "pack.moe.sci.core_formula",
+      title: "🔬 [교육부 8 · 과학] 과학 물리·화학·생명·지구과학 핵심 법칙·공식 브레인팩",
+      subtitle: "중·고등학교 과학 4대 영역(물리·화학·생명·지구과학) 필수 법칙·화학결합·공식 마스터",
+      category: "k12_textbook",
+      age_tier: "teen",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "sci-element-formula:core",
+      covered_ref_ids: ["sci-element-formula:core"],
+      estimated_card_count: 24,
+      badge_label: "교육부 과학 법칙·공식",
+      features: ["옴의 법칙(V=IR), 뉴턴 가속도 법칙(F=ma), 화학 결합, 미토콘드리아 ATP, 판구조론"],
+      sample_cards: [{ front: "뉴턴 운동 제2법칙(가속도 법칙) 공식은?", back: "F = m × a (알짜힘 = 질량 × 가속도)", tag: "물리 법칙" }],
+    },
+    {
+      pack_id: "pack.moe.math.core_formula",
+      title: "📐 [교육부 9 · 수학] 수학 중·고교 필수 공식 (피타고라스·근의 공식·삼각함수·등차수열·미분계수) 브레인팩",
+      subtitle: "중·고등학교 수학과 대수·기하·삼각함수·수열·미적분 핵심 공식 완벽 암기",
+      category: "k12_textbook",
+      age_tier: "teen",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "moe-math:core-formulas",
+      covered_ref_ids: ["moe-math:core-formulas"],
+      estimated_card_count: 28,
+      badge_label: "교육부 수학 필수공식",
+      features: ["피타고라스 정리, 근의 공식·판별식, 삼각함수 제곱 관계, 등차수열 일반항, 미분계수 정의"],
+      sample_cards: [{ front: "첫째항 a, 공차 d인 등차수열의 일반항 aₙ과 미분계수 f'(a)는?", back: "aₙ = a + (n - 1)d · f'(a) = lim(h→0)[f(a+h)-f(a)]/h", tag: "수학 공식" }],
+    },
+    {
+      pack_id: "pack.mid1.eng.donga_yoon.full",
+      title: "📦 [중1 내신] 동아(윤정미) 영어 Lesson 1~8 전 단원 마스터 브레인팩",
+      subtitle: "2022 개정 교육과정 · 단원별·쪽수별 시험범위 슬라이싱 + 핵심 영단어·문법 함정선지 완비",
+      category: "k12_textbook",
+      age_tier: "teen",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "textbook",
+      primary_ref_id: "kr.mid1.eng.donga_yoon.2022",
+      covered_ref_ids: ["kr.mid1.eng.donga_yoon.2022"],
+      estimated_card_count: 34,
+      badge_label: "중1 내신 베스트",
+      features: ["Lesson 1 ~ Lesson 8 전 단원 필수 어휘·숙어·핵심 문법 완벽 매핑"],
+      sample_cards: [{ front: "introduce (p.12)", back: "소개하다 (동사)", tag: "Lesson 1" }],
+    },
+    {
+      pack_id: "pack.mid2.eng.donga_yoon.full",
+      title: "📦 [중2 내신] 동아(윤정미) 영어 전 단원·쪽수 마스터 브레인팩",
+      subtitle: "중학교 2학년 내신 만점 대비 · 단원/쪽수 슬라이싱 & 4지선다 유의어 함정 방어",
+      category: "k12_textbook",
+      age_tier: "teen",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "textbook",
+      primary_ref_id: "kr.mid2.eng.donga_yoon.2022",
+      covered_ref_ids: ["kr.mid2.eng.donga_yoon.2022"],
+      estimated_card_count: 24,
+      badge_label: "중2 내신 필수",
+      features: ["중2 동아(윤정미) 단원별 어휘·문법 수록"],
+      sample_cards: [{ front: "confident (p.16)", back: "자신감 있는 (형용사)", tag: "Lesson 1" }],
+    },
+    {
+      pack_id: "pack.mid2.hist.miraeen.full",
+      title: "📦 [중2 내신] 미래엔 역사① 연표·사료·문화재 브레인팩",
+      subtitle: "중학교 역사 내신 출판사 단원 매핑 · 동시대 사건 함정 보기 자동 구성",
+      category: "k12_textbook",
+      age_tier: "teen",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "textbook",
+      primary_ref_id: "kr.mid2.hist.miraeen.2022",
+      covered_ref_ids: ["kr.mid2.hist.miraeen.2022"],
+      estimated_card_count: 20,
+      badge_label: "역사 내신 특화",
+      features: ["미래엔 중학교 역사① 단원·쪽수별 사건·연표·조약·문화재 정리"],
+      sample_cards: [{ front: "훈민정음 창제 (1443, 반포 1446)", back: "조선 세종 대 백성을 가르치는 바른 소리 28자 창제", tag: "Ⅰ단원" }],
+    },
+    {
+      pack_id: "pack.high1.sci.visang.full",
+      title: "📦 [고1 내신] 비상 통합과학1 공식·핵심개념 브레인팩",
+      subtitle: "고등학교 1학년 통합과학 물리·화학·생명·지구과학 필수 공식 및 원소 완벽 대비",
+      category: "k12_textbook",
+      age_tier: "teen",
+      price_krw: 990,
+      is_free_starter: false,
+      link_kind: "textbook",
+      primary_ref_id: "kr.high1.sci.visang.2022",
+      covered_ref_ids: ["kr.high1.sci.visang.2022", "sci-element-formula:core"],
+      estimated_card_count: 25,
+      badge_label: "고1 내신 1등급",
+      features: ["비상교육 고1 통합과학1 단원별 핵심 공식 및 원소 매핑"],
+      sample_cards: [{ front: "옴의 법칙: V = I × R", back: "전압(V)은 전류(I)와 저항(R)의 곱에 비례한다", tag: "통합과학1" }],
+    },
+    {
+      pack_id: "pack.exam.hanja_master",
+      title: "📦 [급수한자] 어문회 7급~3급 필수 한자 & 사자성어 올인원 브레인팩",
+      subtitle: "동음이의어·유사한자 함정선지 완벽 방어 + 두음법칙/다음자(樂 락·악·요) 정밀 채점",
+      category: "hanja_history",
+      age_tier: "all",
+      price_krw: 1500,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "hanja-grade:7geup",
+      covered_ref_ids: ["hanja-grade:7geup", "hanja-grade:6geup", "hanja-grade:5geup", "hanja-grade:4geup", "hanja-grade:3geup", "ko-idiom:essential"],
+      estimated_card_count: 50,
+      badge_label: "급수시험 올인원",
+      features: ["한자 7급~3급 급수별 필수 한자 및 사자성어 전체 잠금해제"],
+      sample_cards: [{ front: "樂 (3급 대표 다음자)", back: "즐길 락(낙) / 노래 악 / 좋아할 요 (부수: 木 · 15획)", tag: "hanja_3geup" }],
+    },
+    {
+      pack_id: "pack.exam.khist_master",
+      title: "📦 [한국사] 한국사능력검정 심화(1~3급) 핵심 연표·사료·문화재 브레인팩",
+      subtitle: "고려·조선·근현대사 핵심 사건·조약·유네스코 문화재 완벽 총정리",
+      category: "hanja_history",
+      age_tier: "all",
+      price_krw: 1500,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "khist:essential",
+      covered_ref_ids: ["khist:essential"],
+      estimated_card_count: 30,
+      badge_label: "한능검 단기합격",
+      features: ["시대별·왕대별 핵심 사건·조약·문화재 연표 양방향 Cloze"],
+      sample_cards: [{ front: "갑신정변 (1884)", back: "김옥균·박영효 등 급진개화파가 일으킨 근대화 개혁 운동", tag: "khist" }],
+    },
+    {
+      pack_id: "pack.exam.lang_toeic_jlpt",
+      title: "📦 [어학] 토익(TOEIC) 고득점 빈출 & JLPT N5~N3 필수 어휘 브레인팩",
+      subtitle: "비즈니스 영어 핵심 어휘 + 일본어 한자·히라가나 발음/원어민 TTS 스피킹 드릴",
+      category: "language_exam",
+      age_tier: "adult",
+      price_krw: 1900,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "exam-eng:toeic-core",
+      covered_ref_ids: ["exam-eng:toeic-core", "exam-ja:jlpt-n5-n3"],
+      estimated_card_count: 40,
+      badge_label: "어학 베스트셀러",
+      features: ["토익 빈출 어휘 및 JLPT 핵심 어휘 동시 수록"],
+      sample_cards: [{ front: "reimburse", back: "(경비를) 변제하다, 환급하다 (동사 · C1)", tag: "TOEIC" }],
+    },
+    {
+      pack_id: "pack.pro.law_it_cert",
+      title: "📦 [성인/전문] 헌법 핵심 조문 & 정보처리기사·컴활 마스터 브레인팩",
+      subtitle: "공무원·법학 시험 필수 헌법 조문 + IT 자격증(정처기·컴활) 핵심 팩트 완벽 수록",
+      category: "pro_cert",
+      age_tier: "adult",
+      price_krw: 1900,
+      is_free_starter: false,
+      link_kind: "collection",
+      primary_ref_id: "cert-it:core",
+      covered_ref_ids: ["cert-it:core", "law-statute:constitution"],
+      estimated_card_count: 35,
+      badge_label: "수험·자격증 프로",
+      features: ["대한민국 헌법 핵심 조문 & 정보처리기사·컴활 필수 개념 완벽 정리"],
+      sample_cards: [{ front: "데이터베이스 트랜잭션의 4대 특성 (ACID)", back: "원자성, 일관성, 격리성, 영속성", tag: "정처기" }],
     },
   ];
 
@@ -1802,12 +2103,57 @@
       const p = payload || {};
       const db = loadDb();
       const card = db.cards.find((c) => Number(c.card_id) === Number(p.card_id));
-      const rating = Math.max(1, Math.min(4, Number(p.rating || 3)));
+      const rawRating = Math.max(1, Math.min(4, Number(p.rating || 3)));
       if (!card) {
         return { ok: false, error: "Card not found" };
       }
       const nowMs = Date.now();
       const prevEvents = Array.isArray(card.review_events) ? card.review_events.slice() : [];
+      const prevRtSamples = Array.isArray(card.rt_samples) ? card.rt_samples.slice() : [];
+      const prevGoodStreak = Number(card.consecutive_good_streak || 0);
+
+      if (!db.confusionMatrix || typeof db.confusionMatrix !== "object") {
+        db.confusionMatrix = {};
+      }
+      let activeConfusionWeight = Number(p.confusion_weight || 0.0);
+      const confusedPeerId = p.confused_with_card_id !== undefined && p.confused_with_card_id !== null ? String(p.confused_with_card_id).trim() : "";
+      if (confusedPeerId && confusedPeerId !== String(card.card_id)) {
+        const edgeKey = `${card.card_id}->${confusedPeerId}`;
+        const prevEdge = db.confusionMatrix[edgeKey] || { weight: 0.0, ts_ms: nowMs, seen_ids: [] };
+        const elapsedDays = Math.max(0.0, (nowMs - Number(prevEdge.ts_ms || nowMs)) / DAY_MS_V56);
+        const revKey = String(p.review_id || `rev_${card.card_id}_${nowMs}`);
+        const cmRes = updateConfusionMatrixWeight(
+          prevEdge.weight,
+          elapsedDays,
+          String(card.card_id),
+          confusedPeerId,
+          revKey,
+          prevEdge.seen_ids || [],
+          30.0
+        );
+        db.confusionMatrix[edgeKey] = {
+          weight: cmRes.weight,
+          ts_ms: nowMs,
+          seen_ids: (prevEdge.seen_ids || []).concat([revKey]).slice(-50),
+        };
+        activeConfusionWeight = Math.max(activeConfusionWeight, cmRes.weight);
+      } else {
+        Object.keys(db.confusionMatrix).forEach((k) => {
+          if (k.startsWith(`${card.card_id}->`)) {
+            activeConfusionWeight = Math.max(activeConfusionWeight, Number(db.confusionMatrix[k].weight || 0.0));
+          }
+        });
+      }
+
+      const c4 = applyC4ReviewCalibration(
+        rawRating,
+        p.response_time_ms !== undefined ? p.response_time_ms : null,
+        Array.isArray(p.baseline_rt_ms_samples) ? p.baseline_rt_ms_samples : prevRtSamples,
+        p.consecutive_good_streak !== undefined ? p.consecutive_good_streak : prevGoodStreak,
+        activeConfusionWeight
+      );
+      const rating = c4.effective_rating;
+
       db.reviewHistory.push({
         card_id: card.card_id,
         prev_state: card.state,
@@ -1817,9 +2163,22 @@
         prev_difficulty: card.difficulty,
         prev_due_at: card.due_at,
         prev_review_events: prevEvents,
+        prev_rt_samples: prevRtSamples,
+        prev_good_streak: prevGoodStreak,
+        raw_rating: rawRating,
         rating,
         at: new Date(nowMs).toISOString(),
       });
+
+      if (
+        typeof p.response_time_ms === "number" &&
+        Number.isFinite(p.response_time_ms) &&
+        p.response_time_ms >= 300 &&
+        p.response_time_ms <= 60000
+      ) {
+        card.rt_samples = prevRtSamples.concat([Math.round(p.response_time_ms)]).slice(-20);
+      }
+      card.consecutive_good_streak = rating >= 3 ? prevGoodStreak + 1 : 0;
 
       const nextEvents = prevEvents.concat([
         {
@@ -1835,7 +2194,7 @@
       card.review_events = nextEvents;
       card.reps = folded.reps;
       card.lapses = folded.lapses;
-      card.stability = folded.s;
+      card.stability = quantize1e6(folded.s * c4.effective_interval_factor);
       card.difficulty = folded.d;
 
       if (rating === 1) {
@@ -1862,7 +2221,12 @@
         ok: true,
         standalone: true,
         card_id: card.card_id,
+        raw_rating: rawRating,
         rating,
+        effective_rating: rating,
+        fluency_status: c4.status,
+        fluency_z_score: c4.z_score,
+        effective_interval_factor: c4.effective_interval_factor,
         scheduled_days: schedDays,
         scheduled_label: labelMap[rating],
         due_at: card.due_at,
@@ -1966,8 +2330,150 @@
       return insertDeckWithSpecs(deckName, "사진·PDF 문서 추출 단어장", specs, "interleaved");
     }
 
+    function getStorePacks(categoryFilter) {
+      const db = loadDb();
+      const unlockedSet = new Set(["pack.free.starter_k12"].concat(Array.isArray(db.unlockedPackIds) ? db.unlockedPackIds : []));
+      const refundedSet = new Set(Array.isArray(db.refundedPackIds) ? db.refundedPackIds : []);
+      const serialized = STANDALONE_STORE_PACKS.map((p) => {
+        const isRefunded = refundedSet.has(p.pack_id) && !p.is_free_starter;
+        const isUnlocked = Boolean(p.is_free_starter || (unlockedSet.has(p.pack_id) && !isRefunded));
+        const priceLabel = p.price_krw === 0 ? "무료 기본 탑재" : `₩${Number(p.price_krw).toLocaleString("ko-KR")}`;
+        return Object.assign({}, p, {
+          price_label: priceLabel,
+          unlocked: isUnlocked,
+          status: isRefunded ? "refunded_frozen" : isUnlocked ? "unlocked" : "locked",
+          status_badge: isUnlocked ? "✅ 앱 내 장착 완료" : `🔒 스토어 구매 (${priceLabel})`,
+        });
+      });
+      const filtered = filterStorePacks(serialized, categoryFilter);
+      const unlockedCount = serialized.filter((p) => p.unlocked).length;
+      return {
+        ok: true,
+        standalone: true,
+        brand: "BrainDeck (브레인덱)",
+        store_name: "BrainPack Store (브레인팩 스토어)",
+        total_packs: serialized.length,
+        unlocked_packs: unlockedCount,
+        self_upload_free: true,
+        packs: filtered,
+      };
+    }
+
+    function purchaseStorePack(payload) {
+      const p = payload || {};
+      const packId = String(p.pack_id || "").trim();
+      const pack = STANDALONE_STORE_PACKS.find((item) => item.pack_id === packId);
+      if (!pack) {
+        return { ok: false, standalone: true, error: `Unknown BrainPack ID: ${packId}` };
+      }
+      const db = loadDb();
+      if (!Array.isArray(db.unlockedPackIds)) db.unlockedPackIds = ["pack.free.starter_k12"];
+      if (!Array.isArray(db.refundedPackIds)) db.refundedPackIds = [];
+      const wasUnlocked = Boolean(pack.is_free_starter || (db.unlockedPackIds.includes(packId) && !db.refundedPackIds.includes(packId)));
+      if (!db.unlockedPackIds.includes(packId)) {
+        db.unlockedPackIds.push(packId);
+      }
+      db.refundedPackIds = db.refundedPackIds.filter((id) => id !== packId);
+      saveDb(db);
+
+      let mountedDeck = null;
+      const targetDeckTitle = `📦 ${pack.title}`;
+      if (p.auto_create_deck !== false) {
+        const freshDb = loadDb();
+        const existing = freshDb.decks.find((d) => d.name === targetDeckTitle);
+        if (wasUnlocked && existing) {
+          const cardCount = freshDb.cards.filter((c) => Number(c.deck_id) === Number(existing.deck_id)).length;
+          mountedDeck = {
+            ok: true,
+            deck_id: existing.deck_id,
+            deck_name: existing.name,
+            saved_count: cardCount,
+            already_mounted: true,
+          };
+        } else if (pack.link_kind === "textbook") {
+          mountedDeck = buildExamScopeDeck({
+            textbook_id: pack.primary_ref_id,
+            deck_name: targetDeckTitle,
+            difficulty_level: "mixed",
+          });
+        } else {
+          mountedDeck = buildCollectionDeck({
+            collection_id: pack.primary_ref_id,
+            deck_name: targetDeckTitle,
+            difficulty_level: "mixed",
+          });
+        }
+      }
+      const finalDb = loadDb();
+      return {
+        ok: true,
+        standalone: true,
+        pack_id: pack.pack_id,
+        title: pack.title,
+        price_krw: pack.price_krw,
+        price_paid_krw: pack.price_krw,
+        already_unlocked: wasUnlocked,
+        unlocked_pack_ids: finalDb.unlockedPackIds || ["pack.free.starter_k12"],
+        mounted_deck: mountedDeck,
+      };
+    }
+
+    function purchaseStoreBundle(payload) {
+      const p = payload || {};
+      const packIds = Array.isArray(p.pack_ids) ? p.pack_ids : [];
+      const storeSnap = getStorePacks("all");
+      const quote = calculateStoreBundleQuote(storeSnap.packs, packIds);
+      const purchasedItems = [];
+      packIds.forEach((pid) => {
+        const res = purchaseStorePack({
+          pack_id: pid,
+          auto_create_deck: p.auto_create_decks !== false,
+          payment_token: p.payment_token || `BDPAY-BUNDLE-${pid}`,
+        });
+        if (res && res.ok) purchasedItems.push(res);
+      });
+      const finalDb = loadDb();
+      return {
+        ok: true,
+        standalone: true,
+        quote: {
+          subtotal_krw: quote.subtotalKrw,
+          discount_krw: quote.discountKrw,
+          final_price_krw: quote.finalPriceKrw,
+          discount_applied: quote.discountApplied,
+        },
+        purchased_count: purchasedItems.length,
+        purchased_items: purchasedItems,
+        unlocked_pack_ids: finalDb.unlockedPackIds || ["pack.free.starter_k12"],
+      };
+    }
+
+    function refundStorePack(payload) {
+      const p = payload || {};
+      const packId = String(p.pack_id || "").trim();
+      const db = loadDb();
+      if (!Array.isArray(db.refundedPackIds)) db.refundedPackIds = [];
+      if (!db.refundedPackIds.includes(packId)) {
+        db.refundedPackIds.push(packId);
+      }
+      saveDb(db);
+      return {
+        ok: true,
+        standalone: true,
+        pack_id: packId,
+        status: "refunded_frozen",
+        fsrs_history_preserved: true,
+        unlocked_pack_ids: (db.unlockedPackIds || []).filter((id) => !db.refundedPackIds.includes(id)),
+        refunded_pack_ids: db.refundedPackIds,
+      };
+    }
+
     return {
       getCatalog,
+      getStorePacks,
+      purchaseStorePack,
+      purchaseStoreBundle,
+      refundStorePack,
       getDashboard,
       getDueCards,
       buildExamScopeDeck,
@@ -2594,6 +3100,283 @@
     };
   }
 
+  // =========================================================================
+  // PHASE 5 (v5.8): SIMPLE IS BEST — ANKI REA PROGRESSIVE DISCLOSURE & FLUENCY
+  // =========================================================================
+
+  const SMART_AI_FALLBACK_CHAIN = [
+    "glm-5.3-flash",
+    "deepseek-v4.1-flash",
+    "gemma4:31b",
+    "glm-5.3",
+    "local_rule",
+  ];
+
+  const ALLOWED_SMART_AI_MODELS = new Set([
+    "glm-5.3-flash",
+    "deepseek-v4.1-flash",
+    "gemma4:31b",
+    "glm-5.3",
+    "local_rule",
+  ]);
+
+  function computeStudyToolsSummary(opts) {
+    const o = opts || {};
+    const sf = String(o.studyFilter || o.study_filter || "all").trim().toLowerCase();
+    const qf = String(o.qtypeFilter || o.qtype_filter || "all").trim().toLowerCase();
+    const cram = Boolean(o.cramMode || o.cram_mode);
+    const sh = String(o.shuffleMode || o.shuffle_mode || "sequential").trim().toLowerCase();
+    let activeCount = 0;
+    if (sf !== "all") activeCount += 1;
+    if (qf !== "all") activeCount += 1;
+    if (cram) activeCount += 1;
+    if (sh && sh !== "sequential" && sh !== "default") activeCount += 1;
+    const isDefault = activeCount === 0;
+    return {
+      active_count: activeCount,
+      is_default: isDefault,
+      summary_badge_text: isDefault ? "" : `필터 ${activeCount}개 적용 중`,
+    };
+  }
+
+  function resolveSmartAiEngine(opts) {
+    const o = opts || {};
+    const taskNorm = String(o.taskType || o.task_type || "card_generate").trim().toLowerCase();
+    const chain =
+      taskNorm === "vision_doc"
+        ? ["glm-5.3-flash", "gemma4:31b", "deepseek-v4.1-flash", "glm-5.3", "local_rule"]
+        : SMART_AI_FALLBACK_CHAIN.slice();
+
+    const manualRaw = String(o.manualOverride || o.manual_override || "").trim();
+    if (manualRaw) {
+      const manual = manualRaw.toLowerCase();
+      if (manual !== "auto" && manual !== "smart") {
+        if (manual === "offline") {
+          return {
+            ok: true,
+            status: "OFFLINE_LOCAL",
+            selected_model: "local_rule",
+            fallback_chain: ["local_rule"],
+            ui_label: "⚡ 오프라인 빠른 생성",
+            exposes_raw_model_name: false,
+          };
+        }
+        if (isOllamaCloudModelBlocked(manual) || !ALLOWED_SMART_AI_MODELS.has(manual)) {
+          return {
+            ok: false,
+            status: "BLOCKED_MODEL",
+            selected_model: "",
+            fallback_chain: chain,
+            ui_label: "✨ 스마트 자동 생성",
+            exposes_raw_model_name: false,
+          };
+        }
+        return {
+          ok: true,
+          status: "MANUAL_OVERRIDE",
+          selected_model: manual,
+          fallback_chain: chain,
+          ui_label: manual === "local_rule" ? "⚡ 오프라인 빠른 생성" : "✨ 스마트 자동 생성",
+          exposes_raw_model_name: false,
+        };
+      }
+    }
+
+    if (Boolean(o.offlineOnly || o.offline_only)) {
+      return {
+        ok: true,
+        status: "OFFLINE_LOCAL",
+        selected_model: "local_rule",
+        fallback_chain: ["local_rule"],
+        ui_label: "⚡ 오프라인 빠른 생성",
+        exposes_raw_model_name: false,
+      };
+    }
+
+    const failedArr = Array.isArray(o.failedModels || o.failed_models)
+      ? o.failedModels || o.failed_models
+      : [];
+    const failedSet = new Set(failedArr.map((m) => String(m || "").trim().toLowerCase()).filter(Boolean));
+    for (let i = 0; i < chain.length; i += 1) {
+      const cand = chain[i];
+      if (!failedSet.has(cand.toLowerCase())) {
+        return {
+          ok: true,
+          status: cand === "local_rule" ? "FALLBACK_LOCAL" : "OK",
+          selected_model: cand,
+          fallback_chain: chain,
+          ui_label: cand === "local_rule" ? "⚡ 오프라인 빠른 생성" : "✨ 스마트 자동 생성",
+          exposes_raw_model_name: false,
+        };
+      }
+    }
+    return {
+      ok: true,
+      status: "FALLBACK_LOCAL",
+      selected_model: "local_rule",
+      fallback_chain: chain,
+      ui_label: "⚡ 오프라인 빠른 생성",
+      exposes_raw_model_name: false,
+    };
+  }
+
+  function resolveCurriculumSegmentState(activeSegment, combinedScopeCount) {
+    const valid = ["textbook", "collection", "combined"];
+    const raw = String(activeSegment || "textbook").trim().toLowerCase();
+    const seg = valid.includes(raw) ? raw : "textbook";
+    const cnt = Math.max(0, Number(combinedScopeCount) || 0);
+    return {
+      active_segment: seg,
+      combined_scope_count: cnt,
+      combined_tab_label: cnt > 0 ? `🎯 시험범위 조합 (${cnt})` : "🎯 시험범위 조합",
+      visible_panels: {
+        textbook: seg === "textbook",
+        collection: seg === "collection",
+        combined: seg === "combined",
+      },
+    };
+  }
+
+  function calibrateFluencyGrade(rawRating, responseTimeMs, baselineRtMsSamples, consecutiveGoodStreak) {
+    const rRaw = Number(rawRating);
+    if (![1, 2, 3, 4].includes(rRaw)) {
+      throw new Error("raw_rating must be 1..4");
+    }
+    if (rRaw !== 3) {
+      return {
+        raw_rating: rRaw,
+        effective_rating: rRaw,
+        z_score: 0.0,
+        status: "PRESERVED_EXPLICIT_RATING",
+      };
+    }
+    if (
+      responseTimeMs === null ||
+      responseTimeMs === undefined ||
+      typeof responseTimeMs !== "number" ||
+      !Number.isFinite(responseTimeMs) ||
+      responseTimeMs < 300 ||
+      responseTimeMs > 60000
+    ) {
+      return {
+        raw_rating: rRaw,
+        effective_rating: rRaw,
+        z_score: 0.0,
+        status: "BYPASSED_INVALID_RT",
+      };
+    }
+    const samples = Array.isArray(baselineRtMsSamples)
+      ? baselineRtMsSamples.filter((x) => typeof x === "number" && Number.isFinite(x) && x >= 300 && x <= 60000)
+      : [];
+    if (samples.length < 5) {
+      return {
+        raw_rating: rRaw,
+        effective_rating: rRaw,
+        z_score: 0.0,
+        status: "BYPASSED_COLD_START",
+      };
+    }
+    const lnSamples = samples.map((x) => Math.log(x)).sort((a, b) => a - b);
+    const n = lnSamples.length;
+    const mid = Math.floor(n / 2);
+    const medianLn = n % 2 === 1 ? lnSamples[mid] : 0.5 * (lnSamples[mid - 1] + lnSamples[mid]);
+    const absDevs = lnSamples.map((v) => Math.abs(v - medianLn)).sort((a, b) => a - b);
+    const madLn = n % 2 === 1 ? absDevs[mid] : 0.5 * (absDevs[mid - 1] + absDevs[mid]);
+    if (madLn < 1e-9) {
+      return {
+        raw_rating: rRaw,
+        effective_rating: rRaw,
+        z_score: 0.0,
+        status: "BYPASSED_ZERO_MAD",
+      };
+    }
+    const denom = Math.max(0.15, 1.4826 * madLn);
+    const z = quantize1e6((Math.log(responseTimeMs) - medianLn) / denom);
+
+    if (z >= 1.5) {
+      return {
+        raw_rating: rRaw,
+        effective_rating: 2,
+        z_score: z,
+        status: "DOWNGRADED_HESITANT_GOOD",
+      };
+    }
+    if (z <= -1.0 && (Number(consecutiveGoodStreak) || 0) >= 2) {
+      return {
+        raw_rating: rRaw,
+        effective_rating: 4,
+        z_score: z,
+        status: "UPGRADED_FLUENT_GOOD",
+      };
+    }
+    return {
+      raw_rating: rRaw,
+      effective_rating: 3,
+      z_score: z,
+      status: "UNCHANGED_NORMAL_GOOD",
+    };
+  }
+
+  function updateConfusionMatrixWeight(currentWeight, elapsedDays, cardA, cardB, reviewId, seenReviewIds, tauDays) {
+    const aId = String(cardA || "").trim();
+    const bId = String(cardB || "").trim();
+    const rawW = typeof currentWeight === "number" ? currentWeight : Number(currentWeight || 0.0);
+    const curW = !Number.isFinite(rawW) || rawW < 0.0 ? 0.0 : Math.min(100.0, rawW);
+    if (!aId || !bId || aId === bId) {
+      return {
+        weight: quantize1e6(curW),
+        updated: false,
+        should_interleave_peer: curW >= 2.0,
+        should_suggest_contrast_note: curW >= 4.0,
+      };
+    }
+    const revKey = String(reviewId || "").trim();
+    const seenSet = new Set((Array.isArray(seenReviewIds) ? seenReviewIds : []).map((x) => String(x || "").trim()));
+    if (revKey && seenSet.has(revKey)) {
+      return {
+        weight: quantize1e6(curW),
+        updated: false,
+        should_interleave_peer: curW >= 2.0,
+        should_suggest_contrast_note: curW >= 4.0,
+      };
+    }
+    const rawDt = typeof elapsedDays === "number" ? elapsedDays : Number(elapsedDays || 0.0);
+    const dt = !Number.isFinite(rawDt) || rawDt < 0.0 ? 0.0 : rawDt;
+    const rawTau = typeof tauDays === "number" ? tauDays : Number(tauDays || 30.0);
+    const tau = !Number.isFinite(rawTau) || rawTau < 1.0 ? 30.0 : rawTau;
+    const nextW = quantize1e6(Math.min(100.0, curW * Math.exp(-dt / tau) + 1.0));
+    return {
+      weight: nextW,
+      updated: true,
+      should_interleave_peer: nextW >= 2.0,
+      should_suggest_contrast_note: nextW >= 4.0,
+    };
+  }
+
+  function computeConfusionIntervalFactor(confusionWeight) {
+    const rawW = typeof confusionWeight === "number" ? confusionWeight : Number(confusionWeight || 0.0);
+    if (!Number.isFinite(rawW) || rawW <= 0.0) return 1.0;
+    const w = Math.min(100.0, rawW);
+    const penalty = Math.min(0.15, 0.05 * w);
+    return quantize1e6(Math.max(0.85, 1.0 - penalty));
+  }
+
+  function applyC4ReviewCalibration(rawRating, responseTimeMs, baselineRtMsSamples, consecutiveGoodStreak, confusionWeight) {
+    const fluency = calibrateFluencyGrade(rawRating, responseTimeMs, baselineRtMsSamples, consecutiveGoodStreak);
+    const rawFactor = computeConfusionIntervalFactor(confusionWeight);
+    const rewritten = Number(fluency.effective_rating) !== Number(fluency.raw_rating);
+    const effectiveFactor = rewritten ? 1.0 : rawFactor;
+    return {
+      raw_rating: fluency.raw_rating,
+      effective_rating: fluency.effective_rating,
+      z_score: fluency.z_score,
+      status: fluency.status,
+      raw_confusion_factor: rawFactor,
+      effective_interval_factor: effectiveFactor,
+      interval_scaled_by_confusion: !rewritten && effectiveFactor < 1.0,
+    };
+  }
+
   return {
     formatRetentionBadge,
     formatLeechBadge,
@@ -2638,6 +3421,13 @@
     filterStudyQueueByQuestionType,
     computeQuestionTypeCounts,
     buildTypeMatchedQuizOptions,
+    computeStudyToolsSummary,
+    resolveSmartAiEngine,
+    resolveCurriculumSegmentState,
+    calibrateFluencyGrade,
+    updateConfusionMatrixWeight,
+    computeConfusionIntervalFactor,
+    applyC4ReviewCalibration,
   };
 });
 
