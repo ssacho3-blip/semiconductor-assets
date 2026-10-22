@@ -29,14 +29,14 @@
     if (leechStatus === "critical_leech") {
       return {
         visible: true,
-        label: `🚨 집중 처방 대상 (Leech ${count}회 오답) — AI 원자 분할 추천`,
+        label: `🚨 집중 복습 대상 (${count}회 오답) — 쉬운 카드로 쪼개기 추천`,
         tone: "rose",
       };
     }
     if (leechStatus === "warning") {
       return {
         visible: true,
-        label: `⚠️ 반복 오답 주의 (${count}회) — AI 소크라테스 힌트 활용 권장`,
+        label: `⚠️ 반복 오답 주의 (${count}회) — 단계별 힌트 활용 권장`,
         tone: "amber",
       };
     }
@@ -213,6 +213,20 @@
     return PATTERN_META[String(pattern || "definition")] || "개념 정의";
   }
 
+  const OLLAMA_CLOUD_MODELS = [
+    { id: "glm-5.3-flash", label: "☁️ Ollama Cloud · GLM-5.3 Flash (초고속 핵심 카드)", recommended: true },
+    { id: "deepseek-v4.1-flash", label: "☁️ Ollama Cloud · DeepSeek-v4.1 Flash (정밀 빈칸·문맥)", recommended: false },
+    { id: "gemma4:31b", label: "☁️ Ollama Cloud · Gemma-4 31B (시각·표·문서 정밀 분석)", recommended: false },
+    { id: "glm-5.3", label: "☁️ Ollama Cloud · GLM-5.3 (심화·전공 서술 카드)", recommended: false },
+    { id: "local_rule", label: "⚡ 기기 내장 초고속 엔진 (오프라인 · 0초)", recommended: false },
+  ];
+
+  function isOllamaCloudModelBlocked(modelName) {
+    const norm = String(modelName || "").trim().toLowerCase();
+    if (!norm) return false;
+    return norm.startsWith("kimi") || norm.includes("/kimi") || norm.startsWith("minimax") || norm.includes("/minimax");
+  }
+
   function formatIngestStatusBanner(res) {
     if (!res || res.status !== "OK") {
       const code = (res && res.error_code) || "unknown_error";
@@ -228,10 +242,14 @@
     const st = res.stats || {};
     const cat = formatCategoryBadge(res.category);
     const savedMsg = res.deck_id ? ` · 덱 즉시 저장 완료(#${res.deck_id})` : " · 미리보기 검수 대기";
+    const cloudBadge =
+      res.ollama_cloud_model && res.ollama_cloud_model !== "local_rule"
+        ? ` · ☁️ Ollama Cloud (${res.ollama_cloud_model})`
+        : "";
     return {
       status: "OK",
       tone: "emerald",
-      title: `✅ [${cat.label}] '${res.deck_name}' — ${cards.length}장 추출${savedMsg}`,
+      title: `✅ [${cat.label}] '${res.deck_name}' — ${cards.length}장 추출${savedMsg}${cloudBadge}`,
       summary: `총 ${st.pages || 1}쪽 (OCR ${st.ocr_pages || 0}쪽) · 저신뢰 제외 ${st.low_confidence_lines || 0}줄 · 근거미달 폐기 ${st.dropped_ungrounded || 0}장 · 중복제거 ${st.duplicates || 0}장 · 엔진: ${res.provider || "local"} (${res.latency_ms || 0}ms)`,
       canSave: !res.deck_id && cards.length > 0,
     };
@@ -1325,6 +1343,7 @@
   function createStandaloneEngine(customStorage) {
     const STORAGE_KEY = "braindeck_standalone_v55_db";
     const storageObj = customStorage || (typeof localStorage !== "undefined" ? localStorage : null);
+    let memoryDbRaw = null;
 
     function loadDb() {
       if (storageObj) {
@@ -1335,6 +1354,15 @@
             if (parsed && Array.isArray(parsed.decks) && Array.isArray(parsed.cards)) {
               return parsed;
             }
+          }
+        } catch (_e) {
+          // ignore
+        }
+      } else if (memoryDbRaw) {
+        try {
+          const parsed = JSON.parse(memoryDbRaw);
+          if (parsed && Array.isArray(parsed.decks) && Array.isArray(parsed.cards)) {
+            return parsed;
           }
         } catch (_e) {
           // ignore
@@ -1383,9 +1411,11 @@
     }
 
     function saveDb(db) {
+      const serialized = JSON.stringify(db);
+      memoryDbRaw = serialized;
       if (storageObj) {
         try {
-          storageObj.setItem(STORAGE_KEY, JSON.stringify(db));
+          storageObj.setItem(STORAGE_KEY, serialized);
         } catch (_e) {
           // ignore quota error
         }
@@ -1401,18 +1431,49 @@
       };
     }
 
+    function enrichCardWithRenderedFields(card) {
+      const c = Object.assign({}, card || {});
+      const rawFront = String(c.front_text || c.rendered_question || "").trim();
+      const rawBack = String(c.back_text || c.rendered_answer || "").trim();
+      const ext = extractTargetAndExplanation(rawFront, rawBack, c.target_answer, c.extra_explanation);
+      const renderedQ = rawFront.replace(/\{\{c\d+::([^:}]+)(?:::([^}]+))?\}\}/g, function (_, ans, hint) {
+        return hint ? `[힌트: ${hint}]` : "[ ... ]";
+      });
+      c.rendered_question = renderedQ || rawFront;
+      c.rendered_answer = ext.targetAnswer || rawBack;
+      c.target_answer = ext.targetAnswer || rawBack;
+      c.extra_explanation = ext.extraExplanation || "";
+      return c;
+    }
+
+    function isCardDueNow(card, nowMs) {
+      if (!card) return false;
+      if (card.state === "new" || card.state === "learning" || card.state === "relearning") {
+        if (!card.due_at) return true;
+        const parsed = Date.parse(card.due_at);
+        if (!Number.isFinite(parsed)) return true;
+        return parsed <= nowMs + 60000;
+      }
+      if (!card.due_at) return true;
+      const dueTime = Date.parse(card.due_at);
+      if (!Number.isFinite(dueTime)) return true;
+      return dueTime <= nowMs;
+    }
+
     function computeDeckSummaries(db) {
+      const nowMs = Date.now();
       return db.decks.map((d) => {
         const dCards = db.cards.filter((c) => Number(c.deck_id) === Number(d.deck_id));
-        const newCount = dCards.filter((c) => c.state === "new").length;
-        const learnCount = dCards.filter((c) => c.state === "learning" || c.state === "relearning").length;
-        const reviewCount = dCards.filter((c) => c.state === "review").length;
+        const dueCards = dCards.filter((c) => isCardDueNow(c, nowMs));
+        const newCount = dueCards.filter((c) => c.state === "new").length;
+        const learnCount = dueCards.filter((c) => c.state === "learning" || c.state === "relearning").length;
+        const reviewCount = dueCards.filter((c) => c.state === "review").length;
         return {
           deck_id: d.deck_id,
           name: d.name,
           description: d.description || "",
           total_cards: dCards.length,
-          due_cards: dCards.length,
+          due_cards: dueCards.length,
           new_count: newCount,
           learn_count: learnCount,
           review_count: reviewCount,
@@ -1422,8 +1483,10 @@
 
     function getDashboard() {
       const db = loadDb();
+      const nowMs = Date.now();
       const decks = computeDeckSummaries(db);
       const totalCards = db.cards.length;
+      const dueNowCount = db.cards.filter((c) => isCardDueNow(c, nowMs)).length;
       const avgStability = totalCards > 0
         ? db.cards.reduce((acc, c) => acc + Number(c.stability || 1.2), 0) / totalCards
         : 0;
@@ -1434,7 +1497,7 @@
         decks,
         stats: {
           total_cards: totalCards,
-          due_now: totalCards,
+          due_now: dueNowCount,
           reviews_today: (db.reviewHistory || []).length,
           retention_rate_30d: 92.5,
           avg_stability_days: Number(avgStability.toFixed(1)),
@@ -1446,9 +1509,13 @@
     function getDueCards(opts) {
       const options = opts || {};
       const db = loadDb();
+      const nowMs = Date.now();
       let pool = db.cards.slice();
       if (options.deck_id !== undefined && options.deck_id !== null && options.deck_id !== "") {
         pool = pool.filter((c) => Number(c.deck_id) === Number(options.deck_id));
+      }
+      if (!options.include_all_cards) {
+        pool = pool.filter((c) => isCardDueNow(c, nowMs));
       }
       const shuffleMode = String(options.shuffle_mode || "interleaved").toLowerCase();
       if (shuffleMode !== "sequential" && pool.length > 1) {
@@ -1457,6 +1524,7 @@
       if (options.bury_siblings !== false) {
         pool = deduplicateSessionSiblings(pool);
       }
+      pool = pool.map(enrichCardWithRenderedFields);
       return {
         ok: true,
         standalone: true,
@@ -1614,6 +1682,8 @@
       if (!card) {
         return { ok: false, error: "Card not found" };
       }
+      const nowMs = Date.now();
+      const prevEvents = Array.isArray(card.review_events) ? card.review_events.slice() : [];
       db.reviewHistory.push({
         card_id: card.card_id,
         prev_state: card.state,
@@ -1621,37 +1691,57 @@
         prev_lapses: card.lapses,
         prev_stability: card.stability,
         prev_difficulty: card.difficulty,
+        prev_due_at: card.due_at,
+        prev_review_events: prevEvents,
         rating,
-        at: new Date().toISOString(),
+        at: new Date(nowMs).toISOString(),
       });
 
-      card.reps = Number(card.reps || 0) + 1;
+      const nextEvents = prevEvents.concat([
+        {
+          event_id: `ev_${card.card_id}_${nowMs}_${prevEvents.length + 1}`,
+          card_id: card.card_id,
+          rating,
+          ts_ms: nowMs,
+          kind: String(p.kind || "REVIEW"),
+          idem_key: `idem_${card.card_id}_${nowMs}_${prevEvents.length + 1}`,
+        },
+      ]);
+      const folded = foldReviewEvents(nextEvents);
+      card.review_events = nextEvents;
+      card.reps = folded.reps;
+      card.lapses = folded.lapses;
+      card.stability = folded.s;
+      card.difficulty = folded.d;
+
       if (rating === 1) {
-        if (card.state === "review") card.lapses = Number(card.lapses || 0) + 1;
         card.state = "relearning";
-        card.stability = Math.max(0.4, Number(card.stability || 1.2) * 0.55);
-        card.difficulty = Math.min(10.0, Number(card.difficulty || 5.0) + 0.8);
+        card.due_at = new Date(nowMs).toISOString();
       } else if (rating === 2) {
         card.state = "learning";
-        card.stability = Math.max(0.8, Number(card.stability || 1.2) * 1.15);
-        card.difficulty = Math.min(10.0, Number(card.difficulty || 5.0) + 0.3);
-      } else if (rating === 3) {
-        card.state = "review";
-        card.stability = Math.max(1.5, Number(card.stability || 1.2) * 2.2);
+        const ivlDays = Math.max(1, Math.round(card.stability));
+        card.due_at = new Date(nowMs + ivlDays * DAY_MS_V56).toISOString();
       } else {
         card.state = "review";
-        card.stability = Math.max(3.0, Number(card.stability || 1.2) * 3.1);
-        card.difficulty = Math.max(1.0, Number(card.difficulty || 5.0) - 0.3);
+        const ivlDays = Math.max(1, Math.round(card.stability));
+        card.due_at = new Date(nowMs + ivlDays * DAY_MS_V56).toISOString();
       }
       saveDb(db);
-      const labelMap = { 1: "10분 후 재학습", 2: "1일 후 복습", 3: `${Math.round(card.stability)}일 후 복습`, 4: `${Math.round(card.stability)}일 후 복습` };
+      const schedDays = rating === 1 ? 0 : Math.max(1, Math.round(card.stability));
+      const labelMap = {
+        1: "10분 후 재학습",
+        2: `${schedDays}일 후 복습`,
+        3: `${schedDays}일 후 복습`,
+        4: `${schedDays}일 후 복습`,
+      };
       return {
         ok: true,
         standalone: true,
         card_id: card.card_id,
         rating,
-        scheduled_days: Math.round(card.stability),
+        scheduled_days: schedDays,
         scheduled_label: labelMap[rating],
+        due_at: card.due_at,
         memory: {
           state: card.state,
           reps: card.reps,
@@ -1662,6 +1752,49 @@
       };
     }
 
+    function undoLastReview() {
+      const db = loadDb();
+      if (!Array.isArray(db.reviewHistory) || db.reviewHistory.length === 0) {
+        return { ok: false, standalone: true, error: "되돌릴 최근 복습 기록이 없습니다." };
+      }
+      const last = db.reviewHistory.pop();
+      const card = db.cards.find((c) => Number(c.card_id) === Number(last.card_id));
+      if (!card) {
+        saveDb(db);
+        return { ok: false, standalone: true, error: "카드를 찾을 수 없습니다." };
+      }
+      card.state = last.prev_state || "new";
+      card.reps = Number(last.prev_reps || 0);
+      card.lapses = Number(last.prev_lapses || 0);
+      card.stability = Number(last.prev_stability || 1.2);
+      card.difficulty = Number(last.prev_difficulty || 5.0);
+      card.due_at = last.prev_due_at || new Date().toISOString();
+      card.review_events = Array.isArray(last.prev_review_events) ? last.prev_review_events.slice() : [];
+      saveDb(db);
+      return {
+        ok: true,
+        standalone: true,
+        card_id: card.card_id,
+        restored_state: card.state,
+        restored_stability: Number(card.stability.toFixed(2)),
+      };
+    }
+
+    function batchSaveDeck(payload) {
+      const p = payload || {};
+      const cards = Array.isArray(p.cards) ? p.cards : [];
+      const deckName = String(p.deck_name || "사진·PDF 추출 단어장").trim();
+      const specs = cards
+        .map((c) => ({
+          front_text: String(c.front_text || c.front || "").trim(),
+          back_text: String(c.back_text || c.back || "").trim(),
+          note_type: c.note_type || (String(c.front_text || "").includes("{{c") ? "cloze" : "basic"),
+          tags: Array.isArray(c.tags) ? c.tags : [String(p.category || "custom_doc")],
+        }))
+        .filter((s) => s.front_text && s.back_text);
+      return insertDeckWithSpecs(deckName, "사진·PDF 문서 추출 단어장", specs, "interleaved");
+    }
+
     return {
       getCatalog,
       getDashboard,
@@ -1670,12 +1803,14 @@
       buildCollectionDeck,
       buildCombinedExamDeck,
       buildSmartTextDeck,
+      batchSaveDeck,
       submitReview,
+      undoLastReview,
     };
   }
 
   // =========================================================================
-  // BrainDeck v5.6 REA Master Upgrade — Event Fold, Summary Sheet, Exam Print, Audio Loop
+  // BrainDeck v5.6 Master Upgrade — Event Fold, Summary Sheet, Exam Print, Audio Loop
   // =========================================================================
   const DEFAULT_FSRS5_PARAMS = [
     0.40255, 1.18385, 3.17300, 15.69105, 7.19490,
@@ -1978,6 +2113,13 @@
     history: ["강화도 조약", "함무라비 법전", "훈민정음", "경국대전", "갑신정변", "동학 농민 운동", "독립협회", "3·1 운동"],
     science: ["공유 결합", "이온 결합", "활성화 에너지", "미토콘드리아", "옴의 법칙 (V = IR)", "원자성·일관성·격리성·지속성"],
     ko_dictation: ["맑고 따뜻합니다", "할머니께 썼습니다", "조용히 읽어요", "깨끗이 씻어요", "같이 걸어요"],
+    general_concept: [
+      "핵심 원리 및 개념 정의",
+      "상호 배제와 동기화 조건",
+      "원인과 결과의 상관관계",
+      "필수 성립 요건 및 예외 조항",
+      "구조적 특징과 작동 원리",
+    ],
   };
 
   function classifyCardQuestionType(card) {
@@ -2094,6 +2236,24 @@
       };
     }
 
+    const frontWithoutCloze = front.replace(/\{\{c\d+::|::[^}]*\}\}|\}\}/g, " ");
+    const hasEnglishInFront = /[A-Za-z]/.test(frontWithoutCloze);
+    const hasVocabSignal =
+      hasEnglishInFront ||
+      /eng|vocab|word|toeic|teps|toefl|opic|lang|mid1|elem/.test(tagStr) ||
+      front.includes("영단어") ||
+      front.includes("어휘") ||
+      front.includes("단어") ||
+      front.includes("숙어");
+    if (!hasVocabSignal) {
+      return {
+        category_key: "history_sci",
+        facet_key: "general_concept",
+        badge_label: "💡 핵심 개념·정의",
+        short_label: "역사·과학·전공",
+      };
+    }
+
     return {
       category_key: "vocab",
       facet_key: "eng_vocab_meaning",
@@ -2130,6 +2290,19 @@
     return counts;
   }
 
+  function _seededFisherYatesJs(items, seedVal) {
+    const arr = Array.isArray(items) ? items.slice() : [];
+    let state = (Math.abs(Number(seedVal) || 1) * 1664525 + 1013904223) % 4294967296;
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      state = (state * 1664525 + 1013904223) % 4294967296;
+      const j = state % (i + 1);
+      const tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+    }
+    return arr;
+  }
+
   function buildTypeMatchedQuizOptions(card, deckCards, requiredOptions = 4) {
     const c = card || {};
     const qtype = classifyCardQuestionType(c);
@@ -2139,11 +2312,13 @@
     const ext = extractTargetAndExplanation(front, back, c.target_answer, c.extra_explanation);
     const targetAnswer = String(ext.targetAnswer || back || "정답").trim();
 
-    const cid = Number(c.card_id || 0);
+    const cid = Number(c.card_id || 1);
+    const reps = Math.max(0, Number(c.reps || 0));
     const distractors = [];
     const seenNorm = new Set([targetAnswer.toLowerCase()]);
 
     const pool = Array.isArray(deckCards) ? deckCards : [];
+    const poolCandidates = [];
     for (let i = 0; i < pool.length; i += 1) {
       const other = pool[i] || {};
       if (Number(other.card_id || -1) === cid && cid !== 0) continue;
@@ -2157,11 +2332,19 @@
       const norm = cand.toLowerCase();
       if (seenNorm.has(norm)) continue;
       seenNorm.add(norm);
-      distractors.push(cand);
-      if (distractors.length >= requiredOptions - 1) break;
+      poolCandidates.push(cand);
     }
 
-    const fallbackPool = TYPE_FALLBACK_DISTRACTOR_BANK[facetKey] || TYPE_FALLBACK_DISTRACTOR_BANK.eng_vocab_meaning;
+    const shuffledPool = _seededFisherYatesJs(poolCandidates, cid * 31 + reps * 997 + 17);
+    for (let i = 0; i < shuffledPool.length; i += 1) {
+      if (distractors.length >= requiredOptions - 1) break;
+      distractors.push(shuffledPool[i]);
+    }
+
+    const fallbackPool = _seededFisherYatesJs(
+      TYPE_FALLBACK_DISTRACTOR_BANK[facetKey] || TYPE_FALLBACK_DISTRACTOR_BANK.eng_vocab_meaning,
+      cid * 73 + reps * 389 + 53
+    );
     for (let i = 0; i < fallbackPool.length; i += 1) {
       if (distractors.length >= requiredOptions - 1) break;
       const cand = fallbackPool[i];
@@ -2172,15 +2355,14 @@
     }
 
     const rawOptions = [targetAnswer].concat(distractors.slice(0, Math.max(0, requiredOptions - 1)));
-    const shift = Math.abs(cid || 1) % Math.max(1, rawOptions.length);
-    const rotated = rawOptions.slice(shift).concat(rawOptions.slice(0, shift));
+    const shuffledOptions = _seededFisherYatesJs(rawOptions, cid * 131 + reps * 521 + 2026);
 
     return {
       ok: true,
       question_type: qtype,
       question_facet: qtype.badge_label,
       target_answer: targetAnswer,
-      options: rotated,
+      options: shuffledOptions,
       tap_blocks: targetAnswer.split(/\s+/).filter(Boolean),
     };
   }
@@ -2192,6 +2374,8 @@
     buildForgettingCurveSvgPoints,
     formatCategoryBadge,
     formatPatternBadge,
+    OLLAMA_CLOUD_MODELS,
+    isOllamaCloudModelBlocked,
     formatIngestStatusBanner,
     STORE_CATEGORY_LABELS,
     filterStorePacks,
