@@ -441,7 +441,7 @@
         </div>
 
         <!-- Study Filter Chips (All / Wrong-Unknown Only / Marked Only + Smart Interleaved Shuffle Toggle) -->
-        <div id="study-filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+        <div id="study-filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
           <button type="button" class="study-filter-btn btn-primary" data-filter="all" style="padding:7px 13px;font-size:0.8rem;">
             📚 전체 학습
           </button>
@@ -453,6 +453,26 @@
           </button>
           <button type="button" id="btn-toggle-shuffle" class="btn-primary" style="padding:7px 13px;font-size:0.8rem;margin-left:auto;" title="단원·유형 쏠림 없이 지능형 랜덤 섞기">
             🔀 스마트 랜덤 섞기: ON
+          </button>
+        </div>
+
+        <!-- Gate T43: Question-Type Organization & Filter Bar (유형별 모아풀기 · 4지선다 동종 보기 격리) -->
+        <div id="study-type-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;padding:7px 10px;border-radius:13px;background:#f1f5f9;border:1px solid #e2e8f0;">
+          <span style="font-size:0.76rem;font-weight:800;color:#334155;margin-right:2px;">🏷️ 문제 유형별 정리:</span>
+          <button type="button" class="study-qtype-btn btn-primary" id="btn-qtype-all" data-qtype="all" style="padding:5px 11px;font-size:0.76rem;">
+            🗂️ 전체 유형
+          </button>
+          <button type="button" class="study-qtype-btn" id="btn-qtype-vocab" data-qtype="vocab" style="padding:5px 11px;font-size:0.76rem;">
+            📘 단어·어휘만
+          </button>
+          <button type="button" class="study-qtype-btn" id="btn-qtype-grammar" data-qtype="grammar" style="padding:5px 11px;font-size:0.76rem;">
+            📐 문법·구문만
+          </button>
+          <button type="button" class="study-qtype-btn" id="btn-qtype-hanja" data-qtype="hanja" style="padding:5px 11px;font-size:0.76rem;">
+            漢字 한자·성어만
+          </button>
+          <button type="button" class="study-qtype-btn" id="btn-qtype-history_sci" data-qtype="history_sci" style="padding:5px 11px;font-size:0.76rem;">
+            🏛️ 역사·과학·전공
           </button>
         </div>
 
@@ -489,7 +509,10 @@
         <div class="card-arena">
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.78rem;color:var(--muted);">
-              <span id="card-meta">준비 중...</span>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span id="card-qtype-badge" class="badge-pill" style="font-size:0.74rem;background:#eef2ff;color:#1d4ed8;">📘 단어 뜻·어휘</span>
+                <span id="card-meta">준비 중...</span>
+              </div>
               <div style="display:flex;align-items:center;gap:6px;">
                 <span id="card-fsrs-meta" style="display:none;"></span>
                 <button id="btn-mark-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="중요 별표 표시">☆ 별표</button>
