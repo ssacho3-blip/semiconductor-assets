@@ -326,7 +326,7 @@
   <!-- Initial Mode & LearnerProfile v2 Setup Modal (Frame 1: 3 Questions) -->
   <div id="onboarding-modal" class="onboarding-overlay">
     <div class="onboarding-card" style="max-width:460px;">
-      <div style="font-size:2rem;margin-bottom:4px;">🧠</div>
+      <div style="font-size:0.85rem;font-weight:800;color:var(--accent);letter-spacing:0.06em;margin-bottom:4px;">BRAINDECK PROFILE</div>
       <div style="font-size:1.25rem;font-weight:800;margin-bottom:4px;">내 학습 프로필 설정 (1회 설정 · 전역 자동 적용)</div>
       <div style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
         한 번만 골라두면 모든 탭의 풀이 방식·난이도·섞기 옵션이 자동으로 맞춰집니다.
@@ -334,21 +334,21 @@
 
       <div style="font-size:0.78rem;font-weight:800;color:var(--accent);margin-bottom:6px;">1. 학습 연령 · 목표 프리셋 (원탭 선택)</div>
       <button type="button" class="onboarding-mode-btn" data-onboarding-tier="junior">
-        <span style="font-size:1.6rem;">🌱</span>
+        <span class="badge-pill" style="background:#ecfdf5;color:#047857;">JR</span>
         <div>
           <div style="font-size:0.95rem;font-weight:800;color:var(--text);">주니어 모드 (초등·기초)</div>
           <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">큰 글씨 · 4지선다 퀴즈 · Lv.1 기초 · 쉬운 3버튼</div>
         </div>
       </button>
       <button type="button" class="onboarding-mode-btn" data-onboarding-tier="teen">
-        <span style="font-size:1.6rem;">🚀</span>
+        <span class="badge-pill" style="background:#e8f3ff;color:#1b64da;">K12</span>
         <div>
           <div style="font-size:0.95rem;font-weight:800;color:var(--text);">중고등 모드 (내신·수능)</div>
           <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">자동 진화(선다→서술) · 통합 난이도(Lv.1~3) · 교차 섞기</div>
         </div>
       </button>
       <button type="button" class="onboarding-mode-btn" data-onboarding-tier="adult">
-        <span style="font-size:1.6rem;">🎓</span>
+        <span class="badge-pill" style="background:#eef2ff;color:#3730a3;">PRO</span>
         <div>
           <div style="font-size:0.95rem;font-weight:800;color:var(--text);">성인 모드 (자격증·어학·전공)</div>
           <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">자동 진화(선다→서술) · 심화·역방향 인출 · 정밀 FSRS</div>
@@ -356,28 +356,28 @@
       </button>
 
       <details style="margin-top:10px;padding:10px 12px;border-radius:14px;background:#f9fafb;border:1px solid var(--border);">
-        <summary style="font-size:0.82rem;font-weight:700;cursor:pointer;color:var(--muted);">⚙️ 세부 풀이 방식 · 난이도 직접 조정 (선택)</summary>
+        <summary style="font-size:0.82rem;font-weight:700;cursor:pointer;color:var(--muted);">세부 풀이 방식 · 난이도 직접 조정 (선택)</summary>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
           <label style="font-size:0.78rem;font-weight:700;color:var(--muted);">
             2. 카드 풀이 방식 (1카드 1모드)
             <select id="profile-solve-mode-select" style="margin-top:4px;">
-              <option value="adaptive">🔄 자동 진화 (새 카드=4지선다 → 복습 카드=직접 타이핑)</option>
-              <option value="choice">🎯 4지선다 객관식만</option>
-              <option value="typing">✍️ 직접 타이핑(서술형)만</option>
-              <option value="flip">🃏 클래식 카드 뒤집기만</option>
+              <option value="adaptive">자동 진화 (새 카드=4지선다 → 복습 카드=직접 타이핑)</option>
+              <option value="choice">4지선다 객관식만</option>
+              <option value="typing">직접 타이핑(서술형)만</option>
+              <option value="flip">클래식 카드 뒤집기만</option>
             </select>
           </label>
           <label style="font-size:0.78rem;font-weight:700;color:var(--muted);">
             3. 기본 카드 생성 난이도
             <select id="profile-difficulty-select" style="margin-top:4px;">
-              <option value="mixed">🎲 통합 (Lv.1 기초 + Lv.2 빈칸 + Lv.3 심화)</option>
-              <option value="lv1">🌱 Lv.1 기초·핵심 개념</option>
-              <option value="lv2">📘 Lv.2 실전 문맥 빈칸</option>
-              <option value="lv3">🔥 Lv.3 심화·역방향 인출</option>
+              <option value="mixed">통합 (Lv.1 기초 + Lv.2 빈칸 + Lv.3 심화)</option>
+              <option value="lv1">Lv.1 기초·핵심 개념</option>
+              <option value="lv2">Lv.2 실전 문맥 빈칸</option>
+              <option value="lv3">Lv.3 심화·역방향 인출</option>
             </select>
           </label>
           <button id="btn-save-learner-profile" type="button" class="btn-primary" style="margin-top:4px;width:100%;">
-            ✅ 세부 프로필 저장 및 시작
+            세부 프로필 저장 및 시작
           </button>
         </div>
       </details>
@@ -387,19 +387,19 @@
   <div class="app-shell">
     <header style="flex-wrap:wrap;">
       <div class="brand-title" style="flex-wrap:wrap;">
-        🧠 BrainDeck (브레인덱)
-        <span id="age-tier-banner" class="badge-pill">🚀 중고등</span>
+        BrainDeck (브레인덱)
+        <span id="age-tier-banner" class="badge-pill">중고등</span>
         <span id="learner-policy-summary" style="font-size:0.74rem;font-weight:600;color:var(--muted);"></span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button id="btn-open-mode-setup" type="button" style="padding:7px 11px;font-size:0.78rem;">
-          ⚙️ 프로필 설정
+          프로필 설정
         </button>
         <button id="btn-undo-review" type="button" style="padding:7px 11px;font-size:0.78rem;" title="방금 평가 되돌리기 (Z)">
-          ↩️ 취소
+          취소
         </button>
         <button id="btn-reset-study" type="button" style="padding:7px 11px;font-size:0.78rem;background:#fff0f0;color:#be123c;border-color:#fecdd3;" title="현재 덱 학습 진도 및 복습 상태 처음부터 초기화">
-          🔄 초기화
+          초기화
         </button>
       </div>
     </header>
@@ -409,23 +409,23 @@
     <!-- 5-Tab Multi-Page Navigation -->
     <nav id="main-tab-nav" class="tab-nav" aria-label="주요 메뉴">
       <button type="button" class="nav-tab-btn active" data-tab="study">
-        <span class="nav-icon">🏠</span>
+        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">STUDY</span>
         <span>학습</span>
       </button>
       <button type="button" class="nav-tab-btn" data-tab="curriculum">
-        <span class="nav-icon">🏫</span>
+        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">EXAM</span>
         <span>시험·급수</span>
       </button>
       <button type="button" class="nav-tab-btn" data-tab="create">
-        <span class="nav-icon">➕</span>
+        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">CREATE</span>
         <span>만들기</span>
       </button>
       <button type="button" class="nav-tab-btn" data-tab="store">
-        <span class="nav-icon">🛒</span>
+        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">STORE</span>
         <span>스토어</span>
       </button>
       <button type="button" class="nav-tab-btn" data-tab="stats">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">STATS</span>
         <span>내 정보</span>
       </button>
     </nav>
@@ -435,21 +435,25 @@
       <section class="panel">
         <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
           <select id="deck-select" style="flex:1;min-width:180px;"></select>
-          <!-- 3-Color Queue Counter Pills + Progressive Disclosure Study Tools Toggle (Contract C1) -->
+          <!-- 3-Color Queue Counter Pills + Progressive Disclosure Study Tools Toggle (Contract C1 + BD-P0-02 Compact Header Toggle) -->
           <div id="study-queue-counters" style="display:flex;gap:6px;align-items:center;font-size:0.78rem;font-weight:800;flex-wrap:wrap;">
             <span id="count-new" style="padding:5px 10px;border-radius:999px;background:#e8f3ff;color:#1b64da;">새 카드 0</span>
             <span id="count-learn" style="padding:5px 10px;border-radius:999px;background:#fff0f0;color:#be123c;">학습·오답 0</span>
             <span id="count-review" style="padding:5px 10px;border-radius:999px;background:#e8faf0;color:#008a50;">복습 0</span>
             <span id="active-study-filter-summary" class="badge-pill" style="display:none;background:#eef2ff;color:#1d4ed8;font-size:0.74rem;"></span>
+            <button type="button" id="btn-toggle-compact-header" aria-expanded="true" style="padding:5px 11px;font-size:0.76rem;border-radius:999px;" title="상단 학습계획 및 대시보드 접기/펼치기 (카드 집중 뷰)">
+              대시보드 접기
+            </button>
             <button type="button" id="btn-toggle-study-tools" aria-expanded="false" style="padding:5px 11px;font-size:0.76rem;border-radius:999px;" title="필터 · 문제유형 · 요약시트 · 인쇄 · 오디오 도구 열기">
-              🎛️ 필터·도구
+              필터·도구
             </button>
           </div>
         </div>
 
+        <div id="bd-collapsible-header-zone">
         <!-- Always-Visible D-Day Study Planner & Daily Quota Controller (v5.9 Upgrade) -->
         <div id="bd-planner-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:10px 12px;border-radius:16px;background:#eef2ff;border:1px solid #c7d2fe;">
-          <span style="font-size:0.78rem;font-weight:800;color:#1d4ed8;">📅 D-Day 학습계획 · 일일 할당량:</span>
+          <span style="font-size:0.78rem;font-weight:800;color:#1d4ed8;">D-Day 학습계획 · 일일 할당량:</span>
           <select id="bd-plan-days" style="width:auto;padding:5px 8px;font-size:0.76rem;" title="시험·완주 목표 기간 (D-Day)">
             <option value="7">D-7 (단기 집중)</option>
             <option value="14">D-14 (2주 내신)</option>
@@ -471,24 +475,24 @@
             <option value="60">하루 60분</option>
           </select>
           <button type="button" id="btn-compute-study-plan" style="padding:5px 10px;font-size:0.76rem;background:#ffffff;color:#1d4ed8;border-color:#93c5fd;">
-            📊 계획 산출
+            계획 산출
           </button>
           <button type="button" id="btn-apply-study-plan" class="btn-primary" style="padding:5px 12px;font-size:0.76rem;">
-            ✅ 이 계획으로 매일 학습 적용
+            이 계획으로 매일 학습 적용
           </button>
           <select id="bd-custom-study-preset" style="width:auto;padding:5px 8px;font-size:0.76rem;margin-left:auto;" title="맞춤 보충 학습 (Custom Study)">
-            <option value="increase_new_quota">➕ 오늘 새 카드 10장 더 학습</option>
-            <option value="forgotten_recent">🔥 최근 오답·망각 복습</option>
-            <option value="review_ahead">⏩ 시험 대비 3일 선행 복습</option>
-            <option value="preview_new">👀 새 카드 무오염 미리보기</option>
-            <option value="cram_flagged_or_leech">🚩 플래그·거머리 취약 특훈</option>
+            <option value="increase_new_quota">오늘 새 카드 10장 더 학습</option>
+            <option value="forgotten_recent">최근 오답·망각 복습</option>
+            <option value="review_ahead">시험 대비 3일 선행 복습</option>
+            <option value="preview_new">새 카드 무오염 미리보기</option>
+            <option value="cram_flagged_or_leech">플래그·거머리 취약 특훈</option>
           </select>
           <button type="button" id="btn-run-custom-study" style="padding:5px 11px;font-size:0.76rem;background:#ffffff;color:#1d4ed8;border-color:#93c5fd;">
-            ⚡ 맞춤학습 시작
+            맞춤학습 시작
           </button>
         </div>
         <div id="bd-study-plan-banner" class="ai-box" style="display:block;margin-top:0;margin-bottom:10px;background:#f8fafc;border:1px solid #c7d2fe;color:#1e293b;font-size:0.82rem;">
-          📅 덱을 선택하면 전체 카드 수와 목표일(D-Day)에 맞춰 오늘 학습할 할당량이 자동으로 계획·배분됩니다.
+          덱을 선택하면 전체 카드 수와 목표일(D-Day)에 맞춰 오늘 학습할 할당량이 자동으로 계획·배분됩니다.
         </div>
 
         <!-- IMPL-V61: 0.5-Second Multi-Dimensional Progress & Mastery Dashboard (Today % + 1,000-Card Coverage % + 4-Tier Maturity Bar + Lv1~Lv4 Stage Filter) -->
@@ -496,11 +500,11 @@
           <!-- Row 1: Today's Daily Goal Progress Bar -->
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;font-size:0.8rem;">
             <div>
-              🎯 <strong style="color:#0f172a;">오늘 목표 진척률:</strong>
+              <strong style="color:#0f172a;">오늘 목표 진척률:</strong>
               <span id="bd-today-progress-label" style="font-weight:800;color:#2563eb;font-variant-numeric:tabular-nums;">0 / 30장 완료 (0.0%)</span>
             </div>
             <div id="bd-today-eta-label" style="font-size:0.75rem;font-weight:700;color:#475569;font-variant-numeric:tabular-nums;">
-              ⏱️ 남은 시간 약 7분
+              남은 시간 약 7분
             </div>
           </div>
           <div role="progressbar" aria-label="오늘 목표 진척률" style="height:8px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-bottom:10px;">
@@ -510,14 +514,14 @@
           <!-- Row 2: 1,000-Card Whole-Deck Coverage % & FSRS Mastery % + 4-Tier Stacked Bar -->
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;font-size:0.79rem;">
             <div>
-              📊 <strong style="color:#0f172a;">전체 덱 진도율:</strong>
+              <strong style="color:#0f172a;">전체 덱 진도율:</strong>
               <span id="bd-deck-coverage-label" style="font-weight:800;color:#047857;font-variant-numeric:tabular-nums;">0 / 1,020장 (0.0%)</span>
               <span style="color:#94a3b8;margin:0 4px;">|</span>
-              🧠 <strong style="color:#0f172a;">기억 마스터리:</strong>
+              <strong style="color:#0f172a;">기억 마스터리:</strong>
               <span id="bd-deck-mastery-label" style="font-weight:800;color:#4f46e5;font-variant-numeric:tabular-nums;">0.0%</span>
             </div>
             <div id="bd-deck-milestone-label" style="font-size:0.74rem;font-weight:700;color:#0f766e;">
-              🏁 첫 10% 돌파까지 102장
+              첫 10% 돌파까지 102장
             </div>
           </div>
           <div role="progressbar" aria-label="전체 덱 기억 성숙도 분포" style="display:flex;height:9px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-bottom:9px;">
@@ -531,67 +535,68 @@
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:0.74rem;">
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
               <button type="button" class="bd-bucket-chip" data-bucket="unseen" style="padding:3px 9px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:0.73rem;font-weight:700;">
-                ⚪ 미학습 <span id="bd-cnt-unseen">0</span>장
+                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#94a3b8;margin-right:4px;"></span>미학습 <span id="bd-cnt-unseen">0</span>장
               </button>
               <button type="button" class="bd-bucket-chip" data-bucket="learning" style="padding:3px 9px;border-radius:999px;background:#fffbeb;color:#b45309;border:1px solid #fde68a;font-size:0.73rem;font-weight:700;">
-                🟠 학습·오답 <span id="bd-cnt-learning">0</span>장
+                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-right:4px;"></span>학습·오답 <span id="bd-cnt-learning">0</span>장
               </button>
               <button type="button" class="bd-bucket-chip" data-bucket="young" style="padding:3px 9px;border-radius:999px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:0.73rem;font-weight:700;">
-                🔵 단기암기 <span id="bd-cnt-young">0</span>장
+                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#3b82f6;margin-right:4px;"></span>단기암기 <span id="bd-cnt-young">0</span>장
               </button>
               <button type="button" class="bd-bucket-chip" data-bucket="mature" style="padding:3px 9px;border-radius:999px;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-size:0.73rem;font-weight:700;">
-                🟢 장기마스터 <span id="bd-cnt-mature">0</span>장
+                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;margin-right:4px;"></span>장기마스터 <span id="bd-cnt-mature">0</span>장
               </button>
             </div>
             <button type="button" id="btn-open-deck-explorer" style="padding:4px 11px;border-radius:999px;background:#eef2ff;color:#3730a3;border:1px solid #a5b4fc;font-size:0.74rem;font-weight:800;">
-              🔍 전체 카드 진도표·검색
+              전체 카드 진도표·검색
             </button>
           </div>
 
           <!-- Row 3: Stage (Lv.1 ~ Lv.4) Progress & Step-by-Step Filter -->
           <div id="bd-stage-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:7px;border-top:1px dashed #e2e8f0;font-size:0.74rem;">
-            <span style="font-weight:800;color:#334155;">🪜 단계별 정복:</span>
+            <span style="font-weight:800;color:#334155;">단계별 정복:</span>
             <button type="button" class="bd-stage-btn btn-primary" id="btn-stage-all" data-stage="all" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
               전체 단계
             </button>
             <button type="button" class="bd-stage-btn" id="btn-stage-lv1" data-stage="lv1" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
-              🌱 Lv.1 기초 (0%)
+              Lv.1 기초 (0%)
             </button>
             <button type="button" class="bd-stage-btn" id="btn-stage-lv2" data-stage="lv2" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
-              📘 Lv.2 핵심 (0%)
+              Lv.2 핵심 (0%)
             </button>
             <button type="button" class="bd-stage-btn" id="btn-stage-lv3" data-stage="lv3" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
-              🔥 Lv.3 심화 (0%)
+              Lv.3 심화 (0%)
             </button>
             <button type="button" class="bd-stage-btn" id="btn-stage-lv4" data-stage="lv4" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
-              👑 Lv.4 최고급 (0%)
+              Lv.4 최고급 (0%)
             </button>
           </div>
+        </div>
         </div>
 
         <!-- IMPL-V61 AC-5: Deck Card Explorer & Instant Search Drawer -->
         <div id="deck-card-explorer-panel" style="display:none;margin-bottom:14px;padding:14px;border-radius:18px;background:#ffffff;border:2px solid #818cf8;box-shadow:0 8px 24px rgba(15,23,42,0.08);">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
             <div style="font-weight:800;color:#312e81;font-size:0.9rem;">
-              🔍 덱 전체 카드 진도표 · 키워드 검색 (<span id="explorer-total-label">0장</span>)
+              덱 전체 카드 진도표 · 키워드 검색 (<span id="explorer-total-label">0장</span>)
             </div>
-            <button type="button" id="btn-close-deck-explorer" style="padding:4px 10px;font-size:0.76rem;">✖ 닫기</button>
+            <button type="button" id="btn-close-deck-explorer" style="padding:4px 10px;font-size:0.76rem;">닫기</button>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-            <input type="text" id="explorer-search-input" placeholder="🔎 단어, 뜻, 예문, 개념어를 검색하세요..." style="flex:1;min-width:180px;padding:7px 11px;font-size:0.8rem;" />
+            <input type="text" id="explorer-search-input" placeholder="단어, 뜻, 예문, 개념어를 검색하세요..." style="flex:1;min-width:180px;padding:7px 11px;font-size:0.8rem;" />
             <select id="explorer-bucket-select" style="width:auto;padding:6px 10px;font-size:0.78rem;">
               <option value="all">전체 상태</option>
-              <option value="unseen">⚪ 미학습만</option>
-              <option value="learning">🟠 학습·오답만</option>
-              <option value="young">🔵 단기암기만</option>
-              <option value="mature">🟢 장기마스터만</option>
+              <option value="unseen">미학습만</option>
+              <option value="learning">학습·오답만</option>
+              <option value="young">단기암기만</option>
+              <option value="mature">장기마스터만</option>
             </select>
             <select id="explorer-stage-select" style="width:auto;padding:6px 10px;font-size:0.78rem;">
               <option value="all">전체 난이도</option>
-              <option value="lv1">🌱 Lv.1 기초</option>
-              <option value="lv2">📘 Lv.2 핵심</option>
-              <option value="lv3">🔥 Lv.3 심화</option>
-              <option value="lv4">👑 Lv.4 최고급</option>
+              <option value="lv1">Lv.1 기초</option>
+              <option value="lv2">Lv.2 핵심</option>
+              <option value="lv3">Lv.3 심화</option>
+              <option value="lv4">Lv.4 최고급</option>
             </select>
           </div>
           <div id="explorer-card-rows" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;"></div>
@@ -602,64 +607,64 @@
           <!-- Study Filter Chips (All / Wrong-Unknown Only / Marked Only + Smart Interleaved Shuffle Toggle) -->
           <div id="study-filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
             <button type="button" class="study-filter-btn btn-primary" data-filter="all" style="padding:7px 13px;font-size:0.8rem;">
-              📚 전체 학습
+              전체 학습
             </button>
             <button type="button" class="study-filter-btn" id="btn-filter-wrong" data-filter="wrong_only" style="padding:7px 13px;font-size:0.8rem;">
-              🔥 오답·모르는 것만 (0)
+              오답·모르는 것만 (0)
             </button>
             <button type="button" class="study-filter-btn" id="btn-filter-marked" data-filter="marked_only" style="padding:7px 13px;font-size:0.8rem;">
-              ⭐ 별표 카드만 (0)
+              중요 표시 카드만 (0)
             </button>
             <button type="button" id="btn-toggle-shuffle" class="btn-primary" style="padding:7px 13px;font-size:0.8rem;margin-left:auto;" title="단원·유형 쏠림 없이 지능형 랜덤 섞기">
-              🔀 스마트 랜덤 섞기: ON
+              스마트 랜덤 섞기: ON
             </button>
           </div>
 
           <!-- Gate T43: Question-Type Organization & Filter Bar (유형별 모아풀기 · 4지선다 동종 보기 격리) -->
           <div id="study-type-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;padding:7px 10px;border-radius:13px;background:#f1f5f9;border:1px solid #e2e8f0;">
-            <span style="font-size:0.76rem;font-weight:800;color:#334155;margin-right:2px;">🏷️ 문제 유형별 정리:</span>
+            <span style="font-size:0.76rem;font-weight:800;color:#334155;margin-right:2px;">문제 유형별 정리:</span>
             <button type="button" class="study-qtype-btn btn-primary" id="btn-qtype-all" data-qtype="all" style="padding:5px 11px;font-size:0.76rem;">
-              🗂️ 전체 유형
+              전체 유형
             </button>
             <button type="button" class="study-qtype-btn" id="btn-qtype-vocab" data-qtype="vocab" style="padding:5px 11px;font-size:0.76rem;">
-              📘 단어·어휘만
+              단어·어휘만
             </button>
             <button type="button" class="study-qtype-btn" id="btn-qtype-grammar" data-qtype="grammar" style="padding:5px 11px;font-size:0.76rem;">
-              📐 문법·구문만
+              문법·구문만
             </button>
             <button type="button" class="study-qtype-btn" id="btn-qtype-hanja" data-qtype="hanja" style="padding:5px 11px;font-size:0.76rem;">
-              漢字 한자·성어만
+              한자·성어만
             </button>
             <button type="button" class="study-qtype-btn" id="btn-qtype-history_sci" data-qtype="history_sci" style="padding:5px 11px;font-size:0.76rem;">
-              🏛️ 역사·과학·전공
+              역사·과학·전공
             </button>
           </div>
 
           <!-- v5.6 Study Utilities: Electronic Red-Cellophane Sheet, 2-Col Printable Exam, Commute Audio Loop, Non-Destructive Cram -->
           <div id="v56-rea-utility-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 10px;border-radius:14px;background:#ffffff;border:1px solid var(--border);">
             <button type="button" id="btn-open-summary-sheet" style="padding:6px 11px;font-size:0.78rem;background:#fff0f0;color:#be123c;border-color:#fecdd3;">
-              🟥 전자 셀로판지 요약시트
+              전자 셀로판지 요약시트
             </button>
             <button type="button" id="btn-print-exam-sheet" style="padding:6px 11px;font-size:0.78rem;">
-              🖨️ 2단 쪽지시험지 인쇄/PDF
+              2단 쪽지시험지 인쇄/PDF
             </button>
             <button type="button" id="btn-commute-audio-loop" style="padding:6px 11px;font-size:0.78rem;">
-              🎧 통학 오디오 루프
+              통학 오디오 루프
             </button>
             <button type="button" id="btn-toggle-cram-sandbox" style="padding:6px 11px;font-size:0.78rem;" title="켜면 벼락치기 다회독 시 장기기억 스케줄을 오염시키지 않습니다">
-              🧪 무오염 벼락치기(CRAM): OFF
+              무오염 벼락치기(CRAM): OFF
             </button>
-            <button id="btn-reset-card-arena" type="button" style="padding:6px 11px;font-size:0.76rem;color:#be123c;border-color:#fecdd3;background:#fff0f0;margin-left:auto;" title="현재 덱 처음부터 초기화">🔄 덱 진도 초기화</button>
+            <button id="btn-reset-card-arena" type="button" style="padding:6px 11px;font-size:0.76rem;color:#be123c;border-color:#fecdd3;background:#fff0f0;margin-left:auto;" title="현재 덱 처음부터 초기화">덱 진도 초기화</button>
           </div>
         </div>
 
         <!-- Electronic Red-Cellophane Summary Sheet Panel (v5.6 RN-1) -->
         <div id="summary-sheet-panel" style="display:none;margin-bottom:14px;padding:16px;border-radius:18px;background:#ffffff;border:2px solid #fecdd3;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-            <div style="font-weight:800;color:#be123c;font-size:0.92rem;">🟥 시험 5분 전 전자 빨간 셀로판지 요약시트 (정답 탭하여 확인)</div>
+            <div style="font-weight:800;color:#be123c;font-size:0.92rem;">시험 5분 전 전자 빨간 셀로판지 요약시트 (정답 탭하여 확인)</div>
             <div style="display:flex;gap:6px;">
-              <button type="button" id="btn-summary-toggle-all" style="padding:5px 10px;font-size:0.76rem;">👀 정답 전체 보기/가리기</button>
-              <button type="button" id="btn-summary-close" style="padding:5px 10px;font-size:0.76rem;">✖ 닫기</button>
+              <button type="button" id="btn-summary-toggle-all" style="padding:5px 10px;font-size:0.76rem;">정답 전체 보기/가리기</button>
+              <button type="button" id="btn-summary-close" style="padding:5px 10px;font-size:0.76rem;">닫기</button>
             </div>
           </div>
           <div id="summary-sheet-rows" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;"></div>
@@ -672,8 +677,8 @@
             <!-- In-Card Live Progress Bar & Percentage Header (Always Visible Inside Flashcard Arena) -->
             <div id="card-inline-progress-box" style="margin-bottom:12px;padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.78rem;font-weight:800;margin-bottom:6px;">
-                <span id="card-inline-today-pct" style="color:var(--accent);">🎯 오늘 진척률: 0.0% (0/30장 완료)</span>
-                <span id="card-inline-deck-pct" style="color:#047857;">📊 전체 덱 진도율: 0.0% (0/1,020장) · 숙련도 0.0%</span>
+                <span id="card-inline-today-pct" style="color:var(--accent);">오늘 진척률: 0.0% (0/30장 완료)</span>
+                <span id="card-inline-deck-pct" style="color:#047857;">전체 덱 진도율: 0.0% (0/1,020장) · 숙련도 0.0%</span>
               </div>
               <div style="width:100%;height:7px;border-radius:999px;background:#e2e8f0;overflow:hidden;position:relative;">
                 <div id="card-inline-today-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#3182f6,#10b981);transition:width 0.25s ease;"></div>
@@ -682,28 +687,28 @@
 
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.78rem;color:var(--muted);">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                <span id="card-qtype-badge" class="badge-pill" style="font-size:0.74rem;background:#eef2ff;color:#1d4ed8;">📘 단어 뜻·어휘</span>
-                <span id="sprint-progress-badge" class="badge-pill" style="font-size:0.72rem;background:#ecfdf5;color:#047857;">🏁 스프린트 1</span>
+                <span id="card-qtype-badge" class="badge-pill" style="font-size:0.74rem;background:#eef2ff;color:#1d4ed8;">단어 뜻·어휘</span>
+                <span id="sprint-progress-badge" class="badge-pill" style="font-size:0.72rem;background:#ecfdf5;color:#047857;">스프린트 1</span>
                 <span id="card-meta">준비 중...</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 <span id="card-fsrs-meta" style="display:none;"></span>
                 <select id="select-card-flag" style="width:auto;padding:3px 7px;font-size:0.72rem;border-radius:10px;" title="7색 플래그 지정 (단축키 F)">
-                  <option value="0">🏳️ 플래그</option>
-                  <option value="1">🔴 집중 요주의</option>
-                  <option value="2">🟠 시험 전 재확인</option>
-                  <option value="3">🟢 암기 완료 후보</option>
-                  <option value="4">🔵 예문 보충</option>
-                  <option value="5">🩷 오답 노트</option>
-                  <option value="6">🩵 발음 체크</option>
-                  <option value="7">💜 심화 변별</option>
+                  <option value="0">플래그 없음</option>
+                  <option value="1">[Red] 집중 요주의</option>
+                  <option value="2">[Orange] 시험 전 재확인</option>
+                  <option value="3">[Green] 암기 완료 후보</option>
+                  <option value="4">[Blue] 예문 보충</option>
+                  <option value="5">[Pink] 오답 노트</option>
+                  <option value="6">[Teal] 발음 체크</option>
+                  <option value="7">[Purple] 심화 변별</option>
                 </select>
-                <button id="btn-mark-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="중요 별표 표시">☆ 별표</button>
-                <button id="btn-bury-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="오늘 하루 숨기기 (단축키 -)">💤 숨김</button>
-                <button id="btn-suspend-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="카드 일시 정지 (단축키 @)">⏸️ 정지</button>
+                <button id="btn-mark-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="중요 표시">☆ 중요</button>
+                <button id="btn-bury-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="오늘 하루 숨기기 (단축키 -)">숨김</button>
+                <button id="btn-suspend-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="카드 일시 정지 (단축키 @)">정지</button>
               </div>
             </div>
-            <div class="card-question" id="card-question">오늘 카드를 모두 끝냈어요! 🎉</div>
+            <div class="card-question" id="card-question">오늘 카드를 모두 끝냈어요!</div>
             <div class="card-answer" id="card-answer"></div>
             <div id="card-extra-explanation" class="ai-box" style="margin-top:8px;display:none;background:#ffffff;color:#4e5968;border:1px solid #e5e8eb;"></div>
             <div id="interactive-quiz-box" class="ai-box" style="margin-top:12px;"></div>
@@ -713,21 +718,21 @@
               <div id="post-session-summary" style="font-size:0.9rem;font-weight:700;color:#be123c;margin-bottom:10px;"></div>
               <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
                 <button id="btn-retry-wrong-now" type="button" class="btn-primary" style="background:#be123c;border-color:#be123c;">
-                  🔥 틀린·모르는 문제만 다시 복습하기
+                  틀린·모르는 문제만 다시 복습하기
                 </button>
                 <button id="btn-reset-post-session" type="button" style="background:#ffffff;color:#be123c;border-color:#fecdd3;">
-                  🔄 전체 카드 처음부터 다시 학습 (초기화)
+                  전체 카드 처음부터 다시 학습 (초기화)
                 </button>
               </div>
             </div>
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;align-items:center;">
-            <span id="solve-mode-badge" class="badge-pill" style="font-size:0.74rem;">🎯 4지선다 모드</span>
-            <button id="btn-tts" type="button">🔊 발음</button>
-            <button id="btn-quiz-mode" type="button" title="현재 카드 풀이 방식 전환">🔄 풀이방식 전환</button>
-            <button id="btn-hint" type="button">💡 힌트</button>
-            <button id="btn-decompose" type="button" title="어려운 카드를 쉽게 쪼개기" style="display:none;">🧬 쪼개기</button>
+            <span id="solve-mode-badge" class="badge-pill" style="font-size:0.74rem;">4지선다 모드</span>
+            <button id="btn-tts" type="button">발음</button>
+            <button id="btn-quiz-mode" type="button" title="현재 카드 풀이 방식 전환">풀이방식 전환</button>
+            <button id="btn-hint" type="button">힌트</button>
+            <button id="btn-decompose" type="button" title="어려운 카드를 쉽게 쪼개기" style="display:none;">쪼개기</button>
             <button id="btn-reveal" class="btn-primary" type="button" style="margin-left:auto;padding:10px 18px;">
               정답 보기
             </button>
@@ -739,12 +744,12 @@
         <!-- Typing Answer Input + 3-Tier Understanding Grader (Shown only in typing mode under 1-Card 1-Mode) -->
         <div id="typing-solve-zone" style="margin-top:12px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <button id="btn-dont-know" type="button" style="white-space:nowrap;background:#fff0f0;color:#be123c;border-color:#fecdd3;">
-            ❓ 모름
+            모름
           </button>
-          <input type="text" id="recall-input" placeholder="✍️ 답을 직접 입력해 기억을 인출해 보세요..." style="flex:1;min-width:180px;" />
+          <input type="text" id="recall-input" placeholder="답을 직접 입력해 기억을 인출해 보세요..." style="flex:1;min-width:180px;" />
           <button id="btn-eval" type="button" class="btn-primary" style="white-space:nowrap;">채점 확인</button>
           <button id="btn-override-correct" type="button" style="display:none;white-space:nowrap;background:#ecfdf5;color:#047857;border-color:#6ee7b7;" title="오타·유의어로 부분점수가 나왔을 때 정답으로 인정하고 바로 넘어갑니다">
-            ✅ 내 답이 맞아요
+            내 답이 맞아요
           </button>
         </div>
         <div id="eval-box" class="ai-box" style="margin-bottom:12px;"></div>
@@ -778,28 +783,28 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
         <div id="curriculum-seg-bar" role="tablist" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1;min-width:260px;">
           <button type="button" role="tab" aria-selected="true" class="curr-seg-btn btn-primary" data-curr-seg="textbook" style="padding:10px;font-size:0.83rem;">
-            🏫 교과서 단원
+            교과서 단원
           </button>
           <button type="button" role="tab" aria-selected="false" class="curr-seg-btn" data-curr-seg="collection" style="padding:10px;font-size:0.83rem;">
-            📚 교육부·급수
+            교육부·급수
           </button>
           <button type="button" role="tab" aria-selected="false" class="curr-seg-btn" id="btn-curr-seg-combined" data-curr-seg="combined" style="padding:10px;font-size:0.83rem;">
             🎯 시험범위 조합
           </button>
         </div>
         <select id="curriculum-difficulty-select" style="width:auto;min-width:210px;" title="생성할 카드의 학습 깊이를 선택하세요">
-          <option value="mixed">🎚️ 난이도: 통합 (Lv.1~3 골고루)</option>
-          <option value="lv1">🌱 Lv.1 기초·핵심 개념</option>
-          <option value="lv2">🚀 Lv.2 실전 문맥 빈칸</option>
-          <option value="lv3">🔥 Lv.3 심화·역방향·함정</option>
-          <option value="standard">📘 표준 기본형</option>
+          <option value="mixed">난이도: 통합 (Lv.1~3 골고루)</option>
+          <option value="lv1">Lv.1 기초·핵심 개념</option>
+          <option value="lv2">Lv.2 실전 문맥 빈칸</option>
+          <option value="lv3">Lv.3 심화·역방향·함정</option>
+          <option value="standard">표준 기본형</option>
         </select>
       </div>
 
       <div class="panel curr-seg-panel" id="curr-seg-textbook">
         <div class="panel-header">
-          <div class="panel-title">🏫 학교 교과서 시험범위 덱</div>
-          <button id="btn-toggle-all-units" type="button" style="padding:5px 10px;font-size:0.76rem;">☑️ 전체 선택</button>
+          <div class="panel-title">학교 교과서 시험범위 덱</div>
+          <button id="btn-toggle-all-units" type="button" style="padding:5px 10px;font-size:0.76rem;">전체 선택</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:10px;">
           <select id="catalog-textbook-select"></select>
@@ -808,10 +813,10 @@
             <input type="text" id="exam-page-start" placeholder="시작 쪽 (선택)" style="width:120px;" />
             <input type="text" id="exam-page-end" placeholder="끝 쪽 (선택)" style="width:120px;" />
             <button id="btn-add-exam-to-combo" type="button" style="margin-left:auto;">
-              ➕ 통합 시험범위에 추가
+              + 통합 시험범위에 추가
             </button>
             <button id="btn-gen-exam-scope" class="btn-primary" type="button">
-              🎯 단일 덱 바로 만들기
+              단일 덱 바로 만들기
             </button>
           </div>
         </div>
@@ -819,15 +824,15 @@
 
       <div class="panel curr-seg-panel" id="curr-seg-collection" style="display:none;">
         <div class="panel-header">
-          <div class="panel-title">📚 교육부 9대 필수 · 급수 한자 · 한국사 · 자격증</div>
+          <div class="panel-title">교육부 9대 필수 · 급수 한자 · 한국사 · 자격증</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <select id="catalog-collection-select" style="flex:1;min-width:200px;"></select>
           <button id="btn-add-col-to-combo" type="button" style="white-space:nowrap;">
-            ➕ 통합 시험범위에 추가
+            + 통합 시험범위에 추가
           </button>
           <button id="btn-gen-collection" class="btn-primary" type="button" style="white-space:nowrap;">
-            📚 단일 덱 바로 시작
+            단일 덱 바로 시작
           </button>
         </div>
         <div id="catalog-status-msg" style="font-size:0.84rem;color:var(--emerald);margin-top:10px;"></div>
@@ -836,22 +841,22 @@
       <!-- Multi-Scope Combined Exam Deck Builder (지능형 다중 조합 랜덤 인터리빙 덱) -->
       <div class="panel curr-seg-panel" id="curr-seg-combined" style="display:none;border:2px solid #c9e2ff;background:#f4f9ff;">
         <div class="panel-header" style="flex-wrap:wrap;">
-          <div class="panel-title">🎯 내 시험 출제범위 다중 조합 & 지능형 랜덤 덱</div>
+          <div class="panel-title">내 시험 출제범위 다중 조합 & 지능형 랜덤 덱</div>
           <button id="btn-preset-midterm-combo" type="button" style="padding:5px 10px;font-size:0.76rem;background:#ffffff;">
-            ⚡ 중간고사 다중 범위 예시 담기
+            중간고사 다중 범위 예시 담기
           </button>
         </div>
         <div style="font-size:0.82rem;color:#4e5968;margin-bottom:10px;">
-          여러 교과서 단원이나 급수 팩을 <strong>[➕ 통합 시험범위에 추가]</strong>로 담은 뒤 생성하면, 같은 단원이 연속으로 몰리지 않도록 <strong>스마트 인터리빙 랜덤 알고리즘</strong>으로 섞인 통합 시험대비 덱이 만들어집니다.
+          여러 교과서 단원이나 급수 팩을 <strong>[+ 통합 시험범위에 추가]</strong>로 담은 뒤 생성하면, 같은 단원이 연속으로 몰리지 않도록 <strong>스마트 인터리빙 랜덤 알고리즘</strong>으로 섞인 통합 시험대비 덱이 만들어집니다.
         </div>
         <div id="combined-scope-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input type="text" id="combined-deck-name" placeholder="통합 시험덱 이름 (예: 1학기 중간고사 전범위 랜덤 총정리)" style="flex:1;min-width:200px;background:#ffffff;" />
           <button id="btn-clear-combined-scopes" type="button" style="padding:9px 12px;font-size:0.8rem;background:#ffffff;">
-            🗑️ 비우기
+            비우기
           </button>
           <button id="btn-gen-combined-exam-deck" class="btn-primary" type="button">
-            🎲 조합 출제범위 랜덤 통합 덱 생성
+            조합 출제범위 랜덤 통합 덱 생성
           </button>
         </div>
       </div>
@@ -861,19 +866,19 @@
     <section id="page-create" class="tab-page">
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
         <button type="button" class="create-seg-btn btn-primary" data-create-seg="doc" style="padding:10px;font-size:0.84rem;">
-          📸 사진 · PDF
+          사진 · PDF
         </button>
         <button type="button" class="create-seg-btn" data-create-seg="manual" style="padding:10px;font-size:0.84rem;">
-          ✍️ 직접 입력
+          직접 입력
         </button>
         <button type="button" class="create-seg-btn" data-create-seg="ai" style="padding:10px;font-size:0.84rem;">
-          ✨ 노트 · 텍스트
+          노트 · 텍스트
         </button>
       </div>
 
       <div class="panel create-seg-panel" id="create-seg-doc">
         <div class="panel-header" style="flex-wrap:wrap;gap:8px;">
-          <div class="panel-title">📸 사진 · 📄 PDF로 카드 만들기</div>
+          <div class="panel-title">사진 · PDF로 카드 만들기</div>
           <span class="badge-pill" style="background:#eef2ff;color:#1d4ed8;">✨ 스마트 자동 생성</span>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
@@ -896,7 +901,7 @@
         </div>
 
         <div id="doc-dropzone" style="border:2px dashed #c9e2ff;border-radius:18px;padding:28px 16px;text-align:center;background:#f9fafb;cursor:pointer;">
-          <div style="font-size:1.6rem;margin-bottom:6px;">📷 📄</div>
+          <div style="font-size:0.82rem;font-weight:800;color:var(--muted);margin-bottom:6px;">PDF / IMAGE UPLOAD</div>
           <div style="font-size:0.96rem;font-weight:700;color:var(--accent);">
             교재 사진이나 PDF 파일을 선택하세요
           </div>
@@ -909,7 +914,7 @@
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <span id="doc-preview-title" style="font-size:0.86rem;font-weight:700;color:var(--emerald);"></span>
             <button id="btn-save-doc-deck" class="btn-primary" type="button">
-              💾 덱 저장하기
+              덱 저장하기
             </button>
           </div>
           <div id="doc-preview-list" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
@@ -918,7 +923,7 @@
 
       <div class="panel create-seg-panel" id="create-seg-manual" style="display:none;">
         <div class="panel-header">
-          <div class="panel-title">✍️ 카드 직접 추가 (기본형 · {{c1::빈칸}} Cloze)</div>
+          <div class="panel-title">카드 직접 추가 (기본형 · {{c1::빈칸}} Cloze)</div>
           <button id="btn-insert-cloze" type="button" style="padding:5px 10px;font-size:0.76rem;">+ {{c1::빈칸}} 넣기</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
@@ -926,14 +931,14 @@
           <input type="text" id="direct-card-back" placeholder="정답 또는 해설" />
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span id="direct-card-status" style="font-size:0.82rem;color:var(--emerald);"></span>
-            <button id="btn-add-direct-card" class="btn-primary" type="button">➕ 카드 추가하기</button>
+            <button id="btn-add-direct-card" class="btn-primary" type="button">+ 카드 추가하기</button>
           </div>
         </div>
       </div>
 
       <div class="panel create-seg-panel" id="create-seg-ai" style="display:none;">
         <div class="panel-header" style="flex-wrap:wrap;">
-          <div class="panel-title">✨ 텍스트 붙여넣기</div>
+          <div class="panel-title">텍스트 붙여넣기</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <select id="ai-ollama-model-select" style="width:auto;">
               <option value="glm-5.3-flash">✨ 스마트 자동 생성 (추천)</option>
@@ -957,7 +962,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
           <span id="ai-gen-status" style="font-size:0.82rem;color:var(--emerald);"></span>
           <button id="btn-generate-cards" class="btn-primary" type="button">
-            ⚡ 카드 만들기
+            카드 만들기
           </button>
         </div>
       </div>
@@ -967,22 +972,22 @@
     <section id="page-store" class="tab-page">
       <div class="panel">
         <div class="panel-header">
-          <div class="panel-title">🛒 브레인팩 스토어</div>
+          <div class="panel-title">브레인팩 스토어</div>
           <span id="store-summary-badge" class="badge-pill">로딩 중...</span>
         </div>
 
         <div id="store-category-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
           <button type="button" class="store-cat-btn btn-primary" data-cat="all" style="padding:6px 11px;font-size:0.78rem;">전체</button>
-          <button type="button" class="store-cat-btn" data-cat="moe_curriculum" style="padding:6px 11px;font-size:0.78rem;">📚 교육부 필수(9종)</button>
-          <button type="button" class="store-cat-btn" data-cat="starter_free" style="padding:6px 11px;font-size:0.78rem;">🎁 무료</button>
-          <button type="button" class="store-cat-btn" data-cat="k12_textbook" style="padding:6px 11px;font-size:0.78rem;">🏫 교과서</button>
-          <button type="button" class="store-cat-btn" data-cat="hanja_history" style="padding:6px 11px;font-size:0.78rem;">漢字 한자·역사</button>
-          <button type="button" class="store-cat-btn" data-cat="language_exam" style="padding:6px 11px;font-size:0.78rem;">🗣️ 어학</button>
-          <button type="button" class="store-cat-btn" data-cat="pro_cert" style="padding:6px 11px;font-size:0.78rem;">⚖️ 자격증</button>
+          <button type="button" class="store-cat-btn" data-cat="moe_curriculum" style="padding:6px 11px;font-size:0.78rem;">교육부 필수(9종)</button>
+          <button type="button" class="store-cat-btn" data-cat="starter_free" style="padding:6px 11px;font-size:0.78rem;">무료</button>
+          <button type="button" class="store-cat-btn" data-cat="k12_textbook" style="padding:6px 11px;font-size:0.78rem;">교과서</button>
+          <button type="button" class="store-cat-btn" data-cat="hanja_history" style="padding:6px 11px;font-size:0.78rem;">한자·역사</button>
+          <button type="button" class="store-cat-btn" data-cat="language_exam" style="padding:6px 11px;font-size:0.78rem;">어학</button>
+          <button type="button" class="store-cat-btn" data-cat="pro_cert" style="padding:6px 11px;font-size:0.78rem;">자격증</button>
         </div>
 
         <button id="btn-buy-bundle-3" type="button" class="btn-primary" style="width:100%;margin-bottom:12px;padding:11px;font-size:0.84rem;">
-          🎁 3팩 골라담기 15% 할인 장착
+          3팩 골라담기 15% 할인 장착
         </button>
 
         <div id="store-status-msg" style="font-size:0.82rem;color:var(--emerald);margin-bottom:8px;"></div>
@@ -1013,37 +1018,37 @@
 
       <div class="panel">
         <div class="panel-header">
-          <div class="panel-title">👤 학습 모드 변경</div>
-          <span id="offline-vault-badge" class="badge-pill">📱 오프라인 보호중</span>
+          <div class="panel-title">학습 모드 변경</div>
+          <span id="offline-vault-badge" class="badge-pill">오프라인 보호중</span>
         </div>
         <div id="age-tier-switcher" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-          <button type="button" class="age-tier-btn" data-age-tier="junior">🌱 주니어</button>
-          <button type="button" class="age-tier-btn btn-primary" data-age-tier="teen">🚀 중고등</button>
-          <button type="button" class="age-tier-btn" data-age-tier="adult">🎓 성인</button>
+          <button type="button" class="age-tier-btn" data-age-tier="junior">주니어</button>
+          <button type="button" class="age-tier-btn btn-primary" data-age-tier="teen">중고등</button>
+          <button type="button" class="age-tier-btn" data-age-tier="adult">성인</button>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panel-title">📈 30일 기억 유지 그래프</div>
+        <div class="panel-title">30일 기억 유지 그래프</div>
         <svg class="curve-svg" viewBox="0 0 480 120" preserveAspectRatio="none">
           <line x1="0" y1="30" x2="480" y2="30" stroke="rgba(52,211,153,0.35)" stroke-dasharray="4 4" stroke-width="1" />
           <polyline id="curve-polyline" fill="none" stroke="#38bdf8" stroke-width="2.5" points="" />
         </svg>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
-          <button id="btn-decompress" type="button">🏖️ 밀린 복습 나누기</button>
-          <button id="btn-sync-offline-vault" type="button">📲 기기에 오프라인 저장</button>
+          <button id="btn-decompress" type="button">밀린 복습 나누기</button>
+          <button id="btn-sync-offline-vault" type="button">기기에 오프라인 저장</button>
           <a id="link-export-apkg" href="/api/export.apkg" style="text-decoration:none;">
-            <button id="btn-export-apkg" type="button">📦 .apkg 내보내기</button>
+            <button id="btn-export-apkg" type="button">.apkg 내보내기</button>
           </a>
-          <a id="link-download-apk" href="https://github.com/ssacho3-blip/BrainDeck/releases/download/v6.0.0/BrainDeck-v6.0.apk" style="text-decoration:none;">
-            <button id="btn-download-apk" type="button" class="btn-primary">🤖 안드로이드 앱 설치파일 (v6.0)</button>
+          <a id="link-download-apk" href="https://github.com/ssacho3-blip/BrainDeck/releases/download/v7.0.0/BrainDeck-v7.0.apk" style="text-decoration:none;">
+            <button id="btn-download-apk" type="button" class="btn-primary">안드로이드 앱 설치파일 (v7.0)</button>
           </a>
         </div>
       </div>
     </section>
   </div>
 
-  <script src="./viewmodel.js?v=6.1.2"></script>
-  <script src="./app.js?v=6.1.2"></script>
+  <script src="./viewmodel.js?v=7.0.0"></script>
+  <script src="./app.js?v=7.0.0"></script>
 </body>
 </html>
