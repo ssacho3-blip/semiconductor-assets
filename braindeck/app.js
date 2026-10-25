@@ -308,10 +308,19 @@
     }
     if (path.startsWith("/api/quiz/interactive-options")) {
       const card = currentCard();
-      const fullPool =
+      let fullPool =
         Array.isArray(state.rawDueCards) && state.rawDueCards.length > 0
-          ? state.rawDueCards
-          : state.dueCards || [];
+          ? state.rawDueCards.slice()
+          : (state.dueCards || []).slice();
+      if (fullPool.length < 30 && standaloneEngine && typeof standaloneEngine.exploreDeckCards === "function") {
+        const expRes = standaloneEngine.exploreDeckCards({
+          deck_id: state.selectedDeckId || (card && card.deck_id) || null,
+          limit: 1500,
+        });
+        if (expRes && Array.isArray(expRes.cards) && expRes.cards.length > 0) {
+          fullPool = expRes.cards.map(enrichStandaloneCard);
+        }
+      }
       if (vm && typeof vm.buildTypeMatchedQuizOptions === "function") {
         const matched = vm.buildTypeMatchedQuizOptions(card, fullPool, 4);
         return {
@@ -331,7 +340,7 @@
         ok: true,
         standalone: true,
         mode: "multiple_choice",
-        question_facet: "📘 단어 뜻·어휘",
+        question_facet: "단어 뜻·어휘",
         target_answer: target,
         options: [target, "소개하다", "가장 좋아하는", "전통적인"].slice(0, 4),
         tap_blocks: String(target).split(/\s+/).filter(Boolean),
@@ -460,14 +469,15 @@
         : [];
 
     const btnWrong = el("btn-filter-wrong");
-    if (btnWrong) btnWrong.textContent = `🔥 오답·모르는 것만 (${wrongList.length})`;
+    if (btnWrong) btnWrong.textContent = `오답·모르는 것만 (${wrongList.length})`;
     const btnMarked = el("btn-filter-marked");
-    if (btnMarked) btnMarked.textContent = `⭐ 별표 카드만 (${markedList.length})`;
+    if (btnMarked) btnMarked.textContent = `중요 표시 카드만 (${markedList.length})`;
 
     return { activeRaw, wrongList, markedList };
   }
 
-  function applyStudyFilter() {
+  function applyStudyFilter(opts) {
+    const filterOpts = opts || {};
     const { activeRaw, wrongList, markedList } = refreshFilterBadgeCounts();
 
     let candidateQueue;
@@ -486,11 +496,11 @@
       const bGram = el("btn-qtype-grammar");
       const bHanja = el("btn-qtype-hanja");
       const bHist = el("btn-qtype-history_sci");
-      if (bAll) bAll.textContent = `🗂️ 전체 유형 (${tCounts.all})`;
-      if (bVocab) bVocab.textContent = `📘 단어·어휘만 (${tCounts.vocab})`;
-      if (bGram) bGram.textContent = `📐 문법·구문만 (${tCounts.grammar})`;
-      if (bHanja) bHanja.textContent = `漢字 한자·성어만 (${tCounts.hanja})`;
-      if (bHist) bHist.textContent = `🏛️ 역사·과학·전공 (${tCounts.history_sci})`;
+      if (bAll) bAll.textContent = `전체 유형 (${tCounts.all})`;
+      if (bVocab) bVocab.textContent = `단어·어휘만 (${tCounts.vocab})`;
+      if (bGram) bGram.textContent = `문법·구문만 (${tCounts.grammar})`;
+      if (bHanja) bHanja.textContent = `한자·성어만 (${tCounts.hanja})`;
+      if (bHist) bHist.textContent = `역사·과학·전공 (${tCounts.history_sci})`;
     }
 
     if (vm && typeof vm.filterStudyQueueByQuestionType === "function" && state.questionTypeFilter !== "all") {
@@ -501,8 +511,43 @@
       candidateQueue = candidateQueue.filter((c) => vm.classifyCardStage(c) === state.stageFilter);
     }
 
-    if (vm && typeof vm.interleaveAndShuffleStudyQueue === "function" && state.shuffleMode !== "sequential") {
-      state.dueCards = vm.interleaveAndShuffleStudyQueue(candidateQueue, state.shuffleMode);
+    if (filterOpts.preserveSessionOrder && Array.isArray(filterOpts.previousQueue) && filterOpts.previousQueue.length > 0) {
+      const byId = new Map();
+      candidateQueue.forEach((c) => {
+        if (c && c.card_id !== undefined) byId.set(Number(c.card_id), c);
+      });
+      const preserved = [];
+      const seen = new Set();
+      filterOpts.previousQueue.forEach((prevCard) => {
+        const cid = Number(prevCard && prevCard.card_id);
+        if (byId.has(cid) && !seen.has(cid)) {
+          if (filterOpts.lastRating === 1 && cid === Number(filterOpts.lastRatedCardId)) {
+            return; // Re-insert at deterministic +4 offset below
+          }
+          preserved.push(byId.get(cid));
+          seen.add(cid);
+        }
+      });
+      candidateQueue.forEach((c) => {
+        const cid = Number(c && c.card_id);
+        if (seen.has(cid)) return;
+        if (filterOpts.lastRating === 1 && cid === Number(filterOpts.lastRatedCardId)) return;
+        preserved.push(c);
+        seen.add(cid);
+      });
+      if (filterOpts.lastRating === 1 && filterOpts.lastRatedCardId !== undefined) {
+        const failedId = Number(filterOpts.lastRatedCardId);
+        const failedCard = byId.get(failedId);
+        if (failedCard) {
+          const insertIdx = Math.min(4, preserved.length);
+          preserved.splice(insertIdx, 0, failedCard);
+        }
+      }
+      state.dueCards = preserved;
+    } else if (vm && typeof vm.interleaveAndShuffleStudyQueue === "function" && state.shuffleMode !== "sequential") {
+      const intraday = candidateQueue.filter((c) => c && (c.state === "learning" || c.state === "relearning"));
+      const rest = candidateQueue.filter((c) => !c || (c.state !== "learning" && c.state !== "relearning"));
+      state.dueCards = intraday.concat(vm.interleaveAndShuffleStudyQueue(rest, state.shuffleMode));
     } else {
       state.dueCards = candidateQueue;
     }
@@ -522,15 +567,15 @@
 
     const todayLbl = el("bd-today-progress-label");
     if (todayLbl) {
-      const overTxt = Number(t.over_target_count || 0) > 0 ? ` (+${t.over_target_count}장 초과달성!)` : "";
-      todayLbl.textContent = `🎯 오늘 목표 진척률: ${t.completed_count || 0} / ${t.target_count || 0}장 완료 (${Number(t.percent || 0).toFixed(1)}%)${overTxt}`;
+      const overTxt = Number(t.over_target_count || 0) > 0 ? ` (+${t.over_target_count}장 초과달성)` : "";
+      todayLbl.textContent = `오늘 목표 진척률: ${t.completed_count || 0} / ${t.target_count || 0}장 완료 (${Number(t.percent || 0).toFixed(1)}%)${overTxt}`;
     }
     const todayEta = el("bd-today-eta-label");
     if (todayEta) {
       todayEta.textContent =
         Number(t.remaining_count || 0) > 0
-          ? `⏱️ 남은 ${t.remaining_count}장 · 약 ${t.estimated_remaining_minutes || 0}분`
-          : "✅ 오늘 목표 100% 달성!";
+          ? `남은 ${t.remaining_count}장 · 약 ${t.estimated_remaining_minutes || 0}분`
+          : "오늘 목표 100% 달성";
     }
     const todayFill = el("bd-today-progress-fill");
     if (todayFill) {
@@ -539,18 +584,18 @@
 
     const covLbl = el("bd-deck-coverage-label");
     if (covLbl) {
-      covLbl.textContent = `📊 전체 덱 진도율 (1회 이상 학습): ${Number(dp.coverage_pct || 0).toFixed(1)}% (${dp.touched_cards || 0} / ${dp.total_cards || 0}장)`;
+      covLbl.textContent = `전체 덱 진도율 (1회 이상 학습): ${Number(dp.coverage_pct || 0).toFixed(1)}% (${dp.touched_cards || 0} / ${dp.total_cards || 0}장)`;
     }
     const mastLbl = el("bd-deck-mastery-label");
     if (mastLbl) {
-      mastLbl.textContent = `🏆 FSRS 가중 숙련도: ${Number(dp.mastery_pct || 0).toFixed(1)}% · 장기마스터 ${Number(dp.mature_pct || 0).toFixed(1)}%`;
+      mastLbl.textContent = `FSRS 가중 숙련도: ${Number(dp.mastery_pct || 0).toFixed(1)}% · 장기마스터 ${Number(dp.mature_pct || 0).toFixed(1)}%`;
     }
     const mileLbl = el("bd-deck-milestone-label");
     if (mileLbl) {
       if (Number(m.cards_to_next || 0) > 0) {
-        mileLbl.textContent = `🏁 다음 마일스톤(${m.next_pct || 10}%): ${m.cards_to_next}장 남음 (약 ${m.days_to_next || 1}일) · 전수 완주 D-${dp.eta_full_coverage_days || 0}`;
+        mileLbl.textContent = `다음 마일스톤(${m.next_pct || 10}%): ${m.cards_to_next}장 남음 (약 ${m.days_to_next || 1}일) · 전수 완주 D-${dp.eta_full_coverage_days || 0}`;
       } else {
-        mileLbl.textContent = `🎉 전체 덱 100% 마일스톤 달성!`;
+        mileLbl.textContent = `전체 덱 100% 마일스톤 달성`;
       }
     }
 
@@ -592,11 +637,11 @@
     }
     const inlineTodayEl = el("card-inline-today-pct");
     if (inlineTodayEl) {
-      inlineTodayEl.textContent = `🎯 오늘 진척률: ${Number(t.percent || 0).toFixed(1)}% (${t.completed_count || 0}/${t.target_count || 0}장 완료)`;
+      inlineTodayEl.textContent = `오늘 진척률: ${Number(t.percent || 0).toFixed(1)}% (${t.completed_count || 0}/${t.target_count || 0}장 완료)`;
     }
     const inlineDeckEl = el("card-inline-deck-pct");
     if (inlineDeckEl) {
-      inlineDeckEl.textContent = `📊 전체 덱 진도율: ${Number(dp.coverage_pct || 0).toFixed(1)}% (${dp.touched_cards || 0}/${dp.total_cards || 0}장) · 숙련도 ${Number(dp.mastery_pct || 0).toFixed(1)}%`;
+      inlineDeckEl.textContent = `전체 덱 진도율: ${Number(dp.coverage_pct || 0).toFixed(1)}% (${dp.touched_cards || 0}/${dp.total_cards || 0}장) · 숙련도 ${Number(dp.mastery_pct || 0).toFixed(1)}%`;
     }
     const inlineFillEl = el("card-inline-today-fill");
     if (inlineFillEl) {
@@ -619,7 +664,7 @@
       bucket_filter: bVal,
       stage: sVal,
       stage_filter: sVal,
-      limit: 120,
+      limit: 1500,
     });
     if (!res || !res.ok) return;
     const sumEl = el("explorer-result-summary") || el("explorer-total-label");
@@ -630,11 +675,11 @@
     if (!listBox) return;
     listBox.textContent = "";
     const bucketBadges = {
-      mature: { label: "🟢 장기마스터", bg: "#e8faf0", fg: "#008a50" },
-      young: { label: "🔵 단기암기", bg: "#eff6ff", fg: "#1d4ed8" },
-      learning: { label: "🟠 학습·오답", bg: "#fffbeb", fg: "#b45309" },
-      unseen: { label: "⚪ 미학습", bg: "#f1f5f9", fg: "#475569" },
-      suspended: { label: "⏸️ 보류", bg: "#fef2f2", fg: "#be123c" },
+      mature: { label: "장기마스터", bg: "#e8faf0", fg: "#008a50" },
+      young: { label: "단기암기", bg: "#eff6ff", fg: "#1d4ed8" },
+      learning: { label: "학습·오답", bg: "#fffbeb", fg: "#b45309" },
+      unseen: { label: "미학습", bg: "#f1f5f9", fg: "#475569" },
+      suspended: { label: "보류", bg: "#fef2f2", fg: "#be123c" },
     };
     (res.cards || []).forEach((c, idx) => {
       const row = document.createElement("div");
@@ -663,7 +708,7 @@
       const jumpBtn = document.createElement("button");
       jumpBtn.type = "button";
       jumpBtn.style.cssText = "padding:3px 8px;font-size:0.72rem;";
-      jumpBtn.textContent = "🎯 바로 풀기";
+      jumpBtn.textContent = "바로 풀기";
       jumpBtn.onclick = () => {
         const enriched = enrichStandaloneCard(c);
         const existingIdx = state.dueCards.findIndex((dc) => Number(dc.card_id) === Number(c.card_id));
@@ -674,7 +719,7 @@
           state.currentIndex = 0;
         }
         renderCurrentCard();
-        showUxToast(`🎯 선택한 카드(#${c.card_id})로 바로 이동했습니다.`, "emerald");
+        showUxToast(`선택한 카드(#${c.card_id})로 바로 이동했습니다.`, "emerald");
       };
       row.appendChild(left);
       row.appendChild(jumpBtn);
@@ -761,12 +806,12 @@
         : "";
       el("card-meta").textContent = `복습 완료${dpSummary}`;
       const sprintBadgeEl = el("sprint-progress-badge");
-      if (sprintBadgeEl) sprintBadgeEl.textContent = "🏁 오늘 목표 스프린트 완료";
+      if (sprintBadgeEl) sprintBadgeEl.textContent = "오늘 목표 스프린트 완료";
       el("card-fsrs-meta").textContent = "Due: 0";
       el("card-question").textContent =
         state.studyFilterMode === "wrong_only"
-          ? "🎉 오답·모르는 카드를 모두 완벽히 복습했습니다!"
-          : `🎉 오늘 배정된 학습 목표 카드를 모두 완료했습니다!${dpSummary}`;
+          ? "오답·모르는 카드를 모두 복습했습니다!"
+          : `오늘 배정된 학습 목표 카드를 모두 완료했습니다!${dpSummary}`;
       el("leech-banner").style.display = "none";
       const typingZone = el("typing-solve-zone");
       if (typingZone) typingZone.style.display = "none";
@@ -783,14 +828,14 @@
     const isMarked = state.markedCardIds.includes(Number(card.card_id));
     const btnMark = el("btn-mark-card");
     if (btnMark) {
-      btnMark.textContent = isMarked ? "⭐ 별표됨" : "☆ 별표";
+      btnMark.textContent = isMarked ? "★ 중요됨" : "☆ 중요";
       btnMark.style.color = isMarked ? "var(--amber)" : "var(--muted)";
     }
 
     const qTypeObj =
       vm && typeof vm.classifyCardQuestionType === "function"
         ? vm.classifyCardQuestionType(card)
-        : { badge_label: card.note_type === "cloze" ? "📘 빈칸 추론" : "📘 핵심 인출", short_label: "개념" };
+        : { badge_label: card.note_type === "cloze" ? "빈칸 추론" : "핵심 인출", short_label: "개념" };
     const qtypeBadgeEl = el("card-qtype-badge");
     if (qtypeBadgeEl) {
       qtypeBadgeEl.textContent = qTypeObj.badge_label;
@@ -819,7 +864,7 @@
       const inSprintPos = (effectivePosZeroBased % 7) + 1;
       const curSprintLen =
         curSprintIdx < totalSprints ? 7 : Math.max(inSprintPos, effectiveTotal - (totalSprints - 1) * 7);
-      sprintBadgeEl.textContent = `🏁 스프린트 ${curSprintIdx}/${totalSprints} (${inSprintPos}/${curSprintLen})`;
+      sprintBadgeEl.textContent = `스프린트 ${curSprintIdx}/${totalSprints} (${inSprintPos}/${curSprintLen})`;
     }
     const typeLabel = card.note_type === "cloze" ? "빈칸 추론" : "핵심 인출";
     if (isUnfilteredSession && dp && todayProg) {
@@ -830,11 +875,11 @@
         `${card.deck_name} · 오늘 ${ord}/${effectiveTotal}번째 (${todayPct}% 완료) · 전체 진도 ${covPct}% (${dp.touched_cards}/${dp.total_cards}장) · ${typeLabel}`;
       const inlineTodayEl = el("card-inline-today-pct");
       if (inlineTodayEl) {
-        inlineTodayEl.textContent = `🎯 오늘 진척률: ${todayPct}% (${todayProg.completed_count || 0}/${effectiveTotal}장 완료 · 현재 ${ord}번째)`;
+        inlineTodayEl.textContent = `오늘 진척률: ${todayPct}% (${todayProg.completed_count || 0}/${effectiveTotal}장 완료 · 현재 ${ord}번째)`;
       }
       const inlineDeckEl = el("card-inline-deck-pct");
       if (inlineDeckEl) {
-        inlineDeckEl.textContent = `📊 전체 덱 진도율: ${covPct}% (${dp.touched_cards || 0}/${dp.total_cards || 0}장) · 숙련도 ${Number(dp.mastery_pct || 0).toFixed(1)}%`;
+        inlineDeckEl.textContent = `전체 덱 진도율: ${covPct}% (${dp.touched_cards || 0}/${dp.total_cards || 0}장) · 숙련도 ${Number(dp.mastery_pct || 0).toFixed(1)}%`;
       }
       const inlineFillEl = el("card-inline-today-fill");
       if (inlineFillEl) {
@@ -859,11 +904,11 @@
             targetAnswer: card.target_answer || card.rendered_answer,
             extraExplanation: card.extra_explanation || "",
           };
-    el("card-answer").textContent = `🎯 정답: ${extracted.targetAnswer || card.rendered_answer}`;
+    el("card-answer").textContent = `정답: ${extracted.targetAnswer || card.rendered_answer}`;
     if (extraEl) {
       const fullAns = String(card.rendered_answer || "").trim();
       const extraText = extracted.extraExplanation || (fullAns !== extracted.targetAnswer ? fullAns : "");
-      extraEl.textContent = extraText ? `💡 해설 및 전체 문장:\n${extraText}` : "";
+      extraEl.textContent = extraText ? `해설 및 전체 문장:\n${extraText}` : "";
     }
 
     const leech = vm.formatLeechBadge(card.leech_status, card.lapses);
@@ -895,15 +940,15 @@
     const modeBadge = el("solve-mode-badge");
     const typingZone = el("typing-solve-zone");
     if (activeSolveMode === "choice") {
-      if (modeBadge) modeBadge.textContent = "🎯 4지선다 모드";
+      if (modeBadge) modeBadge.textContent = "4지선다 모드";
       if (typingZone) typingZone.style.display = "none";
       requestInteractiveQuiz("multiple_choice");
     } else if (activeSolveMode === "typing") {
-      if (modeBadge) modeBadge.textContent = "✍️ 서술형 인출 모드";
+      if (modeBadge) modeBadge.textContent = "서술형 인출 모드";
       if (typingZone) typingZone.style.display = "flex";
       if (quizBox) quizBox.style.display = "none";
     } else {
-      if (modeBadge) modeBadge.textContent = "🃏 카드 뒤집기 모드";
+      if (modeBadge) modeBadge.textContent = "카드 뒤집기 모드";
       if (typingZone) typingZone.style.display = "none";
       if (quizBox) quizBox.style.display = "none";
     }
@@ -924,23 +969,24 @@
     const remNew = dq.remaining_new_today !== undefined ? Number(dq.remaining_new_today) : Math.max(0, dailyNewLimit - newStudied);
     const badgeTone =
       pl.status === "FEASIBLE"
-        ? "✅ 완주 가능"
+        ? "완주 가능"
         : pl.status === "TIGHT_SCHEDULE"
-        ? "⚠️ 타이트한 일정"
-        : "🚨 집중 배분 권장";
-    const appliedLabel = dq.plan_applied ? "🟢 맞춤 계획 적용 중" : "🔵 기본 일일 할당 적용 중";
+        ? "타이트한 일정"
+        : "집중 배분 권장";
+    const appliedLabel = dq.plan_applied ? "맞춤 계획 적용 중" : "기본 일일 할당 적용 중";
     const progLine = dp
-      ? `\n📊 [전체 덱 진척률] 진도율 ${Number(dp.coverage_pct || 0).toFixed(1)}% (${dp.touched_cards}/${dp.total_cards}장 학습) · 가중 숙련도 ${Number(dp.mastery_pct || 0).toFixed(1)}% · 미학습 ${dp.buckets ? dp.buckets.unseen : 0}장`
+      ? `\n[전체 덱 진척률] 진도율 ${Number(dp.coverage_pct || 0).toFixed(1)}% (${dp.touched_cards}/${dp.total_cards}장 학습) · 가중 숙련도 ${Number(dp.mastery_pct || 0).toFixed(1)}% · 미학습 ${dp.buckets ? dp.buckets.unseen : 0}장`
       : "";
     banner.style.display = "block";
     banner.textContent =
-      `📅 [D-${pl.target_days} 학습 계획 · ${badgeTone} · ${appliedLabel}] 전체 ${pl.total_cards}장 (진도 ${pl.new_intake_days}일 + 총정리 복습 ${pl.consolidation_days}일)\n` +
-      `🎯 오늘의 할당량: 새 카드 ${dailyNewLimit}장 중 남은 ${remNew}장 (오늘 완료 ${newStudied}장) · 일평균 약 ${pl.avg_daily_minutes}분 (권장 최대 복습 ${pl.recommended_max_reviews}장/일)` +
+      `[D-${pl.target_days} 학습 계획 · ${badgeTone} · ${appliedLabel}] 전체 ${pl.total_cards}장 (진도 ${pl.new_intake_days}일 + 총정리 복습 ${pl.consolidation_days}일)\n` +
+      `오늘의 할당량: 새 카드 ${dailyNewLimit}장 중 남은 ${remNew}장 (오늘 완료 ${newStudied}장) · 일평균 약 ${pl.avg_daily_minutes}분 (권장 최대 복습 ${pl.recommended_max_reviews}장/일)` +
       progLine +
-      `\n💡 코칭: ${(pl.recommendations && pl.recommendations[0]) || ""}`;
+      `\n코칭: ${(pl.recommendations && pl.recommendations[0]) || ""}`;
   }
 
-  async function refreshDashboardAndQueue() {
+  async function refreshDashboardAndQueue(opts) {
+    const refreshOpts = opts || {};
     const status = await apiGet("/api/status");
     if (status && status.ok) {
       if (!state.autoEnsuredFullScaleDeck) {
@@ -951,13 +997,13 @@
           const autoRes = await apiPost("/api/catalog/generate-collection-deck", {
             collection_id: "hanja-grade:8geup",
             limit: 1000,
-            deck_name: "🎁 무료 기초 한자·어휘 스타터 (1,000장)",
+            deck_name: "무료 기초 한자·어휘 스타터 (1,000장)",
             difficulty_level: "mixed",
             shuffle_mode: "interleaved",
           }).catch(() => null);
           if (autoRes && autoRes.ok && autoRes.deck_id) {
             state.selectedDeckId = String(autoRes.deck_id);
-            return refreshDashboardAndQueue();
+            return refreshDashboardAndQueue(refreshOpts);
           }
         } else if (!state.selectedDeckId && decksList.some((d) => Number(d.total_cards || 0) < 50)) {
           state.selectedDeckId = String(fullDeck.deck_id);
@@ -1020,7 +1066,7 @@
       state.deckProgress = vm.computeDeckMasteryProgress(state.rawDueCards, state.currentDailyQuota || {});
       renderDeckProgressDashboard(state.deckProgress);
     }
-    applyStudyFilter();
+    applyStudyFilter(refreshOpts);
     renderCurrentCard();
     await renderDeckExplorerPanel();
     if (planRes && planRes.ok) {
@@ -1047,7 +1093,7 @@
     }
     const btnReveal = el("btn-reveal");
     if (btnReveal) {
-      btnReveal.textContent = "✅ 정답 확인됨 (아래 1~4 평가)";
+      btnReveal.textContent = "정답 확인됨 (아래 1~4 평가)";
     }
     applyEvidenceRatingGuard();
   }
@@ -1057,7 +1103,7 @@
     if (res && res.ok) {
       const cid = res.undone_card_id ?? res.restored_card_id ?? "";
       showUxToast(
-        `↩️ 복습 취소 완료: 카드 #${cid}가 이전 기억 상태(S=${Number(res.restored_stability || 0).toFixed(1)}d)로 복원되었습니다.`,
+        `복습 취소 완료: 카드 #${cid}가 이전 기억 상태(S=${Number(res.restored_stability || 0).toFixed(1)}d)로 복원되었습니다.`,
         "emerald"
       );
       await refreshDashboardAndQueue();
@@ -1072,7 +1118,7 @@
     const res = await apiPost("/api/reset", { deck_id: deckIdParam });
     if (!res || !res.ok) {
       const errMsg = (res && (res.detail || res.error)) || "초기화 요청을 처리할 수 없습니다.";
-      showUxToast(`⚠️ 학습 초기화 실패: ${errMsg}`, "rose");
+      showUxToast(`학습 초기화 실패: ${errMsg}`, "rose");
       return;
     }
     if (!res.standalone && standaloneEngine && typeof standaloneEngine.resetStudyProgress === "function") {
@@ -1102,7 +1148,7 @@
     await refreshDashboardAndQueue();
     const count = Number(res.reset_count ?? res.reset_cards ?? 0);
     showUxToast(
-      `🔄 학습 초기화 완료: ${count}장의 카드가 초기 상태(새 카드 1번)로 복원되었습니다!`,
+      `학습 초기화 완료: ${count}장의 카드가 초기 상태(새 카드 1번)로 복원되었습니다.`,
       "emerald"
     );
   }
@@ -1111,7 +1157,7 @@
     const card = currentCard();
     if (!card) return;
     if (!state.isRevealed) {
-      showUxToast("⚠️ 정답을 먼저 확인한 뒤 난이도를 평가해 주세요.", "amber");
+      showUxToast("정답을 먼저 확인한 뒤 난이도를 평가해 주세요.", "amber");
       return;
     }
     const guard =
@@ -1124,6 +1170,7 @@
     }
 
     const cid = Number(card.card_id);
+    const previousQueueSnapshot = Array.isArray(state.dueCards) ? state.dueCards.slice() : [];
     if (safeRating <= 2) {
       if (!state.sessionWrongCardIds.includes(cid)) {
         state.sessionWrongCardIds.push(cid);
@@ -1146,12 +1193,12 @@
     if (res && res.ok) {
       const stab = (res.memory && res.memory.stability) ?? res.stability ?? card.stability ?? 0;
       const nextLbl = state.isCramSandbox
-        ? "🧪 CRAM 샌드박스 (장기기억 S 보존)"
+        ? "CRAM 샌드박스 (장기기억 S 보존)"
         : res.scheduled_label || `${Number(res.scheduled_days || 0).toFixed(1)}d`;
       showUxToast(
-        `✅ 평가 반영 완료 (S: ${Number(stab).toFixed(1)}d · ${nextLbl})`,
+        `평가 반영 완료 (S: ${Number(stab).toFixed(1)}d · ${nextLbl})`,
         "emerald",
-        state.isCramSandbox ? "" : "↩️ 방금 평가 취소 (Z)",
+        state.isCramSandbox ? "" : "방금 평가 취소 (Z)",
         state.isCramSandbox ? null : () => undoLastReview()
       );
     }
@@ -1159,7 +1206,12 @@
       state.currentIndex = (state.currentIndex + 1) % Math.max(1, state.dueCards.length);
       renderCurrentCard();
     } else {
-      await refreshDashboardAndQueue();
+      await refreshDashboardAndQueue({
+        preserveSessionOrder: true,
+        previousQueue: previousQueueSnapshot,
+        lastRatedCardId: cid,
+        lastRating: safeRating,
+      });
     }
   }
 
@@ -2973,6 +3025,19 @@
           btnToggleStudyTools.classList.remove("btn-primary");
         }
         syncStudyToolsSummaryBadge();
+      });
+    }
+
+    // BD-P0-02: 2-Layer Compact Study Header Collapsible Toggle
+    const btnToggleCompactHeader = el("btn-toggle-compact-header");
+    const collapsibleHeaderZone = el("bd-collapsible-header-zone");
+    if (btnToggleCompactHeader && collapsibleHeaderZone) {
+      btnToggleCompactHeader.addEventListener("click", () => {
+        const isOpen = collapsibleHeaderZone.style.display !== "none";
+        const nextOpen = !isOpen;
+        collapsibleHeaderZone.style.display = nextOpen ? "block" : "none";
+        btnToggleCompactHeader.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+        btnToggleCompactHeader.textContent = nextOpen ? "대시보드 접기" : "대시보드 펼치기";
       });
     }
 
