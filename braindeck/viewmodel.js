@@ -70,8 +70,7 @@
       candDirs.push(
         "./src/anki_studio/ui/static",
         "../src/anki_studio/ui/static",
-        "./Documents/개발/BrainDeck/src/anki_studio/ui/static",
-        "/Users/choyoungseo/Documents/개발/BrainDeck/src/anki_studio/ui/static"
+        "./Documents/개발/BrainDeck/src/anki_studio/ui/static"
       );
       for (let i = 0; i < candDirs.length; i += 1) {
         const resolved = path.resolve(candDirs[i], targetPath);
@@ -1829,6 +1828,654 @@
     if (mode === "recall" || mode === "self" || Boolean(selfCheckUnlocked)) return [1, 2, 3, 4];
     return resolveAllowedRatings(solveMode, isCorrect);
   }
+
+  // =========================================================================
+  // v13.0 Commercial Mastery & Retention Booster (Contracts C8 ~ C14)
+  // =========================================================================
+
+  const RECOGNITION_GAIN_DAMPING_V13 = 0.42;
+
+  function stepDualMemoryFsrs(state, rating, modality, elapsedDays, desiredRetention) {
+    const s = state || {};
+    const grade = Math.max(1, Math.min(4, Number(rating) || 3));
+    const modNorm = String(modality || "active_recall").trim().toLowerCase();
+    const isRec = modNorm === "multiple_choice" || modNorm === "choice" || modNorm === "button_2" || modNorm === "recognition";
+    const elapsed = Math.max(0, Number(elapsedDays) || 0);
+    const reqRet = Math.max(0.7, Math.min(0.99, Number(desiredRetention) || 0.9));
+
+    const prevRecS = Math.max(0, Number(s.recognition_stability) || 0);
+    const prevCallS = Math.max(0, Number(s.recall_stability) || 0);
+    const prevD = Math.max(0, Number(s.difficulty) || 0);
+    const prevReps = Math.max(0, Number(s.reps) || 0);
+    const prevLapses = Math.max(0, Number(s.lapses) || 0);
+    const prevConsec = Math.max(0, Number(s.consecutive_recognition_successes) || 0);
+
+    if (isRec) {
+      const recStep = stepFsrs5(
+        { difficulty: prevD, stability: prevRecS, reps: prevReps, lapses: prevLapses, state: s.state || "new" },
+        grade,
+        elapsed,
+        reqRet
+      );
+      let nextRecS;
+      let nextCallS;
+      let nextConsec;
+      if (grade === 1) {
+        nextRecS = recStep.memory.stability;
+        nextCallS = prevCallS > 0 ? Number(Math.max(0.1, prevCallS * 0.75).toFixed(4)) : 0;
+        nextConsec = 0;
+      } else {
+        const rawS = recStep.memory.stability;
+        nextRecS = prevRecS <= 0
+          ? Number(Math.max(0.1, rawS * RECOGNITION_GAIN_DAMPING_V13).toFixed(4))
+          : Number((prevRecS + Math.max(0, rawS - prevRecS) * RECOGNITION_GAIN_DAMPING_V13).toFixed(4));
+        nextCallS = Number(prevCallS.toFixed(4));
+        nextConsec = prevConsec + (grade >= 3 ? 1 : 0);
+      }
+      const effS = nextCallS > 0 && nextCallS >= nextRecS ? nextCallS : Math.max(0.1, nextRecS);
+      const promote = nextConsec >= 2 || nextRecS >= 3.0;
+      return {
+        rating: grade,
+        modality: modNorm,
+        next_state: {
+          difficulty: recStep.memory.difficulty,
+          recognition_stability: nextRecS,
+          recall_stability: nextCallS,
+          reps: recStep.memory.reps,
+          lapses: recStep.memory.lapses,
+          state: recStep.memory.state,
+          consecutive_recognition_successes: nextConsec,
+        },
+        effective_stability: Number(effS.toFixed(4)),
+        retrievability_before: recStep.retrievability_before,
+        scheduled_days: grade === 1 ? 0 : Math.max(1, Math.round(effS)),
+        promotion_triggered: promote,
+        recommended_next_modality: promote ? "active_recall" : "multiple_choice",
+      };
+    }
+
+    const callStep = stepFsrs5(
+      { difficulty: prevD, stability: prevCallS, reps: prevReps, lapses: prevLapses, state: s.state || "new" },
+      grade,
+      elapsed,
+      reqRet
+    );
+    const nextCallS = callStep.memory.stability;
+    const nextRecS = grade === 1
+      ? Number(Math.max(0.1, Math.min(prevRecS || nextCallS, nextCallS)).toFixed(4))
+      : Number(Math.max(prevRecS, nextCallS).toFixed(4));
+    const nextConsec = grade === 1 ? 0 : prevConsec + 1;
+    return {
+      rating: grade,
+      modality: modNorm,
+      next_state: {
+        difficulty: callStep.memory.difficulty,
+        recognition_stability: nextRecS,
+        recall_stability: nextCallS,
+        reps: callStep.memory.reps,
+        lapses: callStep.memory.lapses,
+        state: callStep.memory.state,
+        consecutive_recognition_successes: nextConsec,
+      },
+      effective_stability: nextCallS,
+      retrievability_before: callStep.retrievability_before,
+      scheduled_days: callStep.scheduled_days,
+      promotion_triggered: false,
+      recommended_next_modality: grade === 1 ? "multiple_choice" : "active_recall",
+    };
+  }
+
+  function computeIrtExamPrediction(cards, examTrack) {
+    const trackKey = String(examTrack || "toeic").trim().toLowerCase();
+    const specs = {
+      toeic: { label: "TOEIC (ETS 공인 어휘·독해 환산)", min: 200, max: 990, cut: 0.35 },
+      csat: { label: "대학수학능력시험 (절대평가 등급 예측)", min: 0, max: 100, cut: 0.65 },
+      hanja: { label: "한국어문회 국가공인 급수한자 합격 예측", min: 0, max: 100, cut: 0.20 },
+      civil_service: { label: "공무원·자격증 필기 합격권 예측", min: 0, max: 100, cut: 0.50 },
+    };
+    const spec = specs[trackKey] || specs.toeic;
+    const reviewed = Array.isArray(cards)
+      ? cards.filter((c) => c && Number(c.reps || 0) > 0 && Number(c.stability || 0) > 0)
+      : [];
+    if (reviewed.length === 0) {
+      return {
+        status: "INSUFFICIENT_DATA",
+        exam_track: trackKey,
+        exam_label: spec.label,
+        reviewed_cards: 0,
+        theta: null,
+        standard_error: null,
+        predicted_score: null,
+        confidence_interval: null,
+        pass_probability_pct: null,
+        csat_grade: null,
+      };
+    }
+
+    let theta = 0.0;
+    for (let iter = 0; iter < 12; iter++) {
+      let grad = -theta;
+      let info = 1.0;
+      for (let i = 0; i < reviewed.length; i++) {
+        const c = reviewed[i];
+        const dFsrs = Math.max(1.0, Math.min(10.0, Number(c.difficulty) || 5.0));
+        const bI = (dFsrs - 5.5) / 2.0;
+        const reps = Math.max(1, Number(c.reps) || 1);
+        const lapses = Math.max(0, Number(c.lapses) || 0);
+        const aI = Math.max(0.6, Math.min(1.8, 1.0 + Math.min(0.5, reps * 0.06) - Math.min(0.3, lapses * 0.08)));
+        const sI = Math.max(0.1, Number(c.stability) || 1.0);
+        const tI = Math.max(0.0, Number(c.elapsed_days) || 0.0);
+        const rNow = computeRetrievability(tI, sI);
+        const maturity = Math.min(1.0, Math.log1p(sI) / Math.log1p(30.0));
+        const yI = Math.max(0.02, Math.min(0.98, 0.55 * rNow + 0.45 * maturity - Math.min(0.25, lapses * 0.08)));
+        const z = Math.max(-15.0, Math.min(15.0, aI * (theta - bI)));
+        const pI = 1.0 / (1.0 + Math.exp(-z));
+        grad += aI * (yI - pI);
+        info += aI * aI * pI * (1.0 - pI);
+      }
+      const step = grad / Math.max(1e-6, info);
+      theta = Math.max(-3.0, Math.min(3.0, theta + step));
+      if (Math.abs(step) < 1e-5) break;
+    }
+
+    let totalInfo = 1.0;
+    for (let i = 0; i < reviewed.length; i++) {
+      const c = reviewed[i];
+      const dFsrs = Math.max(1.0, Math.min(10.0, Number(c.difficulty) || 5.0));
+      const bI = (dFsrs - 5.5) / 2.0;
+      const reps = Math.max(1, Number(c.reps) || 1);
+      const lapses = Math.max(0, Number(c.lapses) || 0);
+      const aI = Math.max(0.6, Math.min(1.8, 1.0 + Math.min(0.5, reps * 0.06) - Math.min(0.3, lapses * 0.08)));
+      const z = Math.max(-15.0, Math.min(15.0, aI * (theta - bI)));
+      const pI = 1.0 / (1.0 + Math.exp(-z));
+      totalInfo += aI * aI * pI * (1.0 - pI);
+    }
+    const se = 1.0 / Math.sqrt(Math.max(1.0, totalInfo));
+
+    function thetaToScore(th) {
+      const normP = 1.0 / (1.0 + Math.exp(-0.95 * th));
+      const raw = spec.min + normP * (spec.max - spec.min);
+      if (trackKey === "toeic") {
+        return Math.max(200, Math.min(990, Math.round(raw / 5.0) * 5));
+      }
+      return Math.max(spec.min, Math.min(spec.max, Math.round(raw)));
+    }
+
+    const predScore = thetaToScore(theta);
+    const ciLow = thetaToScore(Math.max(-3.5, theta - 1.96 * se));
+    const ciHigh = thetaToScore(Math.min(3.5, theta + 1.96 * se));
+    const zPass = (theta - spec.cut) / Math.max(0.15, se);
+    const passProb = Number((100.0 / (1.0 + Math.exp(-1.702 * zPass))).toFixed(1));
+    const csatGrade = Math.max(1, Math.min(9, 10 - Math.max(1, Math.min(9, Math.ceil(predScore / 11.0)))));
+
+    return {
+      status: "CALIBRATED",
+      exam_track: trackKey,
+      exam_label: spec.label,
+      reviewed_cards: reviewed.length,
+      theta: Number(theta.toFixed(4)),
+      standard_error: Number(se.toFixed(4)),
+      predicted_score: predScore,
+      confidence_interval: [Math.min(ciLow, predScore), Math.max(ciHigh, predScore)],
+      pass_probability_pct: passProb,
+      csat_grade: csatGrade,
+    };
+  }
+
+  function filterQueueWithSiblingBurying(queue) {
+    const seen = new Set();
+    const active = [];
+    const buriedIds = [];
+    const list = Array.isArray(queue) ? queue : [];
+    for (let i = 0; i < list.length; i++) {
+      const card = Object.assign({}, list[i]);
+      const cid = card.card_id !== undefined ? card.card_id : i + 1;
+      let key;
+      if (card.note_id !== undefined && card.note_id !== null && String(card.note_id).trim() !== "") {
+        key = "note:" + String(card.note_id);
+      } else {
+        const front = String(card.front_text || card.front || "").trim();
+        if (front.includes("{{c") || front.includes("{{io")) {
+          const stem = front.replace(/\{\{(?:c|io)\d+::([^}:]+)(?:::[^}]+)?\}\}/g, "$1");
+          key = "stem:" + stem;
+        } else {
+          key = "card:" + String(cid);
+        }
+      }
+      if (seen.has(key)) {
+        buriedIds.push(cid);
+      } else {
+        seen.add(key);
+        active.push(card);
+      }
+    }
+    return {
+      active_queue: active,
+      buried_sibling_card_ids: buriedIds,
+      buried_count: buriedIds.length,
+    };
+  }
+
+  function parseImageOcclusionSpecs(text) {
+    const re = /\{\{io(\d+)::(\d+(?:\.\d+)?),(\d+(?:\.\d+)?),(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)(?:::([^}]+))?\}\}/g;
+    const masks = [];
+    let m;
+    const raw = String(text || "");
+    while ((m = re.exec(raw)) !== null) {
+      masks.push({
+        ordinal: Number(m[1]),
+        x: Number(m[2]),
+        y: Number(m[3]),
+        w: Math.max(8, Number(m[4])),
+        h: Math.max(8, Number(m[5])),
+        label: String(m[6] || `영역 #${m[1]}`).trim(),
+      });
+    }
+    return masks;
+  }
+
+  function renderImageOcclusionSvg(text, activeOrdinal, reveal) {
+    const masks = parseImageOcclusionSpecs(text);
+    const activeOrd = Number(activeOrdinal) || 1;
+    const cleanTitle = String(text || "")
+      .replace(/\{\{io\d+::[^}]+\}\}/g, "")
+      .replace(/[<>&"]/g, "")
+      .trim() || "Image Occlusion Diagram";
+    const parts = [
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 180" class="bd-io-svg" role="img" aria-label="${cleanTitle}">`,
+      `<rect x="2" y="2" width="356" height="176" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>`,
+      `<text x="16" y="22" fill="#94a3b8" font-size="11" font-weight="bold" font-family="sans-serif">🖼️ 이미지 가리기: ${cleanTitle.slice(0, 28)}</text>`,
+    ];
+    for (let i = 0; i < masks.length; i++) {
+      const mk = masks[i];
+      const cx = (mk.x + mk.w / 2).toFixed(1);
+      const cy = (mk.y + mk.h / 2 + 4).toFixed(1);
+      const safeLabel = mk.label.replace(/[<>&"]/g, "");
+      if (mk.ordinal === activeOrd) {
+        if (reveal) {
+          parts.push(`<rect x="${mk.x}" y="${mk.y}" width="${mk.w}" height="${mk.h}" rx="6" fill="#065f46" fill-opacity="0.88" stroke="#34d399" stroke-width="2"/>`);
+          parts.push(`<text x="${cx}" y="${cy}" fill="#ecfdf5" font-size="11" font-weight="bold" text-anchor="middle">${safeLabel}</text>`);
+        } else {
+          parts.push(`<rect x="${mk.x}" y="${mk.y}" width="${mk.w}" height="${mk.h}" rx="6" fill="#be123c" stroke="#fda4af" stroke-width="2" stroke-dasharray="4,2"/>`);
+          parts.push(`<text x="${cx}" y="${cy}" fill="#fff1f2" font-size="11" font-weight="bold" text-anchor="middle">[ ? #${mk.ordinal} ]</text>`);
+        }
+      } else {
+        parts.push(`<rect x="${mk.x}" y="${mk.y}" width="${mk.w}" height="${mk.h}" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1.2"/>`);
+        parts.push(`<text x="${cx}" y="${cy}" fill="#94a3b8" font-size="10" text-anchor="middle">#${mk.ordinal}</text>`);
+      }
+    }
+    parts.push("</svg>");
+    return parts.join("");
+  }
+
+  function renderMathAndCodeMarkup(text) {
+    let esc = String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    esc = esc.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, function (_, lang, body) {
+      return `<pre class="bd-code-block" data-lang="${lang || "text"}"><code class="bd-code">${body.trim()}</code></pre>`;
+    });
+    esc = esc.replace(/\$\$([\s\S]+?)\$\$/g, function (_, expr) {
+      return `<div class="bd-math-block" role="math"><math display="block"><mrow>${expr.trim()}</mrow></math></div>`;
+    });
+    esc = esc.replace(/\$([^$\n]+?)\$/g, function (_, expr) {
+      return `<span class="bd-math" role="math"><math display="inline"><mrow>${expr.trim()}</mrow></math></span>`;
+    });
+    return esc;
+  }
+
+  function resolveMobileErgonomicsSpec(dxPx, dyPx, minSwipePx, themeMode) {
+    const dx = Number(dxPx) || 0;
+    const dy = Number(dyPx) || 0;
+    const thresh = Math.max(24, Number(minSwipePx) || 64);
+    let swipeRating = null;
+    let swipeDirection = "NONE";
+    let hapticMs = [];
+    if (Math.abs(dx) >= Math.abs(dy) && Math.abs(dx) >= thresh) {
+      if (dx < 0) {
+        swipeRating = 1;
+        swipeDirection = "LEFT";
+        hapticMs = [40, 30, 40];
+      } else {
+        swipeRating = 3;
+        swipeDirection = "RIGHT";
+        hapticMs = [18];
+      }
+    } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) >= thresh) {
+      if (dy > 0) {
+        swipeRating = 2;
+        swipeDirection = "DOWN";
+        hapticMs = [28];
+      } else {
+        swipeRating = 4;
+        swipeDirection = "UP";
+        hapticMs = [12, 20, 25];
+      }
+    }
+    const modeNorm = String(themeMode || "light").trim().toLowerCase();
+    const isOled = modeNorm === "oled" || modeNorm === "oled_dark" || modeNorm === "dark";
+    return {
+      swipe_direction: swipeDirection,
+      swipe_rating: swipeRating,
+      haptic_pattern_ms: hapticMs,
+      theme_mode: modeNorm,
+      theme_tokens: isOled
+        ? { bg: "#000000", panel: "#0b0f19", border: "#1e293b", text: "#f8fafc", muted: "#94a3b8", accent: "#38bdf8" }
+        : { bg: "#f2f4f6", panel: "#ffffff", border: "#e5e8eb", text: "#191f28", muted: "#4e5968", accent: "#1b64da" },
+    };
+  }
+
+  function getTrademarkCleanroomDisclaimers() {
+    return {
+      toeic: "TOEIC®은 Educational Testing Service(ETS)의 등록상표입니다. 본 앱의 모든 어휘·예문은 ETS와 무관하게 자체 클린룸(Clean-Room) 방식으로 집필된 독립 학습 콘텐츠입니다.",
+      csat: "대학수학능력시험(수능) 및 모의평가 명칭은 교육부·한국교육과정평가원(KICE)의 공개 성취기준을 참고한 학습 분류 표기이며, 수록된 모든 문항과 해설은 자체 창작물입니다.",
+      anki: "BrainDeck은 Anki® / Ankitects Pty Ltd와 제휴되거나 보증받지 않은 독립 소프트웨어이며, 공개된 FSRS-5 학술 수식 및 오픈 호환 규격을 준수합니다.",
+      general: "BrainDeck의 모든 어휘 뜻풀이·예문·해설·시각 도식은 외부 출판사 교과서나 기출문제를 복제하지 않은 100% 독립 집필(Clean-Room) 자산입니다.",
+    };
+  }
+
+  // Contract C16 (v13.1): Natural Native Prosody & Bilingual TTS Engine
+  const NOVELTY_OR_ROBOTIC_VOICE_KEYWORDS_JS = [
+    "albert", "bad news", "bahh", "bells", "boing", "bubbles", "cellos",
+    "wobble", "eddy", "flo", "fred", "good news", "grandma", "grandpa",
+    "jester", "junior", "organ", "superstar", "ralph", "reed", "rocko",
+    "sandy", "shelley", "trinoids", "whisper", "zarvox", "compact", "espeak"
+  ];
+
+  function sanitizeTextForNaturalTts(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return "";
+    let s = raw.replace(/\{\{io\d+::[^}]+\}\}/g, " ");
+    s = s.replace(/\{\{c\d+::([^}:]+)(?:::[^}]+)?\}\}/g, "$1");
+    s = s.replace(/\[([^\]]*?(?:#\d+|\d+급|필수\s*영단어|빈출\s*핵심|한자\s*\d*급|(?:초등|중학|고등|수능|토익|공무원|필수|빈출)\s*(?:영단어|어휘|한자|한국사|과학|수학|국어|법률))[^\]]*?)\]/g, " ");
+    s = s.replace(/【([^】]*?(?:#\d+|\d+급|필수\s*영단어|빈출\s*핵심|한자\s*\d*급|(?:초등|중학|고등|수능|토익|공무원|필수|빈출)\s*(?:영단어|어휘|한자|한국사|과학|수학|국어|법률))[^】]*?)】/g, " ");
+    s = s.replace(/\[([^\]]+)\]/g, " $1 ").replace(/【([^】]+)】/g, " $1 ");
+    s = s.replace(/\(\s*\/[^/]+\/\s*\)/g, " ");
+    s = s.replace(/(?:^|\s)\/[ˈˌːɪʊɛɔæɑəʌθðʃʒŋa-zA-Z.\-\s]{2,}\/(?=\s|$|[,.!?;:)])/g, " ");
+    s = s.replace(/\(\s*(?:부수|획수|총\s*\d+\s*획)[^)]*\)/g, " ");
+    s = s.replace(/\(\s*(?:교과부|수능\s*(?:필수|빈출)|평가원|토익\s*(?:필수|빈출)|공무원\s*(?:필수|빈출)|(?:고등|중학|초등)\s*필수|필수\s*영단어)[^)]*\)/g, " ");
+    s = s.replace(/[📘💡🎯🔊🏫📚✍️🖼️⏰🚨✅⚠️🚩🧬🧪🎲🛒🎁❄️🔍]+/g, " ");
+    s = s.replace(/(?:문맥\s*)?예문(?:·활용)?\s*:\s*/g, " ");
+    s = s.replace(/(?:핵심\s*)?(?:정답|해설(?:·유래)?)\s*:\s*/g, " ");
+    s = s.replace(/^(?:다음\s*(?:빈칸에\s*알맞은\s*(?:단어|말|표현)는\??|뜻에\s*해당하는\s*영단어는\??|한자의\s*뜻과\s*음은\??|설명에\s*해당하는\s*(?:개념|용어|단어)은\??|문장의\s*빈칸을\s*채우시오\.?))\s*/i, "");
+    s = s.replace(/_{2,}/g, ", ").replace(/\s*(?:➔|→|↔|—|--)\s*/g, ", ");
+    s = s.replace(/[*`#$~]+/g, " ").replace(/\s+/g, " ").replace(/^[ ,;:\-]+|[ ,;:\-]+$/g, "");
+    return s;
+  }
+
+  function splitLineIntoBilingualClauses(line) {
+    const cleaned = sanitizeTextForNaturalTts(line);
+    if (!cleaned) return [];
+    const parts = cleaned.split(/(\([^)]+\))/g);
+    const clauses = [];
+    for (let i = 0; i < parts.length; i++) {
+      let p = (parts[i] || "").trim();
+      if (!p) continue;
+      if (p.startsWith("(") && p.endsWith(")")) {
+        const inner = p.slice(1, -1).trim();
+        if (!inner) continue;
+        const hasKoIn = /[가-힣一-龥]/.test(inner);
+        const hasEnIn = /[A-Za-z]{2,}/.test(inner);
+        if (hasKoIn && !hasEnIn) {
+          clauses.push({ lang: "ko-KR", text: inner });
+          continue;
+        }
+        if (hasEnIn && !hasKoIn) {
+          clauses.push({ lang: "en-US", text: inner });
+          continue;
+        }
+        p = inner;
+      }
+      const hasKo = /[가-힣一-龥]/.test(p);
+      const hasEn = /[A-Za-z]{2,}/.test(p);
+      if (hasEn && !hasKo) {
+        clauses.push({ lang: "en-US", text: p.replace(/^[ ,;:\-]+|[ ,;:\-]+$/g, "") });
+      } else if (hasKo && !hasEn) {
+        clauses.push({ lang: "ko-KR", text: p.replace(/^[ ,;:\-]+|[ ,;:\-]+$/g, "") });
+      } else if (hasEn && hasKo) {
+        let curLang = null;
+        let curTokens = [];
+        const tokens = p.split(/\s+/);
+        for (let t = 0; t < tokens.length; t++) {
+          const tok = tokens[t];
+          if (!tok) continue;
+          const isKoTok = /[가-힣一-龥]/.test(tok);
+          const isEnTok = /[A-Za-z]/.test(tok);
+          const tokLang = isKoTok ? "ko-KR" : (isEnTok ? "en-US" : (curLang || "ko-KR"));
+          if (!curLang || tokLang === curLang) {
+            curLang = tokLang;
+            curTokens.push(tok);
+          } else {
+            const segTxt = curTokens.join(" ").replace(/^[ ,;:\-]+|[ ,;:\-]+$/g, "");
+            if (segTxt) clauses.push({ lang: curLang, text: segTxt });
+            curLang = tokLang;
+            curTokens = [tok];
+          }
+        }
+        if (curLang && curTokens.length) {
+          const segTxt = curTokens.join(" ").replace(/^[ ,;:\-]+|[ ,;:\-]+$/g, "");
+          if (segTxt) clauses.push({ lang: curLang, text: segTxt });
+        }
+      } else if (/\d/.test(p)) {
+        clauses.push({ lang: "ko-KR", text: p.replace(/^[ ,;:\-]+|[ ,;:\-]+$/g, "") });
+      }
+    }
+    const merged = [];
+    for (let j = 0; j < clauses.length; j++) {
+      const c = clauses[j];
+      const cleanTxt = (c.text || "").replace(/^[ ,;:\-]+|[ ,;:\-]+$/g, "");
+      if (!cleanTxt) continue;
+      if (merged.length > 0 && merged[merged.length - 1].lang === c.lang) {
+        const prev = merged[merged.length - 1].text;
+        const sep = /[.!?,]$/.test(prev) ? " " : ". ";
+        merged[merged.length - 1].text = prev + sep + cleanTxt;
+      } else {
+        merged.push({ lang: c.lang, text: cleanTxt });
+      }
+    }
+    return merged;
+  }
+
+  function buildNaturalTtsSegments(rawText, frontText, backText, isRevealed) {
+    const candidateLines = [];
+    if (isRevealed && (frontText || backText)) {
+      const frontRawLines = String(frontText || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const deferredExamples = [];
+      if (frontRawLines.length > 0) {
+        const headClean = sanitizeTextForNaturalTts(frontRawLines[0]);
+        if (headClean) {
+          if (/[A-Za-z]{2,}/.test(headClean)) {
+            const enHead = splitLineIntoBilingualClauses(headClean)
+              .filter((c) => c.lang === "en-US")
+              .map((c) => c.text);
+            candidateLines.push(enHead.length ? enHead.join(" ") : headClean);
+          } else {
+            candidateLines.push(headClean);
+          }
+        }
+        for (let f = 1; f < frontRawLines.length; f++) {
+          const exClean = sanitizeTextForNaturalTts(frontRawLines[f]);
+          if (exClean && /[A-Za-z]{2,}/.test(exClean)) {
+            deferredExamples.push(frontRawLines[f]);
+          }
+        }
+      }
+      const backSrc = String(backText || rawText || "").trim();
+      const rawLines = backSrc.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const meaningLines = [];
+      for (let b = 0; b < rawLines.length; b++) {
+        const ln = rawLines[b];
+        if (b === 0) meaningLines.push(ln);
+        else if (/^\s*(?:💡\s*)?(?:핵심\s*)?해설(?:·유래)?\s*[:：]/.test(ln)) continue;
+        else if (ln.includes("예문")) deferredExamples.push(ln);
+        else {
+          const lnClean = sanitizeTextForNaturalTts(ln);
+          const enCount = (lnClean.match(/[A-Za-z]/g) || []).length;
+          const koCount = (lnClean.match(/[가-힣一-龥]/g) || []).length;
+          if (enCount >= 6 && enCount > koCount * 2) deferredExamples.push(ln);
+          else meaningLines.push(ln);
+        }
+      }
+      candidateLines.push.apply(candidateLines, meaningLines.length ? meaningLines : rawLines);
+      candidateLines.push.apply(candidateLines, deferredExamples);
+    } else {
+      const src = String(rawText || frontText || backText || "").trim();
+      const rawLines = src.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const filtered = rawLines.filter((ln, idx) => idx === 0 || !/^\s*(?:💡\s*)?(?:핵심\s*)?해설(?:·유래)?\s*[:：]/.test(ln));
+      candidateLines.push.apply(candidateLines, filtered.length ? filtered : rawLines);
+    }
+    const segments = [];
+    const seen = new Set();
+    for (let i = 0; i < candidateLines.length; i++) {
+      const clauses = splitLineIntoBilingualClauses(candidateLines[i]);
+      for (let j = 0; j < clauses.length; j++) {
+        const cl = clauses[j];
+        const key = cl.lang + ":" + cl.text.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const isEn = cl.lang === "en-US";
+        const wordCount = cl.text.split(/\s+/).length;
+        segments.push({
+          text: cl.text,
+          lang: cl.lang,
+          voice: isEn ? "en-US-AvaMultilingualNeural" : "ko-KR-SunHiNeural",
+          macos_voice: isEn ? "Samantha" : "Yuna",
+          rate: isEn ? (wordCount <= 3 ? 0.92 : 0.96) : 0.98,
+          pitch: 1.0,
+        });
+      }
+    }
+    if (segments.length === 0) {
+      const fb = sanitizeTextForNaturalTts(rawText || frontText || backText) || "vocabulary";
+      const isKo = /[가-힣]/.test(fb);
+      segments.push({
+        text: fb,
+        lang: isKo ? "ko-KR" : "en-US",
+        voice: isKo ? "ko-KR-SunHiNeural" : "en-US-AvaMultilingualNeural",
+        macos_voice: isKo ? "Yuna" : "Samantha",
+        rate: isKo ? 0.98 : 0.94,
+        pitch: 1.0,
+      });
+    }
+    return segments;
+  }
+
+  function selectBestBrowserVoice(voices, lang) {
+    const list = Array.isArray(voices) ? voices : [];
+    const targetPrefix = String(lang || "en-US").toLowerCase().startsWith("ko") ? "ko" : "en";
+    const enPref = ["ava", "andrew", "aria", "jenny", "guy", "google us english", "samantha", "alex", "allison", "daniel"];
+    const koPref = ["sunhi", "injoon", "hyunsu", "google 한국의", "yuna", "유나", "sora", "소라", "jian", "지안", "minsu", "민수"];
+    let bestVoice = null;
+    let bestScore = -10000;
+    for (let i = 0; i < list.length; i++) {
+      const v = list[i];
+      if (!v) continue;
+      const vLang = String(v.lang || "").trim().toLowerCase().replace(/_/g, "-");
+      if (!vLang.startsWith(targetPrefix)) continue;
+      const combined = (String(v.name || "") + " " + String(v.voiceURI || "")).toLowerCase();
+      let score = 0;
+      for (let b = 0; b < NOVELTY_OR_ROBOTIC_VOICE_KEYWORDS_JS.length; b++) {
+        if (combined.includes(NOVELTY_OR_ROBOTIC_VOICE_KEYWORDS_JS[b])) {
+          score -= 1000;
+          break;
+        }
+      }
+      if (combined.includes("natural") || combined.includes("neural")) score += 140;
+      if (combined.includes("premium") || combined.includes("enhanced") || combined.includes("siri")) score += 95;
+      if (combined.includes("online") || combined.includes("cloud") || v.localService === false) score += 45;
+      if (targetPrefix === "en") {
+        if (vLang === "en-us") score += 30;
+        else if (vLang === "en-gb" || vLang === "en-au" || vLang === "en-ca") score += 15;
+        for (let p = 0; p < enPref.length; p++) {
+          if (combined.includes(enPref[p])) {
+            score += 75 - p * 4;
+            break;
+          }
+        }
+      } else {
+        if (vLang === "ko-kr") score += 30;
+        for (let p = 0; p < koPref.length; p++) {
+          if (combined.includes(koPref[p])) {
+            score += 75 - p * 4;
+            break;
+          }
+        }
+      }
+      if (v.default) score += 5;
+      if (score > bestScore) {
+        bestScore = score;
+        bestVoice = v;
+      }
+    }
+    return bestVoice;
+  }
+
+  function levenshteinDistJs(a, b) {
+    if (a === b) return 0;
+    if (!a) return b.length;
+    if (!b) return a.length;
+    const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      let cur = [i];
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        cur.push(Math.min(cur[cur.length - 1] + 1, prev[j] + 1, prev[j - 1] + cost));
+      }
+      for (let j = 0; j <= b.length; j++) prev[j] = cur[j];
+    }
+    return prev[b.length];
+  }
+
+  function gradeDictationResponse(targetWord, userInput) {
+    const t = String(targetWord || "").trim().toLowerCase().replace(/[^\w가-힣一-龥\s]/g, "");
+    const u = String(userInput || "").trim().toLowerCase().replace(/[^\w가-힣一-龥\s]/g, "");
+    if (!u) return { is_correct: false, accuracy_pct: 0.0, recommended_rating: 1, verdict: "AGAIN" };
+    const dist = levenshteinDistJs(t, u);
+    const maxLen = Math.max(1, t.length, u.length);
+    const acc = Number((Math.max(0, 1.0 - dist / maxLen) * 100.0).toFixed(1));
+    const rating = dist === 0 ? 4 : (acc >= 85.0 ? 3 : (acc >= 65.0 ? 2 : 1));
+    return { is_correct: dist <= 1, accuracy_pct: acc, recommended_rating: rating, verdict: rating >= 3 ? "PASS" : "RETRY" };
+  }
+
+  function buildSentenceChunkChallenge(sentence) {
+    const words = String(sentence || "The captain refused to abandon the ship").trim().split(/\s+/).filter(Boolean);
+    const canonical = words.map((w, idx) => ({ index: idx, text: w }));
+    const scrambled = canonical.slice().sort((a, b) => (a.text.localeCompare(b.text) || (b.index - a.index)));
+    if (scrambled.length > 1 && scrambled.every((c, idx) => c.index === idx)) {
+      const tmp = scrambled[0];
+      scrambled[0] = scrambled[scrambled.length - 1];
+      scrambled[scrambled.length - 1] = tmp;
+    }
+    return { canonical_chunks: canonical, scrambled_chunks: scrambled };
+  }
+
+  function gradeSentenceChunkOrdering(canonicalSeq, submittedSeq) {
+    const can = Array.isArray(canonicalSeq) ? canonicalSeq.map((s) => String(s || "").trim()) : [];
+    const sub = Array.isArray(submittedSeq) ? submittedSeq.map((s) => String(s || "").trim()) : [];
+    if (!can.length || !sub.length) return { is_correct: false, accuracy_pct: 0.0, recommended_rating: 1 };
+    let matches = 0;
+    const n = Math.max(can.length, sub.length);
+    for (let i = 0; i < Math.min(can.length, sub.length); i++) {
+      if (can[i].toLowerCase() === sub[i].toLowerCase()) matches++;
+    }
+    const acc = Number(((matches / n) * 100.0).toFixed(1));
+    const exact = can.length === sub.length && matches === can.length;
+    return { is_correct: exact, accuracy_pct: acc, recommended_rating: exact ? 4 : (acc >= 75 ? 3 : (acc >= 50 ? 2 : 1)) };
+  }
+
+  function evaluateSpeechShadowing(targetText, spokenTranscript, durationMs) {
+    const res = gradeDictationResponse(targetText, spokenTranscript);
+    return {
+      is_correct: res.is_correct,
+      accuracy_pct: res.accuracy_pct,
+      recommended_rating: res.recommended_rating,
+      duration_ms: Number(durationMs) || 1500,
+      verdict: res.accuracy_pct >= 90 ? "EXCELLENT" : (res.accuracy_pct >= 70 ? "GOOD" : "RETRY"),
+    };
+  }
+
   return {
     formatRetentionBadge,
     formatLeechBadge,
@@ -1917,6 +2564,21 @@
     parseStructuredCardBack,
     recommendStudyMode,
     resolveAllowedRatingsV11,
+    stepDualMemoryFsrs,
+    computeIrtExamPrediction,
+    filterQueueWithSiblingBurying,
+    parseImageOcclusionSpecs,
+    renderImageOcclusionSvg,
+    renderMathAndCodeMarkup,
+    resolveMobileErgonomicsSpec,
+    getTrademarkCleanroomDisclaimers,
+    sanitizeTextForNaturalTts,
+    buildNaturalTtsSegments,
+    selectBestBrowserVoice,
+    gradeDictationResponse,
+    buildSentenceChunkChallenge,
+    gradeSentenceChunkOrdering,
+    evaluateSpeechShadowing,
   };
 });
 

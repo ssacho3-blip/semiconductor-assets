@@ -722,6 +722,40 @@
             <div id="card-svg-diagram" role="region" aria-label="개념 시각 다이어그램" style="display:none;margin:8px 0;"></div>
             <div class="card-answer" id="card-answer"></div>
             <div id="card-extra-explanation" class="ai-box" style="margin-top:8px;display:none;background:#ffffff;color:#4e5968;border:1px solid #e5e8eb;"></div>
+            <!-- v13.0 Contract C11: Hanja & Spelling Handwriting Scratchpad Canvas -->
+            <div id="bd-scratchpad-drawer" style="display:none;margin-top:10px;padding:12px;border-radius:14px;background:#fffbeb;border:1.5px solid #f59e0b;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:0.78rem;font-weight:800;color:#b45309;flex-wrap:wrap;gap:6px;">
+                <span>✍️ 한자 획순 · 스펠링 손글씨 연습장 (마우스/터치/펜슬)</span>
+                <div style="display:flex;gap:6px;">
+                  <button type="button" id="btn-scratchpad-grade" class="btn-primary" style="padding:3px 9px;font-size:0.73rem;">필순·자형 채점</button>
+                  <button type="button" id="btn-scratchpad-clear" style="padding:3px 9px;font-size:0.73rem;">지우기</button>
+                  <button type="button" id="btn-scratchpad-close" style="padding:3px 9px;font-size:0.73rem;">닫기</button>
+                </div>
+              </div>
+              <canvas id="bd-scratchpad-canvas" width="320" height="140" style="width:100%;height:140px;background:#ffffff;border-radius:10px;border:1px dashed #fbbf24;touch-action:none;cursor:crosshair;"></canvas>
+              <div id="bd-scratchpad-feedback" style="margin-top:6px;font-size:0.76rem;font-weight:700;color:#92400e;"></div>
+            </div>
+
+            <!-- v13.2 Contract C8 & C9: Active Production Arena (Dictation, Chunk Ordering, Speech Shadowing & Dual-Memory FSRS) -->
+            <div id="bd-active-production-drawer" style="display:none;margin-top:10px;padding:12px;border-radius:14px;background:#f0fdf4;border:1.5px solid #34d399;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+                <span id="bd-prod-mode-title" style="font-size:0.8rem;font-weight:800;color:#065f46;">🎧 능동 인출 훈련 (이중 기억 FSRS 연동)</span>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                  <button type="button" id="btn-prod-dictation" style="padding:3px 8px;font-size:0.73rem;">🎧 받아쓰기</button>
+                  <button type="button" id="btn-prod-chunk-order" style="padding:3px 8px;font-size:0.73rem;">🧩 어순배열</button>
+                  <button type="button" id="btn-prod-shadowing" style="padding:3px 8px;font-size:0.73rem;">🎙️ 섀도잉</button>
+                  <button type="button" id="btn-prod-close" style="padding:3px 8px;font-size:0.73rem;">닫기</button>
+                </div>
+              </div>
+              <div id="bd-prod-prompt-box" style="font-size:0.82rem;font-weight:700;color:#064e3b;margin-bottom:8px;"></div>
+              <div id="bd-prod-chunks-zone" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <input type="text" id="bd-prod-input" placeholder="듣거나 조합한 문장·단어를 입력하세요..." style="flex:1;min-width:160px;background:#ffffff;" />
+                <button type="button" id="btn-prod-mic" style="display:none;padding:7px 10px;font-size:0.76rem;">🎙️ 음성인식</button>
+                <button type="button" id="btn-prod-grade" class="btn-primary" style="padding:7px 12px;font-size:0.76rem;">능동 채점</button>
+              </div>
+              <div id="bd-prod-feedback" style="margin-top:6px;font-size:0.78rem;font-weight:700;color:#047857;"></div>
+            </div>
             <div id="interactive-quiz-box" class="ai-box" style="margin-top:12px;"></div>
 
             <!-- Post-Session Wrong/Unknown Retry Box -->
@@ -742,7 +776,11 @@
             <span id="solve-mode-badge" class="badge-pill" style="font-size:0.74rem;">4지선다 모드</span>
             <button id="btn-tts" type="button">발음</button>
             <button id="btn-quiz-mode" type="button" title="현재 카드 풀이 방식 전환">풀이방식 전환</button>
+            <button id="btn-toggle-active-production" type="button" title="받아쓰기 · 어순배열 · 발음 섀도잉 능동 인출 훈련 열기">🎧 능동훈련</button>
+            <button id="btn-toggle-scratchpad" type="button" title="한자·영단어 손글씨 연습장 열기">✍️ 필기장</button>
             <button id="btn-hint" type="button">힌트</button>
+            <button id="btn-report-errata" type="button" title="오타·해설 개선 1클릭 제보" style="font-size:0.76rem;padding:7px 10px;">🚨 오류제보</button>
+            <button id="btn-oled-theme-toggle" type="button" title="OLED True-Black 다크모드 전환" style="font-size:0.76rem;padding:7px 10px;">🌙 다크모드</button>
             <button id="btn-decompose" type="button" title="어려운 카드를 쉽게 쪼개기" style="display:none;">쪼개기</button>
             <button id="btn-reveal" class="btn-primary" type="button" style="margin-left:auto;padding:10px 18px;">
               정답 보기
@@ -933,9 +971,22 @@
       </div>
 
       <div class="panel create-seg-panel" id="create-seg-manual" style="display:none;">
-        <div class="panel-header">
-          <div class="panel-title">카드 직접 추가 (기본형 · {{c1::빈칸}} Cloze)</div>
-          <button id="btn-insert-cloze" type="button" style="padding:5px 10px;font-size:0.76rem;">+ {{c1::빈칸}} 넣기</button>
+        <div class="panel-header" style="flex-wrap:wrap;gap:6px;">
+          <div class="panel-title">카드 직접 추가 (기본형 · {{c1::빈칸}} Cloze · 이미지 가리기)</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button id="btn-insert-cloze" type="button" style="padding:5px 10px;font-size:0.76rem;">+ {{c1::빈칸}} 넣기</button>
+            <button id="btn-toggle-io-builder" type="button" style="padding:5px 10px;font-size:0.76rem;">🖼️ 이미지 가리기 영역 그리기</button>
+          </div>
+        </div>
+        <div id="bd-io-builder-drawer" style="display:none;margin-bottom:10px;padding:12px;border-radius:14px;background:#f8fafc;border:1px solid #cbd5e1;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:0.78rem;font-weight:800;color:#1e293b;">
+            <span>🖼️ 마우스·터치 드래그로 이미지 가리기 박스({{io1::x,y,w,h::라벨}}) 자동 생성</span>
+            <button type="button" id="btn-io-clear-boxes" style="padding:3px 8px;font-size:0.72rem;">영역 초기화</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+            <input type="text" id="bd-io-label-input" placeholder="가릴 부위 정답 라벨 (예: 대동맥궁, 좌심실)" style="flex:1;min-width:160px;background:#ffffff;padding:6px 10px;font-size:0.8rem;" />
+          </div>
+          <canvas id="bd-io-builder-canvas" width="320" height="140" style="width:100%;height:140px;background:#0f172a;border-radius:10px;border:1px solid #38bdf8;touch-action:none;cursor:crosshair;"></canvas>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <input type="text" id="direct-card-front" placeholder="질문 또는 빈칸 문장 (예: 광합성은 {{c1::엽록체}}에서 일어난다)" />
@@ -1054,9 +1105,28 @@
           <a id="link-export-apkg" href="/api/export.apkg" style="text-decoration:none;">
             <button id="btn-export-apkg" type="button">.apkg 내보내기</button>
           </a>
-          <a id="link-download-apk" href="https://github.com/ssacho3-blip/BrainDeck/releases/download/v10.0.0/BrainDeck-v10.0.apk" style="text-decoration:none;">
-            <button id="btn-download-apk" type="button" class="btn-primary">안드로이드 앱 설치파일 (v10.0)</button>
+          <a id="link-download-apk" href="https://github.com/ssacho3-blip/semiconductor-assets/releases/download/braindeck-v1.0/BrainDeck-v1.0.apk" style="text-decoration:none;">
+            <button id="btn-download-apk" type="button" class="btn-primary">안드로이드 앱 설치파일 (v1.0 Build 104)</button>
           </a>
+          <button id="btn-share-deck-token" type="button">🔗 단어장 공유 토큰 복사</button>
+          <button id="btn-import-deck-token" type="button">📥 공유 토큰으로 단어장 받기</button>
+        </div>
+      </div>
+
+      <!-- v13.0 Contract C10 & C12: IRT Exam Score Predictor & 365-Day Review Heatmap -->
+      <div class="panel" id="bd-irt-predictor-panel">
+        <div class="panel-header">
+          <div class="panel-title">🎯 문항반응이론(2PL IRT) 시험 예상 점수 · 합격률 예측</div>
+          <span id="bd-irt-status-badge" class="badge-pill">실시간 분석</span>
+        </div>
+        <div id="bd-irt-summary-text" style="font-size:0.86rem;font-weight:700;color:var(--text);margin-bottom:8px;">
+          학습 기록이 쌓이면 예상 TOEIC 점수(95% 신뢰구간)와 급수한자·수능 합격 확률을 자동 계산합니다.
+        </div>
+        <div id="bd-forgetting-alert-banner" style="font-size:0.8rem;color:var(--amber);font-weight:700;margin-bottom:8px;"></div>
+        <div style="font-size:0.78rem;font-weight:800;color:var(--muted);margin-bottom:6px;">🔥 365일 연간 복습 잔디 히트맵 & 스트릭 프리즈 보호</div>
+        <div id="bd-heatmap-365-grid" style="display:grid;grid-template-columns:repeat(53,1fr);gap:2px;padding:8px;border-radius:10px;background:#0f172a;overflow-x:auto;"></div>
+        <div id="bd-trademark-disclaimer-box" style="margin-top:10px;font-size:0.72rem;color:var(--muted);line-height:1.45;">
+          ⚖️ 클린룸(Clean-Room) 및 상표권 고지: TOEIC®은 ETS의 등록상표이며, 수능·교과서 분류 표기는 한국교육과정평가원(KICE)·교육부 공개 성취기준을 참고한 학습 분류입니다. BrainDeck은 타사 상표권자와 제휴되지 않은 독립 소프트웨어이며 모든 예문과 해설은 100% 자체 창작 자산입니다.
         </div>
       </div>
     </section>

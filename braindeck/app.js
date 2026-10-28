@@ -1460,22 +1460,10 @@
     }
   }
 
-  function speakCurrentCard() {
-    const card = currentCard();
-    if (!card) return;
-    if (!("speechSynthesis" in window)) {
-      showUxToast("🔇 현재 브라우저 환경에서 Web Speech TTS 음성 합성을 지원하지 않습니다.", "amber");
-      return;
+  async function speakCurrentCard() {
+    if (uiDialogs && typeof uiDialogs.speakNaturalCardAudio === "function") {
+      return uiDialogs.speakNaturalCardAudio({ vm, state, currentCard, apiPost, showUxToast });
     }
-    window.speechSynthesis.cancel();
-    const textToSpeak = state.isRevealed ? (card.target_answer || card.rendered_answer) : card.rendered_question;
-    const cleanText = textToSpeak.replace(/[【】\[\]]/g, " ");
-    const utter = new SpeechSynthesisUtterance(cleanText);
-    const hasKorean = /[가-힣]/.test(cleanText);
-    utter.lang = hasKorean ? "ko-KR" : "en-US";
-    utter.rate = 0.96;
-    window.speechSynthesis.speak(utter);
-    showUxToast(`🔊 ${state.isRevealed ? "정답" : "질문"} 원어민 발음 재생 중...`, "accent");
   }
 
   function bindEvents() {
@@ -2236,9 +2224,9 @@
 
     // Delegates REA study tools, "btn-toggle-compact-header", ".bd-stage-btn", "syncStudyToolsSummaryBadge", and "switchCurriculumSegment"
     const reaPlannerCtrl = _getAppModule("BrainDeckUiDialogsRender").bindReaUtilitiesAndPlannerDom({
-      el, vm, state, apiPost, currentCard, enrichStandaloneCard, applyStudyFilter,
+      el, vm, state, apiGet, apiPost, currentCard, enrichStandaloneCard, applyStudyFilter,
       renderCurrentCard, renderStudyPlanBanner, refreshDashboardAndQueue,
-      renderDeckExplorerPanel, loadBrainPackStoreAndBind, loadCatalogAndBind, showUxToast,
+      renderDeckExplorerPanel, loadBrainPackStoreAndBind, loadCatalogAndBind, showUxToast, submitRating,
     });
     function syncStudyToolsSummaryBadge() { return reaPlannerCtrl.syncStudyToolsSummaryBadge(); }
     function switchCurriculumSegment(seg) { return reaPlannerCtrl.switchCurriculumSegment(seg); }

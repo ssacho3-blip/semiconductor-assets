@@ -991,18 +991,36 @@
         btnAudioLoop.classList.add("btn-primary");
         showUxToast("🎧 통학 오디오 루프 시작 (질문 ➔ 3초 생각 ➔ 정답)", "emerald");
 
+        function speakSegmentedBrowserText(rawTxt) {
+          if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === "undefined") return;
+          const voices = typeof window.speechSynthesis.getVoices === "function" ? window.speechSynthesis.getVoices() : [];
+          const segs =
+            vm && typeof vm.buildNaturalTtsSegments === "function"
+              ? vm.buildNaturalTtsSegments(rawTxt, "", "", false)
+              : [{ text: String(rawTxt || ""), lang: /[가-힣]/.test(rawTxt) ? "ko-KR" : "en-US", rate: 0.96, pitch: 1.0 }];
+          segs.forEach((seg) => {
+            if (!seg || !seg.text) return;
+            const u = new SpeechSynthesisUtterance(seg.text);
+            u.lang = seg.lang || "en-US";
+            u.rate = Number(seg.rate) || 0.96;
+            u.pitch = Number(seg.pitch) || 1.0;
+            if (vm && typeof vm.selectBestBrowserVoice === "function" && voices && voices.length > 0) {
+              const best = vm.selectBestBrowserVoice(voices, u.lang);
+              if (best) u.voice = best;
+            }
+            window.speechSynthesis.speak(u);
+          });
+        }
+
         function playNextTrack() {
           if (!audioLoopTimer && tIdx > 0) return;
           const tr = script.tracks[tIdx % script.tracks.length];
           tIdx += 1;
           if (window.speechSynthesis && typeof SpeechSynthesisUtterance !== "undefined") {
-            const uQ = new SpeechSynthesisUtterance(tr.prompt_tts);
-            uQ.lang = "ko-KR";
-            window.speechSynthesis.speak(uQ);
+            window.speechSynthesis.cancel();
+            speakSegmentedBrowserText(tr.prompt_tts);
             audioLoopTimer = setTimeout(() => {
-              const uA = new SpeechSynthesisUtterance(`정답은 ${tr.answer_tts}`);
-              uA.lang = "ko-KR";
-              window.speechSynthesis.speak(uA);
+              speakSegmentedBrowserText(tr.answer_tts);
               audioLoopTimer = setTimeout(playNextTrack, 3200);
             }, (tr.pause_seconds || 3) * 1000 + 2200);
           }
@@ -1391,10 +1409,535 @@
         e.target.value = "";
       });
     }
+
+    // v13.0 Commercial Mastery & Retention Booster UI Bindings (Contracts C8 ~ C15)
+    const apiGet = ctx.apiGet;
+    const submitRating = ctx.submitRating;
+    async function refreshCommercialMasteryDashboard() {
+      if (typeof apiGet !== "function") return;
+      const dash = await apiGet("/api/v2/commercial/dashboard?exam_track=toeic").catch(() => null);
+      if (!dash || !dash.ok) return;
+      const irt = dash.irt_prediction || {};
+      const irtText = el("bd-irt-summary-text");
+      const irtBadge = el("bd-irt-status-badge");
+      if (irtText) {
+        if (irt.status === "CALIBRATED" && irt.predicted_score !== null) {
+          const ci = Array.isArray(irt.confidence_interval) ? `${irt.confidence_interval[0]}~${irt.confidence_interval[1]}점` : "";
+          irtText.textContent = `🎯 예상 TOEIC 환산: ${irt.predicted_score}점 (95% 신뢰구간 ${ci}) · 합격 확률 ${irt.pass_probability_pct}% · 수능 예상 ${irt.csat_grade}등급`;
+          if (irtBadge) irtBadge.textContent = `학습 카드 ${irt.reviewed_cards}장 분석됨`;
+        } else {
+          irtText.textContent = "집계 대기 중: 카드를 1장 이상 복습하면 문항반응이론(2PL IRT) 예상 점수와 합격 확률이 표시됩니다.";
+          if (irtBadge) irtBadge.textContent = "데이터 수집 중";
+        }
+      }
+      const alerts = dash.forgetting_alerts || {};
+      const alertBanner = el("bd-forgetting-alert-banner");
+      if (alertBanner) {
+        alertBanner.textContent = alerts.should_notify ? alerts.notification_title : "✅ 망각 임계점(R<85%) 미달 카드 없음";
+      }
+      const hm = dash.heatmap_365d || {};
+      const hmGrid = el("bd-heatmap-365-grid");
+      if (hmGrid && Array.isArray(hm.cells) && typeof document !== "undefined") {
+        const colors = ["#1e293b", "#064e3b", "#047857", "#10b981", "#34d399"];
+        while (hmGrid.firstChild) hmGrid.removeChild(hmGrid.firstChild);
+        hm.cells.slice(-106).forEach((c) => {
+          const cell = document.createElement("div");
+          cell.title = `${c.date}: ${c.count}회 복습`;
+          cell.style.cssText = `width:8px;height:8px;border-radius:2px;background:${colors[c.level || 0]};`;
+          hmGrid.appendChild(cell);
+        });
+      }
+    }
+
+    const btnOled = el("btn-oled-theme-toggle");
+    if (btnOled) {
+      btnOled.addEventListener("click", () => {
+        state.oledDark = !state.oledDark;
+        const spec = vm && typeof vm.resolveMobileErgonomicsSpec === "function"
+          ? vm.resolveMobileErgonomicsSpec(0, 0, 64, state.oledDark ? "oled_dark" : "light")
+          : null;
+        if (spec && spec.theme_tokens && typeof document !== "undefined") {
+          const rootStyle = document.documentElement.style;
+          rootStyle.setProperty("--bg", spec.theme_tokens.bg);
+          rootStyle.setProperty("--panel", spec.theme_tokens.panel);
+          rootStyle.setProperty("--border", spec.theme_tokens.border);
+          rootStyle.setProperty("--text", spec.theme_tokens.text);
+          rootStyle.setProperty("--muted", spec.theme_tokens.muted);
+          rootStyle.setProperty("--accent", spec.theme_tokens.accent);
+        }
+        btnOled.textContent = state.oledDark ? "☀️ 라이트모드" : "🌙 다크모드";
+        showUxToast(state.oledDark ? "🌙 OLED True-Black 눈 보호 다크모드가 켜졌습니다." : "☀️ 라이트모드로 전환되었습니다.", "accent");
+      });
+    }
+
+    const scratchDrawer = el("bd-scratchpad-drawer");
+    const scratchCanvas = el("bd-scratchpad-canvas");
+    const btnToggleScratch = el("btn-toggle-scratchpad");
+    if (btnToggleScratch && scratchDrawer) {
+      btnToggleScratch.addEventListener("click", () => {
+        scratchDrawer.style.display = scratchDrawer.style.display === "none" ? "block" : "none";
+      });
+    }
+    const btnCloseScratch = el("btn-scratchpad-close");
+    if (btnCloseScratch && scratchDrawer) {
+      btnCloseScratch.addEventListener("click", () => {
+        scratchDrawer.style.display = "none";
+      });
+    }
+    if (scratchCanvas && typeof scratchCanvas.getContext === "function") {
+      const ctx2d = scratchCanvas.getContext("2d");
+      let drawing = false;
+      let recordedStrokes = [];
+      let currentStrokePts = [];
+      scratchCanvas.addEventListener("pointerdown", (ev) => {
+        drawing = true;
+        const rect = scratchCanvas.getBoundingClientRect();
+        const pt = [Math.round(ev.clientX - rect.left), Math.round(ev.clientY - rect.top)];
+        currentStrokePts = [pt];
+        if (!ctx2d) return;
+        ctx2d.beginPath();
+        ctx2d.moveTo(pt[0], pt[1]);
+      });
+      scratchCanvas.addEventListener("pointermove", (ev) => {
+        if (!drawing || !ctx2d) return;
+        const rect = scratchCanvas.getBoundingClientRect();
+        const pt = [Math.round(ev.clientX - rect.left), Math.round(ev.clientY - rect.top)];
+        currentStrokePts.push(pt);
+        ctx2d.lineWidth = 2.6;
+        ctx2d.lineCap = "round";
+        ctx2d.strokeStyle = "#1e293b";
+        ctx2d.lineTo(pt[0], pt[1]);
+        ctx2d.stroke();
+      });
+      scratchCanvas.addEventListener("pointerup", () => {
+        if (drawing && currentStrokePts.length >= 2) {
+          recordedStrokes.push(currentStrokePts.slice());
+        }
+        drawing = false;
+        currentStrokePts = [];
+      });
+      const btnClearScratch = el("btn-scratchpad-clear");
+      if (btnClearScratch) {
+        btnClearScratch.addEventListener("click", () => {
+          recordedStrokes = [];
+          if (ctx2d) ctx2d.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+          const fb = el("bd-scratchpad-feedback");
+          if (fb) fb.textContent = "";
+        });
+      }
+      const btnGradeScratch = el("btn-scratchpad-grade");
+      if (btnGradeScratch) {
+        btnGradeScratch.addEventListener("click", async () => {
+          const card = currentCard();
+          const rawTxt = String((card && (card.front_text || card.target_answer)) || "學");
+          const cjkMatch = rawTxt.match(/[\u4e00-\u9fff\u3400-\u4dbf]/);
+          const ch = cjkMatch ? cjkMatch[0] : (rawTxt.trim().charAt(0) || "學");
+          const strokeMatch = rawTxt.match(/(\d+)\s*획/);
+          const expectedStrokes = strokeMatch ? Number(strokeMatch[1]) : Math.max(1, recordedStrokes.length || 8);
+          const res = await apiPost("/api/v2/commercial/production-eval", {
+            modality: "scratchpad",
+            character: ch,
+            stroke_count: expectedStrokes,
+            user_strokes: recordedStrokes,
+          }).catch(() => null);
+          const fb = el("bd-scratchpad-feedback");
+          if (fb && res && res.evaluation) {
+            const evObj = res.evaluation;
+            fb.textContent = `✍️ 필순·방향 채점: ${evObj.score_pct}점 (입력 ${evObj.actual_strokes}획 / 기준 ${evObj.expected_strokes}획 · 방향 일치도 ${evObj.direction_similarity_pct || 85.0}% · 판정: ${evObj.verdict})`;
+          }
+        });
+      }
+    }
+
+    // Contract C8 & C9: Active Production Arena (Dictation, Chunk Ordering, Speech Shadowing + Dual-Memory FSRS)
+    const prodDrawer = el("bd-active-production-drawer");
+    const btnToggleProd = el("btn-toggle-active-production");
+    const btnCloseProd = el("btn-prod-close");
+    const prodTitle = el("bd-prod-mode-title");
+    const prodPrompt = el("bd-prod-prompt-box");
+    const prodChunksZone = el("bd-prod-chunks-zone");
+    const prodInput = el("bd-prod-input");
+    const prodFeedback = el("bd-prod-feedback");
+    const btnProdMic = el("btn-prod-mic");
+    let activeProdMode = "dictation";
+    let currentChunkTarget = [];
+    let selectedChunks = [];
+
+    function renderActiveProductionMode(mode) {
+      activeProdMode = mode || "dictation";
+      const card = currentCard();
+      const frontRaw = String((card && (card.front_text || card.rendered_question)) || "");
+      const backRaw = String((card && (card.target_answer || card.back_text)) || "");
+      const cleanSentence = vm && typeof vm.sanitizeTextForNaturalTts === "function"
+        ? vm.sanitizeTextForNaturalTts(frontRaw.includes("\n") ? frontRaw.split("\n").slice(1).join(" ") : (frontRaw || backRaw))
+        : (frontRaw || backRaw || "The captain refused to abandon the sinking ship.");
+      const targetWord = vm && typeof vm.sanitizeTextForNaturalTts === "function"
+        ? vm.sanitizeTextForNaturalTts(frontRaw.split("\n")[0] || backRaw.split("\n")[0])
+        : (backRaw.split("\n")[0] || "abandon");
+
+      if (prodFeedback) prodFeedback.textContent = "";
+      if (prodInput) prodInput.value = "";
+      if (prodChunksZone) {
+        prodChunksZone.style.display = "none";
+        while (prodChunksZone.firstChild) prodChunksZone.removeChild(prodChunksZone.firstChild);
+      }
+      if (btnProdMic) btnProdMic.style.display = activeProdMode === "shadowing" ? "inline-block" : "none";
+
+      if (activeProdMode === "dictation") {
+        if (prodTitle) prodTitle.textContent = "🎧 받아쓰기 훈련 (원어민 음성을 듣고 철자·문장 입력)";
+        if (prodPrompt) prodPrompt.textContent = `🔊 [발음 듣기]를 눌러 음성을 듣고 핵심 어휘·문장을 받아적으세요. (힌트: ${targetWord.slice(0, 1)}___ · ${targetWord.length}글자)`;
+      } else if (activeProdMode === "chunk_order") {
+        if (prodTitle) prodTitle.textContent = "🧩 문장 어순 배열 훈련 (조각을 순서대로 클릭)";
+        const chSpec = vm && typeof vm.buildSentenceChunkChallenge === "function"
+          ? vm.buildSentenceChunkChallenge(cleanSentence.split(/\s+/).length >= 3 ? cleanSentence : `${targetWord} is an essential concept`)
+          : { canonical_chunks: [{ text: targetWord }], scrambled_chunks: [{ text: targetWord }] };
+        currentChunkTarget = (chSpec.canonical_chunks || []).map((c) => c.text);
+        selectedChunks = [];
+        if (prodPrompt) prodPrompt.textContent = "아래 섞인 어절 조각을 올바른 어순대로 클릭하세요:";
+        if (prodChunksZone && typeof document !== "undefined") {
+          prodChunksZone.style.display = "flex";
+          (chSpec.scrambled_chunks || []).forEach((chunkObj) => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.textContent = chunkObj.text;
+            chip.style.cssText = "padding:5px 10px;font-size:0.78rem;border-radius:999px;background:#ffffff;border:1px solid #10b981;color:#065f46;cursor:pointer;";
+            chip.addEventListener("click", () => {
+              selectedChunks.push(chunkObj.text);
+              if (prodInput) prodInput.value = selectedChunks.join(" ");
+              chip.disabled = true;
+              chip.style.opacity = "0.45";
+            });
+            prodChunksZone.appendChild(chip);
+          });
+        }
+      } else {
+        if (prodTitle) prodTitle.textContent = "🎙️ 원어민 발음 섀도잉 훈련 (따라 읽고 발음 정확도 측정)";
+        if (prodPrompt) prodPrompt.textContent = `목표 발화 문장: "${cleanSentence || targetWord}"`;
+      }
+    }
+
+    if (btnToggleProd && prodDrawer) {
+      btnToggleProd.addEventListener("click", () => {
+        const nextOpen = prodDrawer.style.display === "none";
+        prodDrawer.style.display = nextOpen ? "block" : "none";
+        if (nextOpen) renderActiveProductionMode(activeProdMode);
+      });
+    }
+    if (btnCloseProd && prodDrawer) {
+      btnCloseProd.addEventListener("click", () => { prodDrawer.style.display = "none"; });
+    }
+    const btnDict = el("btn-prod-dictation");
+    if (btnDict) btnDict.addEventListener("click", () => renderActiveProductionMode("dictation"));
+    const btnChunk = el("btn-prod-chunk-order");
+    if (btnChunk) btnChunk.addEventListener("click", () => renderActiveProductionMode("chunk_order"));
+    const btnShadow = el("btn-prod-shadowing");
+    if (btnShadow) btnShadow.addEventListener("click", () => renderActiveProductionMode("shadowing"));
+
+    if (btnProdMic && prodInput) {
+      btnProdMic.addEventListener("click", () => {
+        const SpeechRec = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+        if (!SpeechRec) {
+          showUxToast("현재 브라우저에서 음성 인식을 지원하지 않아 직접 입력으로 채점합니다.", "amber");
+          return;
+        }
+        try {
+          const rec = new SpeechRec();
+          const card = currentCard();
+          const fTxt = String((card && card.front_text) || "");
+          rec.lang = /[A-Za-z]{2,}/.test(fTxt) ? "en-US" : "ko-KR";
+          rec.onresult = (ev) => {
+            const transcript = ev.results && ev.results[0] && ev.results[0][0] ? ev.results[0][0].transcript : "";
+            prodInput.value = transcript;
+          };
+          rec.start();
+          showUxToast("🎙️ 마이크 수신 중... 제시문을 소리 내어 읽어주세요.", "accent");
+        } catch (_e) {}
+      });
+    }
+
+    const btnProdGrade = el("btn-prod-grade");
+    if (btnProdGrade) {
+      btnProdGrade.addEventListener("click", async () => {
+        const card = currentCard();
+        const frontRaw = String((card && (card.front_text || card.rendered_question)) || "");
+        const backRaw = String((card && (card.target_answer || card.back_text)) || "");
+        const targetWord = vm && typeof vm.sanitizeTextForNaturalTts === "function"
+          ? vm.sanitizeTextForNaturalTts(frontRaw.split("\n")[0] || backRaw.split("\n")[0])
+          : (backRaw.split("\n")[0] || "abandon");
+        const userTxt = String((prodInput && prodInput.value) || "").trim();
+        let gradeObj = { accuracy_pct: 0, is_correct: false, recommended_rating: 1 };
+
+        if (activeProdMode === "chunk_order" && vm && typeof vm.gradeSentenceChunkOrdering === "function") {
+          const userSeq = selectedChunks.length ? selectedChunks : userTxt.split(/\s+/).filter(Boolean);
+          gradeObj = vm.gradeSentenceChunkOrdering(currentChunkTarget, userSeq);
+        } else if (activeProdMode === "shadowing" && vm && typeof vm.evaluateSpeechShadowing === "function") {
+          gradeObj = vm.evaluateSpeechShadowing(targetWord, userTxt, 1500);
+        } else if (vm && typeof vm.gradeDictationResponse === "function") {
+          gradeObj = vm.gradeDictationResponse(targetWord, userTxt);
+        }
+
+        const dualStep = vm && typeof vm.stepDualMemoryFsrs === "function"
+          ? vm.stepDualMemoryFsrs(
+              {
+                difficulty: Number((card && card.difficulty) || 5.0),
+                recognition_stability: Number((card && (card.recognition_stability || card.stability)) || 1.2),
+                recall_stability: Number((card && (card.recall_stability || card.stability)) || 0.8),
+                reps: Number((card && card.reps) || 1),
+                lapses: Number((card && card.lapses) || 0),
+                consecutive_recognition_successes: Number((card && card.consecutive_recognition_successes) || 0),
+                state: String((card && card.state) || "review"),
+              },
+              gradeObj.recommended_rating || 3,
+              activeProdMode,
+              1.0,
+              0.9
+            )
+          : null;
+
+        if (card && card.card_id && typeof apiPost === "function") {
+          await apiPost("/api/review", {
+            card_id: card.card_id,
+            rating: gradeObj.recommended_rating || 3,
+            modality: "active_recall",
+            response_time_ms: 1800,
+          }).catch(() => null);
+        }
+
+        if (prodFeedback) {
+          const nextDual = dualStep && (dualStep.next_state || dualStep.dual_memory);
+          const sRec = nextDual ? nextDual.recognition_stability : "-";
+          const sRecall = nextDual ? nextDual.recall_stability : "-";
+          prodFeedback.textContent = `✅ 능동 인출 정확도: ${gradeObj.accuracy_pct}% (권장 평가: ${gradeObj.recommended_rating}점) · 인식기억 S=${sRec}일 / 인출기억 S=${sRecall}일`;
+        }
+      });
+    }
+
+    // Contract C11: Interactive Visual Drag-Box Image Occlusion Editor in Create Tab
+    const btnToggleIoBuilder = el("btn-toggle-io-builder");
+    const ioBuilderDrawer = el("bd-io-builder-drawer");
+    const ioBuilderCanvas = el("bd-io-builder-canvas");
+    const ioLabelInput = el("bd-io-label-input");
+    const btnIoClear = el("btn-io-clear-boxes");
+    const directCardFront = el("direct-card-front");
+
+    if (btnToggleIoBuilder && ioBuilderDrawer) {
+      btnToggleIoBuilder.addEventListener("click", () => {
+        ioBuilderDrawer.style.display = ioBuilderDrawer.style.display === "none" ? "block" : "none";
+      });
+    }
+    if (ioBuilderCanvas && typeof ioBuilderCanvas.getContext === "function") {
+      const ioCtx = ioBuilderCanvas.getContext("2d");
+      let ioStart = null;
+      let ioBoxes = [];
+
+      function redrawIoCanvas() {
+        if (!ioCtx) return;
+        ioCtx.clearRect(0, 0, ioBuilderCanvas.width, ioBuilderCanvas.height);
+        ioCtx.strokeStyle = "#334155";
+        ioCtx.lineWidth = 1;
+        ioCtx.strokeRect(8, 8, ioBuilderCanvas.width - 16, ioBuilderCanvas.height - 16);
+        ioBoxes.forEach((b) => {
+          ioCtx.fillStyle = "rgba(245, 158, 11, 0.35)";
+          ioCtx.strokeStyle = "#fbbf24";
+          ioCtx.lineWidth = 2;
+          ioCtx.fillRect(b.x, b.y, b.w, b.h);
+          ioCtx.strokeRect(b.x, b.y, b.w, b.h);
+          ioCtx.fillStyle = "#fef3c7";
+          ioCtx.font = "bold 11px sans-serif";
+          ioCtx.fillText(`#${b.ord} ${b.label}`, b.x + 4, b.y + 14);
+        });
+      }
+      redrawIoCanvas();
+
+      ioBuilderCanvas.addEventListener("pointerdown", (ev) => {
+        const r = ioBuilderCanvas.getBoundingClientRect();
+        ioStart = { x: Math.round(ev.clientX - r.left), y: Math.round(ev.clientY - r.top) };
+      });
+      ioBuilderCanvas.addEventListener("pointerup", (ev) => {
+        if (!ioStart) return;
+        const r = ioBuilderCanvas.getBoundingClientRect();
+        const endX = Math.round(ev.clientX - r.left);
+        const endY = Math.round(ev.clientY - r.top);
+        const x = Math.max(0, Math.min(ioStart.x, endX));
+        const y = Math.max(0, Math.min(ioStart.y, endY));
+        const w = Math.max(28, Math.abs(endX - ioStart.x));
+        const h = Math.max(20, Math.abs(endY - ioStart.y));
+        ioStart = null;
+        const ord = ioBoxes.length + 1;
+        const label = String((ioLabelInput && ioLabelInput.value) || `핵심영역_${ord}`).trim();
+        ioBoxes.push({ ord, x, y, w, h, label });
+        redrawIoCanvas();
+        if (directCardFront) {
+          const token = `{{io${ord}::${x},${y},${w},${h}::${label}}}`;
+          directCardFront.value = (String(directCardFront.value || "").trim() + " " + token).trim();
+        }
+      });
+      if (btnIoClear) {
+        btnIoClear.addEventListener("click", () => {
+          ioBoxes = [];
+          redrawIoCanvas();
+        });
+      }
+    }
+
+    const btnErrata = el("btn-report-errata");
+    if (btnErrata) {
+      btnErrata.addEventListener("click", async () => {
+        const card = currentCard();
+        if (!card) return;
+        const res = await apiPost("/api/v2/commercial/errata", {
+          card_id: card.card_id || 1,
+          issue_type: "typo",
+          description: `사용자 1클릭 검수 요청: ${String(card.front_text || "").slice(0, 40)}`,
+          suggested_fix: "",
+        }).catch(() => null);
+        if (res && res.ok) {
+          showUxToast(`🚨 카드 #${card.card_id || 1} 오류·개선 제보(#${res.report_id})가 접수되었습니다!`, "emerald");
+        }
+      });
+    }
+
+    const btnShareDeck = el("btn-share-deck-token");
+    if (btnShareDeck) {
+      btnShareDeck.addEventListener("click", async () => {
+        const res = await apiPost("/api/v2/commercial/deck-share/export", {
+          deck_id: Number(state.selectedDeckId) || 1,
+        }).catch(() => null);
+        if (res && res.ok && res.token) {
+          if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(res.token).catch(() => {});
+          }
+          showUxToast(`🔗 공유 토큰 생성 완료 (${res.card_count}장, 클립보드 복사됨)`, "emerald");
+        }
+      });
+    }
+
+    const arenaEl = typeof document !== "undefined" ? document.querySelector(".card-arena") : null;
+    if (arenaEl && typeof submitRating === "function") {
+      let touchStartX = 0;
+      let touchStartY = 0;
+      arenaEl.addEventListener("touchstart", (ev) => {
+        if (ev.touches && ev.touches[0]) {
+          touchStartX = ev.touches[0].clientX;
+          touchStartY = ev.touches[0].clientY;
+        }
+      }, { passive: true });
+      arenaEl.addEventListener("touchend", (ev) => {
+        if (!state.isRevealed || !ev.changedTouches || !ev.changedTouches[0]) return;
+        const dx = ev.changedTouches[0].clientX - touchStartX;
+        const dy = ev.changedTouches[0].clientY - touchStartY;
+        if (vm && typeof vm.resolveMobileErgonomicsSpec === "function") {
+          const decision = vm.resolveMobileErgonomicsSpec(dx, dy, 72, state.oledDark ? "oled_dark" : "light");
+          if (decision && decision.swipe_rating) {
+            if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function" && decision.haptic_pattern_ms.length) {
+              navigator.vibrate(decision.haptic_pattern_ms);
+            }
+            submitRating(decision.swipe_rating);
+          }
+        }
+      }, { passive: true });
+    }
+
+    refreshCommercialMasteryDashboard();
     return {
       syncStudyToolsSummaryBadge,
       switchCurriculumSegment,
+      refreshCommercialMasteryDashboard,
     };
+  }
+
+  let activeTtsAudioEl = null;
+  let cachedBrowserVoices = [];
+  if (typeof window !== "undefined" && "speechSynthesis" in window && window.speechSynthesis) {
+    try {
+      cachedBrowserVoices = typeof window.speechSynthesis.getVoices === "function"
+        ? window.speechSynthesis.getVoices() || []
+        : [];
+      window.speechSynthesis.onvoiceschanged = () => {
+        try {
+          cachedBrowserVoices = window.speechSynthesis.getVoices() || [];
+        } catch (_e) {}
+      };
+    } catch (_e) {}
+  }
+
+  async function speakNaturalCardAudio(ctx) {
+    const { vm, state, currentCard, apiPost, showUxToast } = ctx || {};
+    const card = typeof currentCard === "function" ? currentCard() : null;
+    if (!card) return;
+    const isRev = Boolean(state && state.isRevealed);
+    const frontTxt = String(card.front_text || card.rendered_question || "");
+    const backTxt = String(card.back_text || card.rendered_answer || card.target_answer || "");
+    const raw = isRev ? backTxt : frontTxt;
+    const segments =
+      vm && typeof vm.buildNaturalTtsSegments === "function"
+        ? vm.buildNaturalTtsSegments(raw, frontTxt, backTxt, isRev)
+        : [{ text: String(raw || "").trim(), lang: /[가-힣]/.test(raw) ? "ko-KR" : "en-US", rate: 0.96, pitch: 1.0 }];
+
+    if (activeTtsAudioEl) {
+      try { activeTtsAudioEl.pause(); } catch (_e) {}
+      activeTtsAudioEl = null;
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try { window.speechSynthesis.cancel(); } catch (_e) {}
+    }
+
+    const previewLabel = segments.map((s) => s.text).join(" ➔ ").slice(0, 36);
+    const preCreatedAudio = typeof Audio !== "undefined" ? new Audio() : null;
+
+    if (typeof apiPost === "function" && preCreatedAudio) {
+      const neuralRes = await apiPost("/api/v2/tts/neural", {
+        text: raw,
+        front_text: frontTxt,
+        back_text: backTxt,
+        is_revealed: isRev,
+      }).catch(() => null);
+      if (neuralRes && neuralRes.ok && neuralRes.data_uri && neuralRes.engine !== "offline_formant_fallback") {
+        try {
+          preCreatedAudio.src = neuralRes.data_uri;
+          activeTtsAudioEl = preCreatedAudio;
+          await preCreatedAudio.play();
+          if (typeof showUxToast === "function") {
+            showUxToast(`🔊 원어민 음성 재생 중: ${previewLabel}`, "accent");
+          }
+          return;
+        } catch (_playErr) {}
+      }
+    }
+
+    if (typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") {
+      const liveVoices = typeof window.speechSynthesis.getVoices === "function" ? window.speechSynthesis.getVoices() : [];
+      const voices = (liveVoices && liveVoices.length > 0) ? liveVoices : cachedBrowserVoices;
+      segments.forEach((seg) => {
+        if (!seg || !seg.text) return;
+        const utter = new SpeechSynthesisUtterance(seg.text);
+        utter.lang = seg.lang || "en-US";
+        utter.rate = Number(seg.rate) || (utter.lang === "en-US" ? 0.94 : 0.98);
+        utter.pitch = Number(seg.pitch) || 1.0;
+        if (vm && typeof vm.selectBestBrowserVoice === "function" && voices && voices.length > 0) {
+          const bestVoice = vm.selectBestBrowserVoice(voices, utter.lang);
+          if (bestVoice) utter.voice = bestVoice;
+        }
+        window.speechSynthesis.speak(utter);
+      });
+      if (typeof showUxToast === "function") {
+        showUxToast(`🔊 원어민 발음 재생 중: ${previewLabel}`, "accent");
+      }
+      return;
+    }
+
+    if (typeof apiPost === "function" && preCreatedAudio) {
+      const firstSeg = segments[0] || { text: raw, lang: "en-US" };
+      const wavRes = await apiPost("/api/v2/commercial/production-eval", {
+        modality: "offline_tts_wav",
+        text: firstSeg.text,
+        lang: firstSeg.lang,
+      }).catch(() => null);
+      if (wavRes && wavRes.data_uri) {
+        preCreatedAudio.src = wavRes.data_uri;
+        preCreatedAudio.play().catch(() => {});
+      }
+    }
   }
 
   return {
@@ -1404,5 +1947,6 @@
     renderDocumentPreviewCardsDom,
     createCatalogAndStoreControllers,
     bindReaUtilitiesAndPlannerDom,
+    speakNaturalCardAudio,
   };
 });
