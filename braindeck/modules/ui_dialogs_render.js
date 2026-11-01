@@ -551,7 +551,6 @@
           deck_name: customName || null,
           difficulty_level: diffLevel,
           shuffle_mode: "interleaved",
-          max_cards: 1000,
         });
         if (res && res.ok) {
           if (statusMsgEl) {
@@ -595,7 +594,6 @@
           page_end: pEnd ? Number(pEnd) : null,
           difficulty_level: diffLevel,
           shuffle_mode: "interleaved",
-          limit: 1000,
         });
         if (res && res.ok) {
           if (statusMsgEl) {
@@ -622,7 +620,6 @@
         }
         const res = await apiPost("/api/catalog/generate-collection-deck", {
           collection_id: colSel.value,
-          limit: 1000,
           difficulty_level: diffLevel,
           shuffle_mode: "interleaved",
         });

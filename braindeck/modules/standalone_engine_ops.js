@@ -19,9 +19,9 @@
       link_kind: "collection",
       primary_ref_id: "hanja-grade:8geup",
       covered_ref_ids: ["hanja-grade:8geup", "ko-dictation:grade1-2", "moe-eng:elementary"],
-      estimated_card_count: 1020,
+      estimated_card_count: 100,
       badge_label: "무료 기본 탑재",
-      features: ["어문회 8급 기초 한자 + 초등 받아쓰기 기본 내장", "사진·PDF 업로드 무제한 무료"],
+      features: ["어문회 8급 기초 한자 50자 양방향 인출 + 초등 받아쓰기 기본 내장", "사진·PDF 업로드 무제한 무료"],
       sample_cards: [{ front: "韓", back: "나라 한 (부수: 韋 · 17획)", tag: "hanja_8geup" }],
     },
     {
@@ -35,15 +35,15 @@
       link_kind: "collection",
       primary_ref_id: "moe-eng:elem-3-4",
       covered_ref_ids: ["moe-eng:elem-3-4"],
-      estimated_card_count: 1015,
+      estimated_card_count: 240,
       badge_label: "초등 3~4",
-      features: ["초등 3~4학년 기초 필수 영단어(morning, weather, borrow 등)", "Lv.1~3 단계별 카드 & 예문 해설"],
+      features: ["초등 3~4학년 기초 필수 영단어 240개(morning, weather, borrow 등)", "Lv.1~3 단계별 카드 & 예문 해설"],
       sample_cards: [{ front: "weather", back: "날씨 — How is the weather today?", tag: "초등 3~4" }],
     },
     {
       pack_id: "pack.moe.eng.elem56",
       title: "초등 5~6학년 영단어 800",
-      subtitle: "2022 개정 교육과정 초등 5~6학년군 영단어 800 어휘 & 의사소통 표현",
+      subtitle: "2022 개정 교육과정 초등 5~6학년군 영단어 핵심 어휘 & 의사소통 표현",
       category: "k12_textbook",
       age_tier: "junior",
       price_krw: 990,
@@ -51,15 +51,15 @@
       link_kind: "collection",
       primary_ref_id: "moe-eng:elementary",
       covered_ref_ids: ["moe-eng:elementary"],
-      estimated_card_count: 1040,
+      estimated_card_count: 400,
       badge_label: "초등 5~6",
-      features: ["초등 5~6학년 필수 영단어 800 핵심(library, museum, vacation, between 등)", "중학 진학 전 필수 마스터"],
+      features: ["초등 5~6학년 필수 영단어 400개 핵심(library, museum, vacation, between 등)", "중학 진학 전 필수 마스터"],
       sample_cards: [{ front: "museum", back: "박물관, 미술관 — We visited the science museum.", tag: "초등 5~6" }],
     },
     {
       pack_id: "pack.moe.eng.mid1200",
       title: "중학교 영단어 1,200·영문법",
-      subtitle: "2022 개정 중학 영단어 1,200 + 현재완료·관계대명사·감각동사 등 내신 8대 영문법",
+      subtitle: "2022 개정 중학 필수 영단어 + 현재완료·관계대명사·감각동사 등 내신 핵심 영문법",
       category: "k12_textbook",
       age_tier: "teen",
       price_krw: 990,
@@ -67,9 +67,9 @@
       link_kind: "collection",
       primary_ref_id: "moe-eng:middle-1200",
       covered_ref_ids: ["moe-eng:middle-1200"],
-      estimated_card_count: 1200,
+      estimated_card_count: 500,
       badge_label: "중학 영단어·문법",
-      features: ["중학 필수 영단어 1,200 핵심 + 내신 8대 핵심 영문법 동시 수록", "단어·문법 분리형 4지선다"],
+      features: ["중학 필수 영단어 핵심 500개 + 내신 8대 핵심 영문법 동시 수록", "단어·문법 분리형 4지선다"],
       sample_cards: [{ front: "감각동사(look/smell/taste) 뒤 보어 품사는?", back: "형용사 (부사 -ly 불가)", tag: "중학 영문법" }],
     },
     {
@@ -83,9 +83,9 @@
       link_kind: "collection",
       primary_ref_id: "moe-eng:high-csat",
       covered_ref_ids: ["moe-eng:high-csat"],
-      estimated_card_count: 1150,
+      estimated_card_count: 500,
       badge_label: "고교·수능",
-      features: ["평가원·수능 최빈출 학술 어휘(hypothesis, empirical, correlation, cognitive 등)", "반의어·파생어 해설"],
+      features: ["평가원·수능 최빈출 학술 어휘 500개(hypothesis, empirical, correlation, cognitive 등)", "반의어·파생어 해설"],
       sample_cards: [{ front: "empirical", back: "경험적인, 실증적인 (↔ theoretical 이론적인)", tag: "수능 학술" }],
     },
     {
@@ -99,15 +99,15 @@
       link_kind: "collection",
       primary_ref_id: "moe-kor:orthography-lit",
       covered_ref_ids: ["moe-kor:orthography-lit"],
-      estimated_card_count: 1035,
+      estimated_card_count: 300,
       badge_label: "국어·문학",
-      features: ["한글 맞춤법·표준어 규정 혼동 어휘 & 필수 문학 개념어(역설법, 객관적 상관물 등)"],
+      features: ["한글 맞춤법·표준어 규정 혼동 어휘 & 필수 문학 개념어 300선(역설법, 객관적 상관물 등)"],
       sample_cards: [{ front: "'오늘이 몇 월 [ ___ ]이지?' 바른 맞춤법 표기는?", back: "며칠 ('몇일'은 틀린 표기)", tag: "한글 맞춤법" }],
     },
     {
       pack_id: "pack.moe.hanja.mid1800",
       title: "중·고교 한자 1,800",
-      subtitle: "교육부 고시 한문 교육용 기초한자 1,800자(중등 900·고등 900) & 교과서 성어",
+      subtitle: "교육부 고시 한문 교육용 기초한자 핵심 대표자 양방향 인출",
       category: "hanja_history",
       age_tier: "all",
       price_krw: 990,
@@ -115,9 +115,9 @@
       link_kind: "collection",
       primary_ref_id: "moe-hanja-1800:middle",
       covered_ref_ids: ["moe-hanja-1800:middle"],
-      estimated_card_count: 1350,
+      estimated_card_count: 500,
       badge_label: "한자 1,800",
-      features: ["교육부 고시 중·고교 기초한자 1,800 핵심 훈음·부수·획수 & 사자성어(온고지신 등)"],
+      features: ["교육부 고시 중·고교 기초한자 핵심 대표 250자 양방향 인출(500카드) 훈음·부수·획수"],
       sample_cards: [{ front: "溫故知新 (온고지신)", back: "옛것을 익히고 그것을 미루어 새것을 안다", tag: "기초한자 1800" }],
     },
     {
@@ -131,9 +131,9 @@
       link_kind: "collection",
       primary_ref_id: "khist:essential",
       covered_ref_ids: ["khist:essential"],
-      estimated_card_count: 1080,
+      estimated_card_count: 300,
       badge_label: "한국사 연표",
-      features: ["시대별 핵심 사건·조약·개혁·문화재 연표 총정리"],
+      features: ["시대별 핵심 사건·조약·개혁·문화재 연표 300선 총정리"],
       sample_cards: [{ front: "1876년 체결된 조선 최초의 근대적 조약이자 불평등 조약은?", back: "강화도 조약 (조일수호조규)", tag: "한국사 연표" }],
     },
     {
@@ -147,9 +147,9 @@
       link_kind: "collection",
       primary_ref_id: "sci-element-formula:core",
       covered_ref_ids: ["sci-element-formula:core"],
-      estimated_card_count: 1045,
+      estimated_card_count: 300,
       badge_label: "과학 법칙·공식",
-      features: ["옴의 법칙(V=IR), 뉴턴 가속도 법칙(F=ma), 화학 결합, 미토콘드리아 ATP, 판구조론"],
+      features: ["옴의 법칙(V=IR), 뉴턴 가속도 법칙(F=ma), 필수 원소(1~20번), 미토콘드리아 ATP, 판구조론 300선"],
       sample_cards: [{ front: "뉴턴 운동 제2법칙(가속도 법칙) 공식은?", back: "F = m × a (알짜힘 = 질량 × 가속도)", tag: "물리 법칙" }],
     },
     {
@@ -163,9 +163,9 @@
       link_kind: "collection",
       primary_ref_id: "moe-math:core-formulas",
       covered_ref_ids: ["moe-math:core-formulas"],
-      estimated_card_count: 1060,
+      estimated_card_count: 300,
       badge_label: "수학 공식",
-      features: ["피타고라스 정리, 근의 공식·판별식, 삼각함수 제곱 관계, 등차수열 일반항, 미분계수 정의"],
+      features: ["피타고라스 정리, 근의 공식·판별식, 삼각함수 제곱 관계, 등차수열 일반항, 미분계수 정의 300선"],
       sample_cards: [{ front: "첫째항 a, 공차 d인 등차수열의 일반항 aₙ과 미분계수 f'(a)는?", back: "aₙ = a + (n - 1)d · f'(a) = lim(h→0)[f(a+h)-f(a)]/h", tag: "수학 공식" }],
     },
     {
@@ -179,9 +179,9 @@
       link_kind: "textbook",
       primary_ref_id: "kr.mid1.eng.donga_yoon.2022",
       covered_ref_ids: ["kr.mid1.eng.donga_yoon.2022"],
-      estimated_card_count: 1024,
+      estimated_card_count: 240,
       badge_label: "중1 내신",
-      features: ["Lesson 1 ~ Lesson 8 전 단원 필수 어휘·숙어·핵심 문법 완벽 매핑 (1,000+ 카드)"],
+      features: ["Lesson 1 ~ Lesson 8 전 단원 필수 어휘·숙어·핵심 문법 완벽 매핑 (240카드)"],
       sample_cards: [{ front: "introduce (p.12)", back: "소개하다 (동사)", tag: "Lesson 1" }],
     },
     {
@@ -195,9 +195,9 @@
       link_kind: "textbook",
       primary_ref_id: "kr.mid2.eng.donga_yoon.2022",
       covered_ref_ids: ["kr.mid2.eng.donga_yoon.2022"],
-      estimated_card_count: 1032,
+      estimated_card_count: 240,
       badge_label: "중2 내신",
-      features: ["중2 동아(윤정미) 단원별 어휘·문법 수록 (1,000+ 카드)"],
+      features: ["중2 동아(윤정미) 단원별 어휘·문법 핵심 수록 (240카드)"],
       sample_cards: [{ front: "confident (p.16)", back: "자신감 있는 (형용사)", tag: "Lesson 1" }],
     },
     {
@@ -211,9 +211,9 @@
       link_kind: "textbook",
       primary_ref_id: "kr.mid2.hist.miraeen.2022",
       covered_ref_ids: ["kr.mid2.hist.miraeen.2022"],
-      estimated_card_count: 1018,
+      estimated_card_count: 240,
       badge_label: "역사 내신",
-      features: ["미래엔 중학교 역사① 단원·쪽수별 사건·연표·조약·문화재 정리 (1,000+ 카드)"],
+      features: ["미래엔 중학교 역사① 단원·쪽수별 사건·연표·조약·문화재 정리 (240카드)"],
       sample_cards: [{ front: "훈민정음 창제 (1443, 반포 1446)", back: "조선 세종 대 백성을 가르치는 바른 소리 28자 창제", tag: "Ⅰ단원" }],
     },
     {
@@ -227,9 +227,9 @@
       link_kind: "textbook",
       primary_ref_id: "kr.high1.sci.visang.2022",
       covered_ref_ids: ["kr.high1.sci.visang.2022", "sci-element-formula:core"],
-      estimated_card_count: 1028,
+      estimated_card_count: 240,
       badge_label: "고1 내신",
-      features: ["비상교육 고1 통합과학1 단원별 핵심 공식 및 원소 매핑 (1,000+ 카드)"],
+      features: ["비상교육 고1 통합과학1 단원별 핵심 공식 및 필수 원소 매핑 (240카드)"],
       sample_cards: [{ front: "옴의 법칙: V = I × R", back: "전압(V)은 전류(I)와 저항(R)의 곱에 비례한다", tag: "통합과학1" }],
     },
     {
@@ -243,9 +243,9 @@
       link_kind: "collection",
       primary_ref_id: "hanja-grade:7geup",
       covered_ref_ids: ["hanja-grade:7geup", "hanja-grade:6geup", "hanja-grade:5geup", "hanja-grade:4geup", "hanja-grade:3geup", "ko-idiom:essential"],
-      estimated_card_count: 1250,
+      estimated_card_count: 200,
       badge_label: "급수한자",
-      features: ["한자 7급~3급 급수별 필수 한자 및 사자성어 전체 잠금해제 (1,200+ 카드)"],
+      features: ["한자 7급~3급 급수별 배정 한자(각 100자 양방향 200카드) 및 필수 사자성어 300선 잠금해제"],
       sample_cards: [{ front: "樂 (3급 대표 다음자)", back: "즐길 락(낙) / 노래 악 / 좋아할 요 (부수: 木 · 15획)", tag: "hanja_3geup" }],
     },
     {
@@ -259,9 +259,9 @@
       link_kind: "collection",
       primary_ref_id: "khist:essential",
       covered_ref_ids: ["khist:essential"],
-      estimated_card_count: 1080,
+      estimated_card_count: 300,
       badge_label: "한능검",
-      features: ["시대별·왕대별 핵심 사건·조약·문화재 연표 양방향 Cloze (1,000+ 카드)"],
+      features: ["시대별·왕대별 핵심 사건·조약·문화재 연표 300선 Cloze"],
       sample_cards: [{ front: "갑신정변 (1884)", back: "김옥균·박영효 등 급진개화파가 일으킨 근대화 개혁 운동", tag: "khist" }],
     },
     {
@@ -275,9 +275,9 @@
       link_kind: "collection",
       primary_ref_id: "exam-eng:toeic-core",
       covered_ref_ids: ["exam-eng:toeic-core", "exam-ja:jlpt-n5-n3"],
-      estimated_card_count: 1180,
+      estimated_card_count: 500,
       badge_label: "어학",
-      features: ["토익 빈출 어휘 및 JLPT 핵심 어휘 동시 수록 (1,200+ 카드)"],
+      features: ["토익 빈출 어휘 500선 및 JLPT 핵심 어휘 500선 동시 수록"],
       sample_cards: [{ front: "reimburse", back: "(경비를) 변제하다, 환급하다 (동사 · C1)", tag: "TOEIC" }],
     },
     {
@@ -291,9 +291,9 @@
       link_kind: "collection",
       primary_ref_id: "cert-it:core",
       covered_ref_ids: ["cert-it:core", "law-statute:constitution"],
-      estimated_card_count: 1050,
+      estimated_card_count: 300,
       badge_label: "수험·자격증",
-      features: ["대한민국 헌법 핵심 조문 & 정보처리기사·컴활 필수 개념 완벽 정리 (1,000+ 카드)"],
+      features: ["대한민국 헌법 핵심 조문 300선 & 정보처리기사·컴활 필수 개념 300선 완벽 정리"],
       sample_cards: [{ front: "데이터베이스 트랜잭션의 4대 특성 (ACID)", back: "원자성, 일관성, 격리성, 영속성", tag: "정처기" }],
     },
   ];
@@ -502,14 +502,14 @@
             textbook_id: pack.primary_ref_id,
             deck_name: targetDeckTitle,
             difficulty_level: "mixed",
-            limit: Math.max(1000, Number(pack.estimated_card_count || 1000)),
+            limit: Number(pack.estimated_card_count || 240),
           });
         } else {
           mountedDeck = buildCollectionDeck({
             collection_id: pack.primary_ref_id,
             deck_name: targetDeckTitle,
             difficulty_level: "mixed",
-            limit: Math.max(1000, Number(pack.estimated_card_count || 1000)),
+            limit: Number(pack.estimated_card_count || 240),
           });
         }
       }
@@ -581,8 +581,7 @@
       const cid = String(collectionId || "hanja-grade:8geup").trim();
       const col = STANDALONE_COLLECTIONS.find((c) => c.collection_id === cid);
       const diff = difficultyLevel || "mixed";
-      const cap = Math.max(1, Number(targetCount || 1000));
-      return padStandaloneSpecsToTarget(col ? col.items : [], col ? col.collection_id : cid, diff, cap);
+      return padStandaloneSpecsToTarget(col ? col.items : [], col ? col.collection_id : cid, diff, targetCount);
     }
 
     function extractCleanTargetAnswer(frontText, backText) {

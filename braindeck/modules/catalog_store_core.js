@@ -214,8 +214,10 @@
     if (hasCjk && !hasHangul && !hasLatin) return "PURE_CJK";
     if (hasCjk && hasHangul) return "MIXED_CJK_HANGUL";
     if (hasHangul && !hasCjk && !hasLatin) {
-      const tokens = clean.split(/\s+/).filter(Boolean);
-      if (tokens.length >= 2 && tokens[tokens.length - 1].length === 1 && clean.length <= 12) {
+      const primarySeg = clean.split("/")[0].split(",")[0].trim();
+      const tokens = primarySeg.split(/\s+/).filter(Boolean);
+      const lastTok = (tokens[tokens.length - 1] || "").replace(/\([^)]*\)/g, "").trim();
+      if (tokens.length === 2 && tokens[0].length <= 5 && lastTok.length === 1 && primarySeg.length <= 12) {
         return "PURE_HANGUL_HUNEUM";
       }
       return "KOREAN_TERM";
@@ -247,7 +249,12 @@
       if (n === 3) return "CJK_3";
       return "CJK_4";
     }
-    if (prof === "PURE_HANGUL_HUNEUM") return "HANGUL_HUNEUM";
+    if (prof === "PURE_HANGUL_HUNEUM") {
+      if (!facetKey || facetKey.startsWith("hanja") || facetKey === "idiom") {
+        return "HANGUL_HUNEUM";
+      }
+      return "KOREAN_CONCEPT";
+    }
     if (prof === "KOREAN_TERM") {
       const compact = clean.replace(/[\s,·()[\]/~-]+/g, "");
       const hasSpace = clean.includes(" ");
@@ -291,17 +298,11 @@
         if (asksHanja || (!frontHasCjk && isHuneum)) {
           return mHanParen[2].trim();
         }
-        if (preserveKoreanParenthetical && !frontHasCjk && !isHuneum) {
-          return cand;
-        }
         return hangulPart;
       }
       const mDash = cand.match(/^([\u4e00-\u9fff\u3400-\u4dbf]{1,6})\s*(?:—|–|-|:)\s*(.+)$/);
       if (mDash) {
         return frontHasCjk ? mDash[2].trim() : mDash[1].trim();
-      }
-      if (preserveKoreanParenthetical && !frontHasCjk && !asksHanja) {
-        return cand;
       }
       const stripped = cand.replace(/\s*\([^)]*[\u4e00-\u9fff\u3400-\u4dbf][^)]*\)/g, "").trim();
       if (stripped && !/[\u4e00-\u9fff\u3400-\u4dbf]/.test(stripped)) {
@@ -460,7 +461,7 @@
       entries: [
         { id: "m2_u1_1", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "communicate", answer: "의사소통하다", pos: "동사", role: "core_vocab", sentence: "We {{c1::communicate::의사소통하다}} with friends through emojis.", explain: "communicate with (~와 소통하다)" },
         { id: "m2_u1_2", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "experience", answer: "경험하다", pos: "동사", role: "core_vocab", sentence: "Traveling helps you {{c1::experience::경험하다}} new cultures.", explain: "경험(명사) / 경험하다(동사)" },
-        { id: "m2_u1_g1", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "감각동사 + 형용사", answer: "감각동사(look/sound/smell/taste/feel) + 형용사 보어", prompt: "감각동사(look, sound, smell, taste, feel) 뒤에 보어로 반드시 와야 하는 품사는?", role: "key_grammar", sentence: "That idea sounds {{c1::great::감각동사+형용사}}! (부사 greatly 불가)", explain: "감각동사 뒤에는 부사(-ly)가 아니라 형용사 보어가 옵니다." },
+        { id: "m2_u1_g1", unit_id: "kr.mid2.eng.donga_yoon.2022:U01", term: "감각동사 + 형용사", answer: "형용사 보어 (부사 -ly 불가)", prompt: "감각동사(look, sound, smell, taste, feel) 뒤에 보어로 반드시 와야 하는 품사는?", role: "key_grammar", sentence: "That idea sounds {{c1::great::감각동사+형용사}}! (부사 greatly 불가)", explain: "감각동사 뒤에는 부사(-ly)가 아니라 형용사 보어가 옵니다." },
         { id: "m2_u2_1", unit_id: "kr.mid2.eng.donga_yoon.2022:U02", term: "balanced", answer: "균형 잡힌", pos: "형용사", role: "core_vocab", sentence: "Eating a {{c1::balanced::균형 잡힌}} diet is important for health.", explain: "a balanced diet (균형 잡힌 식단)" },
         { id: "m2_u2_2", unit_id: "kr.mid2.eng.donga_yoon.2022:U02", term: "nutrient", answer: "영양소", pos: "명사", role: "core_vocab", sentence: "Vegetables contain essential {{c1::nutrients::영양소}}.", explain: "nutrition(영양) / nutrient(영양소)" },
       ],
@@ -724,7 +725,7 @@
         { id: "mm_08", term: "cooperate", answer: "협력하다", role: "core_vocab", sentence: "Team members need to {{c1::cooperate::협력하다}} with one another.", explain: "명사형: cooperation (협력, 협동)" },
         { id: "mm_09", term: "persuade", answer: "설득하다", role: "core_vocab", sentence: "He tried to {{c1::persuade::설득하다}} his parents to allow the trip.", explain: "persuade + 목적어 + to부정사 (~가 …하도록 설득하다)" },
         { id: "mm_10", term: "participate", answer: "참여하다, 참가하다", role: "core_vocab", sentence: "Many students {{c1::participate::참여하다}} in the school club activities.", explain: "participate in (~에 참여하다) = take part in" },
-        { id: "mm_11", term: "감각동사 + 형용사 보어", answer: "감각동사(look/sound/smell/taste/feel) + 형용사 보어", role: "key_grammar", prompt: "감각동사(look, sound, smell, taste, feel) 뒤에 보어로 반드시 와야 하는 품사는?", sentence: "The cookies smell {{c1::good::형용사 보어(well 불가)}}.", explain: "감각동사 뒤에는 부사(-ly)가 올 수 없고 형용사만 보어로 옴" },
+        { id: "mm_11", term: "감각동사 + 형용사 보어", answer: "형용사 보어 (부사 -ly 불가)", role: "key_grammar", prompt: "감각동사(look, sound, smell, taste, feel) 뒤에 보어로 반드시 와야 하는 품사는?", sentence: "The cookies smell {{c1::good::형용사 보어(well 불가)}}.", explain: "감각동사 뒤에는 부사(-ly)가 올 수 없고 형용사만 보어로 옴" },
         { id: "mm_12", term: "현재완료 (have/has + p.p.)", answer: "have / has + 과거분사(p.p.) (현재완료)", role: "key_grammar", prompt: "과거에 시작된 동작이나 상태가 현재까지 이어질 때(경험·계속·완료·결과) 사용하는 시제 형태는?", sentence: "I {{c1::have lived::현재완료(계속)}} in Seoul for five years.", explain: "for + 기간 / since + 과거 시점과 함께 쓰이면 현재완료 계속 용법" },
       ],
     },
@@ -972,6 +973,12 @@
       "조동사(will/can/must) + 동사원형",
       "전치사(at/in/of) + 동명사(-ing)",
       "주격 관계대명사 who / which / that + 불완전 절",
+      "동사원형",
+      "동명사",
+      "현재분사",
+      "과거분사",
+      "형용사 보어",
+      "가목적어·진목적어 구문",
     ],
     hanja_hun_eum: [
       "배울 학",
@@ -1036,11 +1043,14 @@
     const rawTags = c.tags || [];
     const tagStr = (Array.isArray(rawTags) ? rawTags.join(" ") : String(rawTags)).toLowerCase();
 
-    const hasCjk = /[\u4e00-\u9fff]/.test(front + " " + target);
-    const isAsciiAlpha = Boolean(target) && /^[A-Za-z\s~'.,?!-]+$/.test(target) && /[A-Za-z]/.test(target);
+    const frontNoParenCjk = front.replace(/\([^)]*[\u4e00-\u9fff\u3400-\u4dbf][^)]*\)/g, " ");
+    const targetNoParenCjk = target.replace(/\([^)]*[\u4e00-\u9fff\u3400-\u4dbf][^)]*\)/g, " ");
+    const hasKana = /[\u3040-\u30ff]/.test(front + " " + target);
+    const hasCjk = !hasKana && !tagStr.includes("jlpt") && !tagStr.includes("exam-ja") && /[\u4e00-\u9fff\u3400-\u4dbf]/.test(frontNoParenCjk + " " + targetNoParenCjk);
+    const isAsciiAlpha = Boolean(target) && /^[A-Za-z\s~'.,?!()-]+$/.test(target) && /[A-Za-z]/.test(target);
     const isAsciiTarget =
       isAsciiAlpha &&
-      target.split(/\s+/).filter(Boolean).length <= 3 &&
+      target.split(/\s+/).filter(Boolean).length <= 6 &&
       !target.endsWith(".");
 
     if (
@@ -1101,7 +1111,35 @@
       };
     }
 
-    const combinedLower = `${front} ${back} ${tagStr}`.toLowerCase();
+    if (isAsciiTarget) {
+      return {
+        category_key: "vocab",
+        facet_key: "eng_vocab_word",
+        badge_label: "🔤 영단어 스펠링·빈칸",
+        short_label: "단어·어휘",
+      };
+    }
+
+    const isPureAsciiFront =
+      Boolean(front) &&
+      /^[A-Za-z\s~'.,?!()【】-]+$/.test(front) &&
+      /[A-Za-z]/.test(front);
+    const isEnglishOrJaTagged =
+      tagStr.includes("eng") ||
+      tagStr.includes("toeic") ||
+      tagStr.includes("jlpt") ||
+      tagStr.includes("exam-ja") ||
+      hasKana;
+    if (isPureAsciiFront || isEnglishOrJaTagged) {
+      return {
+        category_key: "vocab",
+        facet_key: "eng_vocab_meaning",
+        badge_label: "📘 단어 뜻·어휘",
+        short_label: "단어·어휘",
+      };
+    }
+
+    const combinedLower = `${front} ${target} ${tagStr}`.toLowerCase();
     const historyKeywords = [
       "한국사",
       "세계사",
@@ -1326,6 +1364,11 @@
     const reps = Math.max(0, Number(c.reps || 0));
     const distractors = [];
     const seenNorm = new Set([targetAnswer.toLowerCase()]);
+    if (front) seenNorm.add(front.toLowerCase());
+    const allowCompositeKoreanMix =
+      facetKey === "eng_grammar" ||
+      qtype.category_key === "history_sci" ||
+      (!isStrictMorph && (targetProfile === "FORMULA_OR_COMPOSITE" || targetProfile === "KOREAN_TERM"));
 
     const pool = Array.isArray(actualDeckCards) ? actualDeckCards : [];
     const poolCandidates = [];
@@ -1356,8 +1399,23 @@
       const oExt = extractTargetAndExplanation(oFront, oBack, other.target_answer, other.extra_explanation);
       const cand = String(oExt.targetAnswer || oBack).trim();
       if (!cand) continue;
+      if (!targetAnswer.endsWith("?") && cand.endsWith("?")) continue;
+      if (targetAnswer.length <= 36 && cand.length > 56) continue;
+      if (targetAnswer.startsWith("㉠") !== cand.startsWith("㉠")) continue;
+      const isTargetElement = /\([A-Z][a-z]?,\s*원자번호\s*\d+번\)/.test(targetAnswer);
+      const isCandElement = /\([A-Z][a-z]?,\s*원자번호\s*\d+번\)/.test(cand);
+      if (isTargetElement !== isCandElement) continue;
       const candProfile = classifyScriptProfileJs(cand);
-      if (!isScriptProfileCompatibleJs(targetProfile, candProfile)) continue;
+      const profileOk =
+        isScriptProfileCompatibleJs(targetProfile, candProfile) ||
+        (qtype.category_key === "history_sci" &&
+          candProfile !== "PURE_CJK" &&
+          candProfile !== "MIXED_CJK_HANGUL" &&
+          candProfile !== "PURE_HANGUL_HUNEUM") ||
+        (allowCompositeKoreanMix &&
+          (targetProfile === "KOREAN_TERM" || targetProfile === "FORMULA_OR_COMPOSITE") &&
+          (candProfile === "KOREAN_TERM" || candProfile === "FORMULA_OR_COMPOSITE"));
+      if (!profileOk) continue;
       const candMorph = classifyAnswerMorphologyJs(cand, otherFacet);
       if (isStrictMorph && candMorph !== targetMorph) continue;
       const norm = cand.toLowerCase();
@@ -1403,13 +1461,40 @@
       if (distractors.length >= reqCount - 1) break;
       const cand = fallbackPool[i];
       const candProfile = classifyScriptProfileJs(cand);
-      if (!isScriptProfileCompatibleJs(targetProfile, candProfile)) continue;
+      const profileOk =
+        isScriptProfileCompatibleJs(targetProfile, candProfile) ||
+        (qtype.category_key === "history_sci" &&
+          candProfile !== "PURE_CJK" &&
+          candProfile !== "MIXED_CJK_HANGUL" &&
+          candProfile !== "PURE_HANGUL_HUNEUM") ||
+        (allowCompositeKoreanMix &&
+          (targetProfile === "KOREAN_TERM" || targetProfile === "FORMULA_OR_COMPOSITE") &&
+          (candProfile === "KOREAN_TERM" || candProfile === "FORMULA_OR_COMPOSITE"));
+      if (!profileOk) continue;
       const candMorph = classifyAnswerMorphologyJs(cand, facetKey);
       if (isStrictMorph && candMorph !== targetMorph) continue;
       const norm = cand.toLowerCase();
       if (seenNorm.has(norm)) continue;
       seenNorm.add(norm);
       distractors.push(cand);
+    }
+
+    if (distractors.length < reqCount - 1) {
+      const emergencyBank =
+        targetProfile === "PURE_LATIN"
+          ? TYPE_FALLBACK_DISTRACTOR_BANK.eng_vocab_word
+          : targetProfile === "PURE_CJK"
+          ? TYPE_FALLBACK_DISTRACTOR_BANK.hanja_char
+          : TYPE_FALLBACK_DISTRACTOR_BANK[fallbackKey] || TYPE_FALLBACK_DISTRACTOR_BANK.eng_vocab_meaning;
+      const emergencyPool = _seededFisherYatesJs(emergencyBank || [], cid * 97 + reps * 401 + 79);
+      for (let i = 0; i < emergencyPool.length; i += 1) {
+        if (distractors.length >= reqCount - 1) break;
+        const cand = emergencyPool[i];
+        const norm = String(cand || "").toLowerCase();
+        if (!cand || seenNorm.has(norm)) continue;
+        seenNorm.add(norm);
+        distractors.push(cand);
+      }
     }
 
     const rawOptions = [targetAnswer].concat(distractors.slice(0, Math.max(0, reqCount - 1)));

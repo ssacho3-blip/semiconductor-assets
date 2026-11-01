@@ -973,24 +973,24 @@
   const STANDALONE_COLLECTIONS = _getModule("BrainDeckCatalogStoreCore").STANDALONE_COLLECTIONS;
   const STANDALONE_STORE_PACKS = _getModule("BrainDeckStandaloneEngineOps", "./modules/standalone_engine_ops.js").STANDALONE_STORE_PACKS;
   const STANDALONE_PACK_CARD_COUNT_INDEX = [
-    { pack_id: "pack.free.starter_k12", estimated_card_count: 1020 },
-    { pack_id: "pack.moe.eng.elem34", estimated_card_count: 1015 },
-    { pack_id: "pack.moe.eng.elem56", estimated_card_count: 1040 },
-    { pack_id: "pack.moe.eng.mid1200", estimated_card_count: 1200 },
-    { pack_id: "pack.moe.eng.high_csat", estimated_card_count: 1150 },
-    { pack_id: "pack.moe.kor.orthography_lit", estimated_card_count: 1035 },
-    { pack_id: "pack.moe.hanja.mid1800", estimated_card_count: 1350 },
-    { pack_id: "pack.moe.hist.essential", estimated_card_count: 1080 },
-    { pack_id: "pack.moe.sci.core_formula", estimated_card_count: 1045 },
-    { pack_id: "pack.moe.math.core_formula", estimated_card_count: 1060 },
-    { pack_id: "pack.mid1.eng.donga_yoon.full", estimated_card_count: 1024 },
-    { pack_id: "pack.mid2.eng.donga_yoon.full", estimated_card_count: 1032 },
-    { pack_id: "pack.mid2.hist.miraeen.full", estimated_card_count: 1018 },
-    { pack_id: "pack.high1.sci.visang.full", estimated_card_count: 1028 },
-    { pack_id: "pack.exam.hanja_master", estimated_card_count: 1250 },
-    { pack_id: "pack.exam.khist_master", estimated_card_count: 1080 },
-    { pack_id: "pack.exam.lang_toeic_jlpt", estimated_card_count: 1180 },
-    { pack_id: "pack.pro.law_it_cert", estimated_card_count: 1050 },
+    { pack_id: "pack.free.starter_k12", estimated_card_count: 100 },
+    { pack_id: "pack.moe.eng.elem34", estimated_card_count: 240 },
+    { pack_id: "pack.moe.eng.elem56", estimated_card_count: 400 },
+    { pack_id: "pack.moe.eng.mid1200", estimated_card_count: 500 },
+    { pack_id: "pack.moe.eng.high_csat", estimated_card_count: 500 },
+    { pack_id: "pack.moe.kor.orthography_lit", estimated_card_count: 300 },
+    { pack_id: "pack.moe.hanja.mid1800", estimated_card_count: 500 },
+    { pack_id: "pack.moe.hist.essential", estimated_card_count: 300 },
+    { pack_id: "pack.moe.sci.core_formula", estimated_card_count: 300 },
+    { pack_id: "pack.moe.math.core_formula", estimated_card_count: 300 },
+    { pack_id: "pack.mid1.eng.donga_yoon.full", estimated_card_count: 240 },
+    { pack_id: "pack.mid2.eng.donga_yoon.full", estimated_card_count: 240 },
+    { pack_id: "pack.mid2.hist.miraeen.full", estimated_card_count: 240 },
+    { pack_id: "pack.high1.sci.visang.full", estimated_card_count: 240 },
+    { pack_id: "pack.exam.hanja_master", estimated_card_count: 200 },
+    { pack_id: "pack.exam.khist_master", estimated_card_count: 300 },
+    { pack_id: "pack.exam.lang_toeic_jlpt", estimated_card_count: 500 },
+    { pack_id: "pack.pro.law_it_cert", estimated_card_count: 300 },
   ];
 
   const GENERIC_SECTION_LABELS_JS = new Set([
@@ -1086,29 +1086,54 @@
     const t = String(term || "").trim();
     const a = String(answer || "").trim();
     if (!d || (!t && !a)) return d;
+    const stopWords = new Set(["정의", "성질", "원리", "구별", "구분", "비교", "공식", "법칙", "정리", "판별", "판정", "해설", "개념", "적용", "특징", "조건", "구조", "원소 기호"]);
     const candidates = [];
-    function addCand(raw) {
-      if (!raw) return;
-      if (!candidates.includes(raw)) candidates.push(raw);
-      const base = raw.replace(/\s*\([^)]*\)\s*/g, "").trim();
-      if (base && !candidates.includes(base)) candidates.push(base);
+    function pushCand(s) {
+      const clean = String(s || "").trim();
+      if (!clean || stopWords.has(clean)) return;
+      if (clean.includes("[") || clean.includes("]")) return;
+      if (/^원자번호\s*\d+번$/.test(clean)) return;
+      if (clean.length >= 2 || /[\u4e00-\u9fff\u3400-\u4dbf]/.test(clean)) {
+        if (!candidates.includes(clean)) candidates.push(clean);
+      }
     }
-    addCand(t);
+    function addCand(raw) {
+      const r = String(raw || "").trim();
+      if (!r) return;
+      pushCand(r);
+      const base = r.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim();
+      pushCand(base);
+      const headCore = r.split("(")[0].split("[")[0].split("—")[0].split("·")[0].trim();
+      pushCand(headCore);
+      const subParts = base.split(/\s*(?:—|·|과\s+|와\s+|및\s+|vs\s+|\/|,)\s*/);
+      subParts.forEach((sp) => {
+        const p = sp.trim();
+        pushCand(p);
+        const strippedSuffix = p
+          .replace(/(?:의\s*(?:정의|세기|성질|원리|구별|구분|비교|적용|공식|법칙|유무|특성|조건|관계|변환)|판별|판정|공식)$/, "")
+          .trim();
+        pushCand(strippedSuffix);
+      });
+    }
     if (t.includes(":")) {
       const tTail = t.split(":").pop().trim();
       if (tTail.length >= 2) addCand(tTail);
+    } else {
+      addCand(t);
     }
-    const aBase = a.replace(/\s*\([^)]*\)\s*/g, "").trim();
-    if (aBase && aBase.length <= 15 && !aBase.includes(" ")) {
+    if (a && !a.startsWith("㉠")) {
       addCand(a);
     }
+    candidates.sort((x, y) => y.length - x.length);
     let masked = d;
     candidates.forEach((cand) => {
-      if (cand.length >= 2 || /[\u4e00-\u9fff\u3400-\u4dbf]/.test(cand)) {
-        const escaped = cand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        masked = masked.replace(new RegExp(escaped, "gi"), "[ ___ ]");
-      }
+      const escaped = cand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      masked = masked.replace(new RegExp(escaped, "gi"), "[ ___ ]");
     });
+    masked = masked.replace(/\[\s*\[\s*___\s*\]\s*\]?/g, "[ ___ ]");
+    masked = masked.replace(/\[\s*___\s*\](?:\s*\[\s*___\s*\])+/g, "[ ___ ]");
+    masked = masked.replace(/\[\s*___\s*\]\s*\(\s*\[\s*___\s*\]\s*\)/g, "[ ___ ]");
+    masked = masked.replace(/\[\s*___\s*\]\(/g, "[ ___ ] (");
     return masked;
   }
 
@@ -1253,20 +1278,139 @@
     return "";
   }
 
+  const _DISCARD_MATH_SECTION_RE_JS =
+    /\[(?:행렬·선형변환·공간기하·정수론·고급해석·확률분포 심화|조합론·확률 표준값|정수론·수열 표준값|기하·해석 표준 공식|미적분 핵심 정적분|미적분 핵심 극한|삼각함수 특수각|정수론|조합론|그래프이론|기하학|선형대수|미분방정식|복소해석|푸리에해석|수치해석|이산수학|확률과정|통계학|집합론·위상|최적화|암호수학|대수학|이산수학·알고리즘|이산수학·조합|해석학|정보이론·수학|금융수학|대수·수론|기하·해석|조합·확률|통계·기계학습|수열·해석|집합·논리|대수·기하|대수·복소행렬|해석·수열극한|미적분·다변수벡터|미적분·미분방정식|확률통계·수리통계|확률통계·확률과정|정수론·이산수학|선형대수·행렬|선형대수·해석|해석·미적분심화|해석·복소수치|수치해석·최적화|추상대수·군론|추상대수·환체|위상·집합론|부등식·최적화|정수론·암호대수|조합·그래프이론|확률통계·정보이론|해석·미적분응용|미적분·함수해석|미분기하·곡선곡면|미적·선형보충|현대대수|조합·이산수학)\]/;
+  const _DISCARD_MATH_OUT_OF_SCOPE_RE_JS =
+    /로랑\s*급수|유수\s*정리|코시-리만|르베그|바나흐|힐베르트|무어-펜로즈|의사역행렬|고유값|고유벡터|특이값\s*분해|라플라스\s*변환|푸리에|야코비안|헤시안|가우스-마르코프|마르코프|갈루아|아벨\s*군|뇌터|위상수학|컴팩트|하우스도르프|측도론|보렐|비탈리|제타\s*함수|리만\s*가설|디리클레|페르마|오일러\s*피|중국인의\s*나머지|윌슨의\s*정리|비둘기집|생성함수|카탈랑|카탈란|스터링|벨\s*수|람세이|그래프\s*이론|오일러\s*경로|해밀턴\s*경로|평면\s*그래프|크루스칼|다익스트라|벨만-포드|플로이드-워셜|네트워크\s*플로우|심플렉스|쌍대성|테일러\s*급수|매클로린|편미분|중적분|선적분|면적분|발산\s*정리|스토크스|그린\s*정리|미분방정식|베르누이\s*미분|초기하|포아송\s*분포|감마\s*분포|베타\s*분포|카이제곱|스튜던트\s*t|F-분포|중심극한정리|우도함수|최대우도|베이즈\s*추정|신뢰구간\s*추정|가설검정|제1종\s*오류|p-값|회귀분석|최소제곱법|공분산\s*행렬|주성분\s*분석|PCA|케일리-해밀턴|조르당|그램-슈미트|직교행렬|유니터리|에르미트|정부호\s*행렬|텐서|다양체|리\s*군|호몰로지|호모토피|범주론|함자|초한기수|선택공리|체르멜로|괴델|튜링\s*기계|정지\s*문제|P-NP|볼차노|하이네-보렐|코시\s*평균값|로피탈|오일러\s*공식|드무아브르|쌍곡선함수|역삼각함수|바젤\s*문제|교대급수|이상적분|스튜어트\s*정리|체바의\s*정리|메넬라우스|톨레미|브라마굽타|픽의\s*정리|오일러\s*직선|구점원|방멱의\s*정리|현수선|사이클로이드|준원|젠센\s*부등식|베르누이\s*부등식|재배열\s*부등식|체비쇼프|완전순열|교란순열|다항정리|베주\s*항등식|메르센\s*소수|쌍둥이\s*소수|르장드르/;
+  const _DISCARD_SCI_OUT_OF_SCOPE_RE_JS =
+    /슈뢰딩거|디랙\s*방정식|클라인-고든|양자장론|파인만\s*다이어그램|게이지\s*대칭|히그스\s*메커니즘|크리스토펠|리만\s*곡률|아인슈타인\s*장방정식|슈바르츠실트|맥스웰\s*텐서|라그랑지안\s*역학|해밀토니안\s*역학|포아송\s*괄호|리우빌|볼츠만\s*H|분배함수|그랜드\s*캐노니컬|페르미-디랙|보즈-아인슈타인|샤논|기브스\s*듀헴|퓨개시티|활동도\s*계수|하트리-폭|밀도범함수|분자궤도\s*함수|리간드장\s*이론|얀-텔러|우드워드-호프만|미카엘리스-멘텐|라인위버-버크|알로스테릭|샤페론\s*단백질|유비퀴틴|크리스퍼|오페론\s*조절/;
+  const _DISCARD_KOR_OUT_OF_SCOPE_RE_JS =
+    /\[(?:독서이론|화법이론|작문이론|매체이론)\]|샤넌\s*정보량|칸트의\s*의무론|기준금리|초등\s*1·2학년\s*어휘·받아쓰기:|초등\s*감각어·모양말:/;
+
+  function defaultTargetCountForSourceJs(sourceTag) {
+    const s = String(sourceTag || "").toLowerCase();
+    if (s.includes("8geup") || s.includes("starter_k12")) return 100;
+    if (s.includes("dictation")) return 120;
+    if (/hanja-grade:[76543]geup/.test(s) || s.includes("hanja_master")) return 200;
+    if (s.includes("elem-3-4") || s.includes("elem34") || /^kr\./.test(s)) return 240;
+    if (s.includes("moe-eng:elementary") || s.includes("elem56") || s.includes("elem-5-6")) return 400;
+    if (s.includes("middle-1200") || s.includes("mid1200") || s.includes("high-csat") || s.includes("high_csat") || s.includes("toeic") || s.includes("jlpt") || s.includes("exam-ja") || s.includes("hanja-1800") || s.includes("mid1800")) return 500;
+    return 300;
+  }
+
+  function filterAuthenticGradedRowsJs(gKey, rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (gKey === "hanja_8geup") {
+      return list.filter((line) => String(line || "").split("\t")[0].trim().length === 1).slice(0, 50);
+    }
+    if (/^hanja_[76543]geup$/.test(gKey)) {
+      return list.filter((line) => String(line || "").split("\t")[0].trim().length === 1).slice(0, 100);
+    }
+    if (gKey === "hanja_mid1800") {
+      return list.filter((line) => String(line || "").split("\t")[0].trim().length === 1).slice(0, 250);
+    }
+    if (gKey === "hanja_idiom") {
+      return list.filter((line) => String(line || "").split("\t")[0].trim().length === 4).slice(0, 300);
+    }
+    if (gKey === "eng_elem34") return list.slice(0, 240);
+    if (gKey === "eng_elem56") return list.slice(0, 400);
+    if (gKey === "eng_mid1200" || gKey === "eng_high_csat" || gKey === "eng_toeic" || gKey === "ja_jlpt") {
+      return list.slice(0, 500);
+    }
+    if (gKey === "kor_dictation") {
+      return list.filter((line) => {
+        const s = String(line || "");
+        return !s.startsWith("초등 바른 생활 문장 받아쓰기:");
+      }).slice(0, 120);
+    }
+    if (gKey === "kor_orthography_lit") {
+      return list.filter((line) => !_DISCARD_KOR_OUT_OF_SCOPE_RE_JS.test(String(line || ""))).slice(0, 300);
+    }
+    if (gKey === "law_statute" || gKey === "cert_it") {
+      return list.filter((line) => {
+        const s = String(line || "");
+        const parts = s.split("\t");
+        const term = (parts[0] || "").trim();
+        const ctx = (parts[2] || "").trim();
+        const exp = (parts[3] || "").trim();
+        if (term.includes("채무불이행") && ctx.includes("채무자위험부담")) return false;
+        return !exp.includes("보충") && !exp.includes("인공지능");
+      }).slice(0, 300);
+    }
+    return list;
+  }
+
+  function filterAuthenticSubjectRowsJs(subjKey, rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (subjKey === "math") {
+      return list.filter((line) => {
+        const s = String(line || "");
+        const term = (s.split("\t")[0] || "").trim();
+        if (term.endsWith("의 정확한 값")) return false;
+        return !_DISCARD_MATH_SECTION_RE_JS.test(s) && !_DISCARD_MATH_OUT_OF_SCOPE_RE_JS.test(s);
+      }).slice(0, 300);
+    }
+    if (subjKey === "science") {
+      return list.filter((line) => {
+        const s = String(line || "");
+        const m = s.match(/원자번호\s*(\d+)번/);
+        if (m) {
+          const num = Number(m[1]);
+          if (num > 20 && num !== 26 && num !== 29 && num !== 47 && num !== 79) return false;
+        }
+        return !_DISCARD_SCI_OUT_OF_SCOPE_RE_JS.test(s);
+      }).slice(0, 300);
+    }
+    if (subjKey === "korean") {
+      return list.filter((line) => !_DISCARD_KOR_OUT_OF_SCOPE_RE_JS.test(String(line || ""))).slice(0, 300);
+    }
+    if (subjKey === "history") {
+      return list.slice(0, 300);
+    }
+    if (subjKey === "hanja") {
+      return list.filter((line) => {
+        const t = (String(line || "").split("\t")[0] || "").trim();
+        return t.length === 1 || t.length === 4;
+      }).slice(0, 300);
+    }
+    if (subjKey === "law_it") {
+      return list.filter((line) => {
+        const s = String(line || "");
+        const parts = s.split("\t");
+        const term = (parts[0] || "").trim();
+        const ctx = (parts[2] || "").trim();
+        const exp = (parts[3] || "").trim();
+        if (term.includes("채무불이행") && ctx.includes("채무자위험부담")) return false;
+        return !exp.includes("보충") && !exp.includes("인공지능");
+      }).slice(0, 300);
+    }
+    return list.slice(0, 500);
+  }
+
   function getAuthenticGradedBankItems(gradedKey) {
     const gKey = String(gradedKey || "").trim();
     if (!gKey) return [];
     if (_PARSED_GRADED_BANK_CACHE[gKey]) return _PARSED_GRADED_BANK_CACHE[gKey];
-    const rawRows = AUTHENTIC_GRADED_TSV_BANK[gKey] || [];
+    const rawRows = filterAuthenticGradedRowsJs(gKey, AUTHENTIC_GRADED_TSV_BANK[gKey] || []);
     const isEng = gKey.startsWith("eng_");
     const isJa = gKey === "ja_jlpt";
     const isHanja = gKey.startsWith("hanja_");
+    const idiomFixMap = {
+      "日中則昃": "일중즉측 (해가 중천에 이르면 기욺 · 기울 측)",
+      "一葉片舟": "일엽편주 (나뭇잎 같은 작은 배 · 배 주)",
+      "狡兎三窟": "교토삼굴 (위기에 대비해 굴을 세 개 팜 · 토끼 토)",
+    };
     const parsed = rawRows.map((line, idx) => {
       const parts = String(line || "").split("\t");
       const term = (parts[0] || "").trim();
-      const answer = (parts[1] || "").trim();
-      const ctx = (parts[2] || "").trim();
-      const explain = (parts[3] || "").trim();
+      let rawAns = (parts[1] || "").replace(/\(\s*:\s*/g, "(").trim();
+      if (isHanja && idiomFixMap[term]) {
+        rawAns = idiomFixMap[term];
+      }
+      const ctx = (parts[2] || "").replace(/\(\s*:\s*/g, "(").trim();
+      const rawExplain = (parts[3] || "").replace(/\(\s*:\s*/g, "(").trim();
+      let answer = rawAns;
+      let explain = rawExplain || ctx;
       let prompt = "";
       let sentence = "";
       if (isEng || isJa) {
@@ -1276,8 +1420,71 @@
         prompt = `【 ${term} 】`;
         sentence = "";
       } else {
-        const rawCue = ctx || explain || term;
-        const maskedTip = maskTermInDescJs(rawCue, term, answer);
+        let cleanedTerm = term.replace(/\s*—\s*[^)]+(?=\))/g, "").split(" — ")[0].trim();
+        let conciseTerm = cleanedTerm.length > 42
+          ? (cleanedTerm.split(" · ")[0].split(" 및 ")[0].split("(")[0].trim() || cleanedTerm.slice(0, 42))
+          : cleanedTerm;
+        if (!conciseTerm.includes("(") && conciseTerm.includes(")")) {
+          conciseTerm = conciseTerm.replace(/\)/g, "").trim();
+        } else if (conciseTerm.includes("(") && !conciseTerm.includes(")")) {
+          conciseTerm = conciseTerm.split("(")[0].trim();
+        }
+        const badge = rawExplain || "핵심 개념";
+        let rawCue = ctx || rawExplain || term;
+        if (rawAns.startsWith("㉠") && rawAns.split(" — ")[0].trim().length <= 48) {
+          answer = rawAns.split(" — ")[0].trim();
+          explain = rawExplain || (rawAns.includes(" — ") ? rawAns.split(" — ").slice(1).join(" — ").trim() : ctx);
+          rawCue = ctx || rawExplain || term;
+        } else if (term.startsWith("초등 1·2학년 어휘·받아쓰기:")) {
+          answer = term.split(":").slice(1).join(":").trim();
+          explain = rawExplain ? `${rawAns} · ${rawExplain}` : rawAns;
+          rawCue = ctx || rawAns;
+        } else if (term.startsWith("초등 감각어·모양말:")) {
+          answer = term.split(":").slice(1).join(":").trim();
+          explain = rawExplain ? `${rawAns} · ${rawExplain}` : rawAns;
+          rawCue = `[초등 국어 감각어·모양말] '${rawAns}'을(를) 생생하게 표현하는 낱말은?`;
+        } else if (term.startsWith("낱말 뜻 구별:") || term.startsWith("받아쓰기 구별:")) {
+          const quoted = Array.from(rawAns.split("(")[0].matchAll(/'([^']+)'/g))
+            .map((m) => m[1].trim())
+            .filter(Boolean);
+          answer = quoted.length >= 2 ? quoted.join(" / ") : rawAns.split(" — ")[0].trim();
+          explain = rawExplain ? `${rawAns} · ${rawExplain}` : rawAns;
+          rawCue = ctx || rawExplain || term;
+        } else if (term.includes("받아쓰기")) {
+          answer = rawAns.split(" — ")[0].trim();
+          explain = rawExplain || ctx;
+          rawCue = ctx || rawExplain || term;
+        } else if (gKey === "law_statute" || gKey === "cert_it") {
+          const meanHead = rawAns.split(" — ")[0].trim();
+          answer = (rawAns.includes(" — ") && meanHead.length <= 20 && !conciseTerm.includes(meanHead) && (conciseTerm.length + meanHead.length + 3) <= 48)
+            ? `${conciseTerm} (${meanHead})`
+            : conciseTerm;
+          explain = rawExplain ? `${rawAns} · ${rawExplain}` : rawAns;
+          const ctxPrefixMatch = ctx.match(/^(\[[^\]]+\])\s*/);
+          const ctxPrefix = ctxPrefixMatch ? ctxPrefixMatch[1] : `[${badge}]`;
+          const ctxBody = ctx.replace(/^\[[^\]]+\]\s*/, "").trim();
+          if (ctx && rawAns && !ctxBody.includes(rawAns.slice(0, Math.min(12, rawAns.length)))) {
+            rawCue = `${ctxPrefix} ${rawAns} (${ctxBody})`;
+          } else if (ctx) {
+            rawCue = ctx;
+          } else {
+            rawCue = rawAns;
+          }
+        } else {
+          answer = conciseTerm;
+          explain = (rawExplain && rawExplain !== rawAns) ? `${rawAns} · ${rawExplain}` : (rawExplain || rawAns);
+          const ctxPrefixMatch = ctx.match(/^(\[[^\]]+\])\s*/);
+          const ctxPrefix = ctxPrefixMatch ? ctxPrefixMatch[1] : "";
+          const ctxBody = ctx.replace(/^\[[^\]]+\]\s*/, "").trim();
+          if (ctx && rawAns && rawAns !== term && !ctxBody.includes(rawAns.slice(0, Math.min(10, rawAns.length)))) {
+            rawCue = ctxPrefix ? `${ctxPrefix} ${rawAns} (${ctxBody})` : `${rawAns} (${ctxBody})`;
+          } else {
+            rawCue = ctx || rawExplain || rawAns;
+          }
+        }
+        if (answer.length > 48) answer = conciseTerm.slice(0, 48).trim();
+        const maskAns = !answer.startsWith("㉠") ? answer : "";
+        const maskedTip = maskTermInDescJs(rawCue, term, maskAns);
         prompt = cleanCardFrontForDisplayJs(maskedTip);
         sentence = "";
       }
@@ -1287,7 +1494,7 @@
         answer,
         prompt,
         sentence,
-        explain: explain || ctx,
+        explain,
         role: isEng || isJa ? "core_vocab" : "core_concept",
       };
     });
@@ -1298,15 +1505,17 @@
   function getAuthenticSubjectBankItems(subj) {
     const key = String(subj || "english").toLowerCase();
     if (_PARSED_SUBJECT_BANK_CACHE[key]) return _PARSED_SUBJECT_BANK_CACHE[key];
-    const rawRows = AUTHENTIC_SUBJECT_TSV_BANK[key] || AUTHENTIC_SUBJECT_TSV_BANK.english || [];
+    const rawRows = filterAuthenticSubjectRowsJs(key, AUTHENTIC_SUBJECT_TSV_BANK[key] || AUTHENTIC_SUBJECT_TSV_BANK.english || []);
     const parsed = rawRows.map((line, idx) => {
       const parts = String(line || "").split("\t");
       const term = (parts[0] || "").trim();
-      const answer = (parts[1] || "").trim();
+      const rawAns = (parts[1] || "").trim();
       const ctx = (parts[2] || "").trim();
-      const explain = (parts[3] || "").trim();
+      const rawExplain = (parts[3] || "").trim();
       const isEng = key === "english";
       const isHanja = key === "hanja";
+      let answer = rawAns;
+      let explain = rawExplain || ctx;
       let prompt = "";
       let sentence = "";
       if (isEng) {
@@ -1315,8 +1524,36 @@
       } else if (isHanja) {
         prompt = `【 ${term} 】`;
         sentence = "";
+      } else if (term.endsWith("의 정확한 값")) {
+        const suffixRaw = rawAns.startsWith(term)
+          ? rawAns.slice(term.length).trim().replace(/^\(|\)$/g, "").trim()
+          : rawAns;
+        const conciseVal = suffixRaw.split(" (")[0].trim();
+        answer = conciseVal.length <= 48 ? conciseVal : conciseVal.split(",").slice(0, 2).join(",").trim();
+        prompt = `[수학 필수 표준값] ${term}은?`;
+        explain = rawExplain ? `${ctx} · ${rawExplain}` : ctx;
       } else {
-        const rawCue = ctx || explain || term;
+        let conciseTerm = term.length > 42
+          ? (term.split(" — ")[0].split(" · ")[0].split(" 및 ")[0].split("(")[0].trim() || term.slice(0, 42))
+          : term;
+        if (!conciseTerm.includes("(") && conciseTerm.includes(")")) {
+          conciseTerm = conciseTerm.replace(/\)/g, "").trim();
+        } else if (conciseTerm.includes("(") && !conciseTerm.includes(")")) {
+          conciseTerm = conciseTerm.split("(")[0].trim();
+        }
+        const candAns = rawAns.includes(" — ") ? rawAns.split(" — ")[0].trim() : rawAns;
+        answer = candAns.length <= 48 ? candAns : conciseTerm.slice(0, 48).trim();
+        explain = (rawExplain && rawExplain !== rawAns)
+          ? `${rawAns} · ${rawExplain}`
+          : (answer !== rawAns ? rawAns : (rawExplain || ctx));
+        let rawCue = ctx || rawExplain || rawAns;
+        if (candAns.length > 48 && rawExplain.includes("|")) {
+          const afterPipe = rawExplain.split("|").slice(1).map((s) => s.trim()).filter(Boolean).join(" · ");
+          const prefixTag = (ctx.match(/^\[[^\]]+\]/) || [""])[0];
+          if (afterPipe) {
+            rawCue = prefixTag ? `${prefixTag} ${afterPipe}` : afterPipe;
+          }
+        }
         const maskedTip = maskTermInDescJs(rawCue, term, answer);
         prompt = cleanCardFrontForDisplayJs(maskedTip);
         sentence = "";
@@ -1327,7 +1564,7 @@
         answer,
         prompt,
         sentence,
-        explain: explain || ctx,
+        explain,
         role: isEng ? "core_vocab" : "core_concept",
       };
     });
@@ -1354,10 +1591,10 @@
 
     const isFactPrompt = Boolean(cleanPrompt && (item.term === item.answer || isGrammar));
     const lv3Front = isFactPrompt
-      ? `【 ${item.term} 】`
+      ? (cleanPrompt || lv1Front)
       : `${item.answer}`;
     const lv3Back = isFactPrompt
-      ? formatConciseBackJs(item.explain || item.answer, "", item.term)
+      ? lv1Back
       : formatConciseBackJs(item.term, item.explain, item.term);
 
     const cLv1 = {
@@ -1412,8 +1649,9 @@
     if (gradedKey) {
       const gradedItems = getAuthenticGradedBankItems(gradedKey);
       if (gradedItems.length > 0) {
+        const isTextbookSource = /^kr\./.test(tagLower);
         const grammarSeeds = cleanSeeds.filter((it) => it && it.role === "key_grammar");
-        const mergedGraded = gradedItems.concat(grammarSeeds);
+        const mergedGraded = isTextbookSource ? cleanSeeds.concat(gradedItems) : gradedItems.concat(grammarSeeds);
         const seenG = new Set();
         const seenPromptsG = new Set();
         const dedupedG = [];
@@ -1472,24 +1710,34 @@
   }
 
   function padStandaloneSpecsToTarget(seedItems, sourceTag, difficultyLevel, targetCount) {
-    const cap = Math.max(1, Number(targetCount || 1000));
+    const rawTarget = Number(targetCount || 0);
+    const defaultCap = defaultTargetCountForSourceJs(sourceTag);
+    const cap = Math.max(1, (rawTarget <= 0 || rawTarget >= 1000) ? defaultCap : Math.min(rawTarget, defaultCap));
     const subj = detectSubjectCategoryFromTag(sourceTag, seedItems);
     const pool = getSubjectPureSeedPool(subj, seedItems, sourceTag);
     const specs = [];
     const seenFronts = new Set();
     const n = Math.max(1, pool.length);
-    const rawSeedLen = Array.isArray(seedItems) ? seedItems.filter(Boolean).length : 0;
-    let seedCount = Math.min(rawSeedLen, n);
-    if (/hanja-grade:8geup/.test(String(sourceTag || ""))) {
+    const srcLower = String(sourceTag || "").toLowerCase();
+    const isHanjaSingleCharGrade = subj === "hanja" && !srcLower.includes("idiom");
+    let seedCount = n;
+    if (srcLower.includes("8geup") || srcLower.includes("starter_k12")) {
       seedCount = Math.min(50, n);
-    } else if (/hanja-grade:[76543]geup/.test(String(sourceTag || ""))) {
+    } else if (/hanja-grade:[76543]geup/.test(srcLower) || srcLower.includes("hanja_master")) {
       seedCount = Math.min(100, n);
+    } else if (srcLower.includes("hanja-1800") || srcLower.includes("mid1800")) {
+      seedCount = Math.min(250, n);
     }
     const stepPairs = [];
-    for (let i = 0; i < seedCount; i += 1) stepPairs.push([i, 0]);
-    for (let i = 0; i < seedCount; i += 1) stepPairs.push([i, 1]);
-    for (let i = seedCount; i < n; i += 1) stepPairs.push([i, 0]);
-    for (let i = seedCount; i < n; i += 1) stepPairs.push([i, 1]);
+    if (isHanjaSingleCharGrade) {
+      for (let i = 0; i < seedCount; i += 1) stepPairs.push([i, 0]);
+      for (let i = 0; i < seedCount; i += 1) stepPairs.push([i, 1]);
+    } else {
+      for (let i = 0; i < n; i += 1) stepPairs.push([i, 0]);
+      if (subj === "english") {
+        for (let i = 0; i < n; i += 1) stepPairs.push([i, 1]);
+      }
+    }
 
     let step = 0;
     const maxSteps = stepPairs.length;
@@ -1548,7 +1796,7 @@
           backText = formatConciseBackJs(cleanTerm, base.explain || cleanAns, cleanTerm);
         } else if (subj === "english") {
           if (base.role === "key_grammar") {
-            frontText = `【 ${rawTermStr} 】`;
+            frontText = "";
           } else {
             frontText = `${cleanAns}`;
             if (seenFronts.has(frontText)) {
@@ -1560,23 +1808,17 @@
             backText = formatConciseBackJs(cleanTerm, base.explain || cleanAns, cleanTerm);
           }
         } else {
-          const cleanHeadTerm = rawTermStr.replace(/^\[[^\]]+\]\s*/, "").trim() || rawTermStr;
-          const bracketHead = `【 ${cleanHeadTerm} 】`;
           const defDetail = String(base.explain || rawPrompt || cleanAns)
             .replace(/^\[[^\]]+\]\s*/, "")
             .replace(new RegExp(`^${cleanTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s*\\([^)]*\\))?\\s*(?:\\|\\s*)?[:：—-]?\\s*`), "")
             .trim();
-          if (rawPrompt !== bracketHead && !seenFronts.has(bracketHead)) {
-            frontText = bracketHead;
-            if (cleanAns !== cleanTerm && cleanAns !== rawTermStr && !cleanAns.startsWith(cleanTerm)) {
-              backText = formatConciseBackJs(cleanAns, defDetail, cleanTerm);
-            } else {
-              backText = formatConciseBackJs(defDetail || cleanAns, "", cleanTerm);
-            }
-          } else {
-            const altCue = cleanCardFrontForDisplayJs(maskTermInDescJs(base.explain || "", base.term, base.answer));
-            frontText = (altCue && !seenFronts.has(altCue)) ? altCue : "";
-          }
+          const maskAns = !cleanAns.startsWith("㉠") ? cleanAns : "";
+          const rawSecondCue = defDetail && defDetail !== rawPrompt
+            ? `[핵심 개념 확인] ${defDetail}`
+            : `[심화 확인] ${rawPrompt || rawTermStr}`;
+          const altCue = cleanCardFrontForDisplayJs(maskTermInDescJs(rawSecondCue, base.term, maskAns));
+          frontText = (altCue && !seenFronts.has(altCue)) ? altCue : "";
+          backText = formatConciseBackJs(cleanAns, base.explain, cleanTerm);
         }
       }
 

@@ -1,9 +1,10 @@
-const CACHE_NAME = "braindeck-shell-v8.2.0";
+const CACHE_NAME = "braindeck-shell-v1.1.0-b108";
 const APP_SHELL_ASSETS = [
   "./",
   "./index.html",
   "./curriculum_corpus_v8.js",
   "./curriculum_corpus_v8.json",
+  "./modules/rust_wasm_core.js",
   "./modules/fsrs_core.js",
   "./modules/sync_crdt.js",
   "./modules/curriculum_standards.js",
@@ -13,6 +14,8 @@ const APP_SHELL_ASSETS = [
   "./modules/standalone_engine_core.js",
   "./modules/standalone_engine_ops.js",
   "./modules/ui_dialogs_render.js",
+  "./modules/user_guide_and_quick_vm.js",
+  "./wasm/braindeck_core.wasm",
   "./viewmodel.js",
   "./app.js",
   "./manifest.json",

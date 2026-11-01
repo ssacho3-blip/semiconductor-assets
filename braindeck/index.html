@@ -26,6 +26,49 @@
       --min-touch-target: 48px;
       --card-radius: 22px;
     }
+    body[data-persona-tier="kids"] {
+      --question-font-size: 1.55rem;
+      --min-touch-target: 58px;
+      --card-radius: 28px;
+      background: #f0f9ff;
+    }
+    body[data-persona-tier="kids"] #main-tab-nav,
+    body[data-persona-tier="kids"] #bd-collapsible-header-zone,
+    body[data-persona-tier="kids"] #card-fsrs-meta,
+    body[data-persona-tier="kids"] #btn-bury-card,
+    body[data-persona-tier="kids"] #btn-suspend-card,
+    body[data-persona-tier="kids"] #btn-decompose,
+    body[data-persona-tier="kids"] #btn-quiz-mode,
+    body[data-persona-tier="kids"] #rate-4 {
+      display: none !important;
+    }
+    body[data-persona-tier="kids"] .card-arena {
+      background: #ffffff;
+      border: 2.5px solid #93c5fd;
+      box-shadow: 0 10px 25px rgba(59, 130, 246, 0.08);
+    }
+    body[data-persona-tier="teen"] {
+      --question-font-size: 1.32rem;
+      --min-touch-target: 50px;
+      --card-radius: 22px;
+      background: #f8fafc;
+    }
+    body[data-persona-tier="teen"] #card-fsrs-meta,
+    body[data-persona-tier="teen"] #btn-decompose {
+      display: none !important;
+    }
+    body[data-persona-tier="adult"] {
+      --question-font-size: 1.15rem;
+      --min-touch-target: 44px;
+      --card-radius: 14px;
+      background: #f1f5f9;
+    }
+    body[data-persona-tier="adult"] .app-shell {
+      max-width: 860px;
+    }
+    body[data-persona-tier="adult"] #bd-daily-stamp-strip {
+      display: none !important;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -434,6 +477,60 @@
     <!-- PAGE 1: STUDY (오늘의 학습) -->
     <main id="page-study" class="tab-page active">
       <section class="panel">
+        <!-- Unified Single-Screen Focus Bar (English & Hanja Level Selectors + Family Profile + Daily Goal + User Manual) -->
+        <div id="bd-kids-quick-start-bar" style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px;border-radius:16px;background:linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%);border:1.5px solid #93c5fd;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span id="bd-rust-engine-badge" class="badge-pill" style="background:#1e293b;color:#f8fafc;font-size:0.72rem;font-weight:800;">🦀 Rust/WASM Core</span>
+            <select id="bd-family-profile-select" style="width:auto;padding:5px 10px;font-size:0.78rem;font-weight:800;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="연령·목적별 맞춤 UI 및 기억 엔진 전환">
+              <option value="kid1" selected>👦 초등 키즈 · 첫째 (놀이·3버튼)</option>
+              <option value="kid2">👧 초등 키즈 · 둘째 (놀이·3버튼)</option>
+              <option value="teen">🧑‍🎓 중고등 내신·수능 (오답·스프린트)</option>
+              <option value="adult">👨 성인·프로 워크스페이스 (정밀지표·전체도구)</option>
+            </select>
+            <span id="bd-persona-mode-badge" class="badge-pill" style="background:#dbeafe;color:#1e40af;font-size:0.73rem;font-weight:800;">🎈 초등 키즈 놀이학습 (큰 글씨 · 3버튼 · 4지선다)</span>
+            <select id="bd-daily-goal-select" style="width:auto;padding:5px 9px;font-size:0.76rem;font-weight:800;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="오늘의 목표 문제 수">
+              <option value="10">하루 10문제</option>
+              <option value="15" selected>하루 15문제</option>
+              <option value="20">하루 20문제</option>
+              <option value="30">하루 30문제</option>
+            </select>
+            <span id="bd-daily-session-counter" style="font-size:0.8rem;font-weight:800;color:#0f172a;">🎯 오늘의 목표 0 / 15문제</span>
+            <span id="bd-daily-stamp-strip" style="font-size:0.78rem;letter-spacing:1px;">⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button type="button" id="btn-quick-speak-now" style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#ffffff;color:#1d4ed8;border:1px solid #93c5fd;" title="현재 영단어 발음 듣기 (단축키 R)">
+              🔊 발음 듣기
+            </button>
+            <button type="button" id="btn-toggle-auto-tts" aria-pressed="true" style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#ffffff;color:#1d4ed8;border:1px solid #93c5fd;">
+              🔊 자동발음 ON
+            </button>
+            <button type="button" id="btn-quick-today-wrong" disabled style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;">
+              📝 오늘 오답 (0)
+            </button>
+            <select id="bd-quick-eng-level" style="width:auto;padding:5px 8px;font-size:0.76rem;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="영어 단계 선택">
+              <option value="moe-eng:elem-3-4" selected>🇬🇧 초3·4 필수(240)</option>
+              <option value="moe-eng:elementary">🇬🇧 초5·6 완성(400)</option>
+              <option value="moe-eng:middle">🇬🇧 중등 필수(500)</option>
+              <option value="moe-eng:high">🇬🇧 고등 내신(500)</option>
+              <option value="exam-eng:csat-civil">🇬🇧 수능·공무원(450)</option>
+            </select>
+            <button type="button" id="btn-quick-start-english" class="btn-primary" style="padding:6px 12px;font-size:0.8rem;border-radius:999px;background:#1b64da;border-color:#1b64da;">
+              영어 시작
+            </button>
+            <select id="bd-quick-hanja-level" style="width:auto;padding:5px 8px;font-size:0.76rem;border-radius:999px;background:#ffffff;border:1px solid #86efac;" title="한자 급수 선택">
+              <option value="hanja-grade:8geup" selected>🀄 8급 기초(100)</option>
+              <option value="hanja-grade:7geup">🀄 7급 초등(150)</option>
+              <option value="hanja-grade:6to4geup">🀄 6~4급 중급(400)</option>
+              <option value="moe-hanja-1800:middle">🀄 중등 한자(450)</option>
+            </select>
+            <button type="button" id="btn-quick-start-hanja" class="btn-primary" style="padding:6px 12px;font-size:0.8rem;border-radius:999px;background:#047857;border-color:#047857;">
+              한자 시작
+            </button>
+            <button type="button" id="btn-open-user-manual" style="padding:6px 11px;font-size:0.76rem;font-weight:800;border-radius:999px;background:#0f172a;color:#ffffff;border:1px solid #0f172a;" title="아이·학부모 눈높이 사용설명서 열기 (단축키 ?)">
+              📖 사용설명서
+            </button>
+          </div>
+        </div>
         <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
           <select id="deck-select" style="flex:1;min-width:180px;"></select>
           <!-- 3-Color Queue Counter Pills + Progressive Disclosure Study Tools Toggle (Contract C1 + BD-P0-02 Compact Header Toggle) -->
@@ -681,6 +778,39 @@
 
         <div class="card-arena">
           <div>
+            <!-- Rust/WASM Hanja Radical/Stroke & English Phonics Live Coaching Banner -->
+            <div id="bd-card-coaching-banner" style="display:none;margin-bottom:10px;padding:9px 12px;border-radius:12px;background:#f0fdf4;border:1px solid #86efac;color:#065f46;font-size:0.8rem;font-weight:700;"></div>
+
+            <!-- Daily 15-Card Session Completion Celebration Modal -->
+            <div id="bd-session-complete-modal" role="dialog" aria-modal="true" aria-label="오늘의 학습 목표 완주" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
+              <div style="max-width:420px;width:100%;background:#ffffff;border-radius:24px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,0.25);text-align:center;">
+                <div style="font-size:2.4rem;margin-bottom:8px;">🏅🎉</div>
+                <h3 style="margin:0 0 8px 0;font-size:1.25rem;color:#0f172a;">오늘의 학습 목표 완주 성공!</h3>
+                <p id="bd-session-complete-summary" style="margin:0 0 16px 0;font-size:0.88rem;color:#334155;font-weight:700;"></p>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <button type="button" id="btn-session-retry-wrong" class="btn-primary" style="background:#d97706;border-color:#d97706;">🔥 오늘 틀린·모르는 문제만 다시 풀기</button>
+                  <button type="button" id="btn-session-more-10" class="btn-primary">➕ 오늘 목표 10문제 더 풀기</button>
+                  <button type="button" id="btn-session-finish-close">✅ 오늘 공부 기분 좋게 끝내기</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Interactive 3-Tab User Manual Modal (아이용 / 부모님용 / 단축키·FAQ) -->
+            <div id="bd-user-manual-modal" role="dialog" aria-modal="true" aria-labelledby="bd-user-manual-title" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.6);align-items:center;justify-content:center;padding:16px;">
+              <div style="max-width:620px;width:100%;max-height:86vh;display:flex;flex-direction:column;background:#ffffff;border-radius:24px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,0.3);">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">
+                  <h3 id="bd-user-manual-title" style="margin:0;font-size:1.15rem;color:#0f172a;">📖 BrainDeck 영어·한자 집중 학습 사용설명서</h3>
+                  <button type="button" id="btn-close-user-manual" style="padding:5px 12px;font-size:0.8rem;border-radius:999px;">✕ 닫기 (Esc)</button>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+                  <button type="button" id="btn-manual-tab-kids" class="btn-primary" style="padding:7px 14px;font-size:0.82rem;border-radius:999px;">👦 아이용 3초 시작 가이드</button>
+                  <button type="button" id="btn-manual-tab-parents" style="padding:7px 14px;font-size:0.82rem;border-radius:999px;">👨‍👩‍👧 부모님 관리 · FAQ</button>
+                  <button type="button" id="btn-manual-tab-shortcuts" style="padding:7px 14px;font-size:0.82rem;border-radius:999px;">⌨️ 키보드 단축키 표</button>
+                </div>
+                <div id="bd-user-manual-body" style="overflow-y:auto;padding-right:4px;flex:1;"></div>
+              </div>
+            </div>
+
             <!-- In-Card Live Progress Bar & Percentage Header (Always Visible Inside Flashcard Arena) -->
             <div id="card-inline-progress-box" style="margin-bottom:12px;padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.78rem;font-weight:800;margin-bottom:6px;">
@@ -1105,8 +1235,8 @@
           <a id="link-export-apkg" href="/api/export.apkg" style="text-decoration:none;">
             <button id="btn-export-apkg" type="button">.apkg 내보내기</button>
           </a>
-          <a id="link-download-apk" href="https://github.com/ssacho3-blip/semiconductor-assets/releases/download/braindeck-v1.0/BrainDeck-v1.0.apk" style="text-decoration:none;">
-            <button id="btn-download-apk" type="button" class="btn-primary">안드로이드 앱 설치파일 (v1.0 Build 104)</button>
+          <a id="link-download-apk" href="https://github.com/ssacho3-blip/semiconductor-assets/releases/download/braindeck-v1.1/BrainDeck-v1.1.apk" style="text-decoration:none;">
+            <button id="btn-download-apk" type="button" class="btn-primary">안드로이드 앱 설치파일 (v1.1 Build 108)</button>
           </a>
           <button id="btn-share-deck-token" type="button">🔗 단어장 공유 토큰 복사</button>
           <button id="btn-import-deck-token" type="button">📥 공유 토큰으로 단어장 받기</button>
@@ -1133,6 +1263,8 @@
   </div>
 
   <script src="./curriculum_corpus_v8.js?v=10.0.0"></script>
+  <script src="./modules/user_guide_and_quick_vm.js?v=10.0.0"></script>
+  <script src="./modules/rust_wasm_core.js?v=10.0.0"></script>
   <script src="./modules/fsrs_core.js?v=10.0.0"></script>
   <script src="./modules/sync_crdt.js?v=10.0.0"></script>
   <script src="./modules/curriculum_standards.js?v=10.0.0"></script>

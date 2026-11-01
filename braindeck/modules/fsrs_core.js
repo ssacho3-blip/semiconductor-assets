@@ -21,6 +21,22 @@
   ]);
   const DAY_MS_V56 = 86400000;
 
+  let _rustWasmBridge =
+    typeof globalThis !== "undefined" && globalThis.BrainDeckRustWasmCore
+      ? globalThis.BrainDeckRustWasmCore
+      : null;
+  if (!_rustWasmBridge && typeof require === "function") {
+    try {
+      _rustWasmBridge = require("./rust_wasm_core.js");
+    } catch (_e) {
+      _rustWasmBridge = null;
+    }
+  }
+
+  function isRustWasmActive() {
+    return Boolean(_rustWasmBridge && _rustWasmBridge.isWasmLoaded());
+  }
+
   function clamp(val, lo, hi) {
     return Math.max(lo, Math.min(hi, val));
   }
@@ -37,6 +53,14 @@
   }
 
   function stepFsrs5(memory, rating, elapsedDays = 0.0, desiredRetention = 0.90, weights = DEFAULT_FSRS5_WEIGHTS) {
+    if (
+      weights === DEFAULT_FSRS5_WEIGHTS &&
+      _rustWasmBridge &&
+      _rustWasmBridge.isWasmLoaded()
+    ) {
+      const wasmRes = _rustWasmBridge.stepFsrs5Wasm(memory, rating, elapsedDays, desiredRetention);
+      if (wasmRes) return wasmRes;
+    }
     const w = Array.isArray(weights) && weights.length >= 19 ? weights.map(Number) : DEFAULT_FSRS5_WEIGHTS;
     const g = Math.max(1, Math.min(4, Math.round(Number(rating || 3))));
     const mem = memory && typeof memory === "object" ? memory : {};
@@ -251,6 +275,7 @@
 
   return {
     DEFAULT_FSRS5_WEIGHTS,
+    isRustWasmActive,
     quantize1e6,
     computeRetrievability,
     stepFsrs5,

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BrainDeck v1.1.0 (Build 108) 공식 종합 사용설명서</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: #0f172a; background: #f8fafc; margin: 0; padding: 24px 16px; line-height: 1.68; }
+  .container { max-width: 860px; margin: 0 auto; background: #ffffff; border-radius: 18px; padding: 36px 40px; box-shadow: 0 8px 28px rgba(15,23,42,0.06); border: 1px solid #e2e8f0; }
+  h1 { font-size: 25px; color: #0f172a; margin-top: 0; border-bottom: 3px solid #1d4ed8; padding-bottom: 12px; }
+  h2 { font-size: 18.5px; color: #1e3a8a; margin-top: 26px; background: #eff6ff; padding: 8px 14px; border-left: 4px solid #1d4ed8; border-radius: 6px; }
+  h3 { font-size: 15.5px; color: #047857; margin-top: 16px; }
+  blockquote { background: #f0fdf4; border-left: 4px solid #10b981; margin: 14px 0; padding: 12px 16px; border-radius: 8px; color: #065f46; font-size: 13.8px; }
+  code { background: #f1f5f9; color: #0f172a; padding: 2px 6px; border-radius: 5px; font-size: 0.92em; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+  th, td { border: 1px solid #cbd5e1; padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; color: #0f172a; font-weight: 800; }
+  hr { border: none; border-top: 1px solid #e2e8f0; margin: 22px 0; }
+  li { margin-bottom: 6px; font-size: 14px; }
+  @media print { body { background: #fff; padding: 0; } .container { box-shadow: none; border: none; padding: 10px 14px; } h2 { break-after: avoid; } table { break-inside: avoid; } }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>📖 BrainDeck (v1.1.0) 공식 종합 사용설명서</h1>
+<blockquote>
+<p><strong>BrainDeck (<code>v1.1.0</code> / Android Build 108 · Rust/WASM FSRS-5 엔진 탑재)</strong>은 초·중·고 필수 <strong>영어·한자·국어·수학·역사·과학</strong>부터 성인 <strong>자격증·공무원·법령·어학</strong>까지, 뇌과학 기억 반감기 알고리즘(<strong>FSRS-5</strong>)과 <strong>1,728자 한자 조자·파닉스 실시간 코칭</strong>으로 암기 효율을 극대화하는 올인원 학습 앱입니다.</p>
+<p>💡 앱 화면 우측 상단 <strong><code>[📖 사용설명서]</code></strong> (안드로이드: <strong><code>[📖 설명서]</code></strong>) 버튼 또는 키보드 <strong><code>?</code></strong> 키를 누르면 학습 중 언제든지 앱 내부에서도 요약 가이드를 바로 열어볼 수 있습니다.</p>
+</blockquote>
+<hr />
+<h2>0. 기기별 실행 및 설치 방법 (로그인·회원가입 불필요 · 100% 오프라인 지원)</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">사용 기기</th>
+<th style="text-align: left;">실행 및 설치 방법</th>
+<th style="text-align: left;">특징</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>🍎 iPhone / iPad (iOS)</strong></td>
+<td style="text-align: left;">Safari로 웹앱 접속 ➔ 하단 <strong><code>[공유(↑)]</code></strong> ➔ <strong><code>[홈 화면에 추가]</code></strong></td>
+<td style="text-align: left;">네이티브 풀스크린 PWA · 비행기 모드 오프라인 작동 (<code>braindeck_core.wasm</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>💻 Mac / Windows PC</strong></td>
+<td style="text-align: left;">Chrome · Edge · Safari 접속 (주소창 우측 <strong><code>[앱 설치]</code></strong> 클릭 가능)</td>
+<td style="text-align: left;">키보드 단축키(<code>Space</code>, <code>1~4</code>, <code>R</code>, <code>H</code>, <code>Z</code>, <code>?</code>) 고속 학습 및 2단 시험지 인쇄</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>📲 Android 스마트폰 / 태블릿 / 갤럭시 Z 폴드7</strong></td>
+<td style="text-align: left;"><strong><code>BrainDeck-v1.1.apk</code></strong> 설치 (또는 웹 PWA 실행)</td>
+<td style="text-align: left;">네이티브 SQLite + 신경망/고음질 TTS + 폴드7 힌지(북모드/테이블탑) 자동 분할</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>1. 👦 초등학생(아이용) 3초 시작 가이드 (<code>첫째</code> · <code>둘째</code> 키즈 모드)</h2>
+<p>초등 키즈 프로필을 선택하면 복잡한 메뉴와 어려운 통계가 자동으로 숨겨지고, <strong>큰 글씨 · 4지선다 · 3버튼 평가 · 별 도장 10칸</strong> 중심의 단일 집중 화면으로 전환됩니다.</p>
+<h3>1단계. 오늘 공부 3초 만에 시작하기 (내 프로필과 목표 고르기)</h3>
+<ol>
+<li><strong>내 이름 고르기</strong>: 화면 맨 위 프로필 선택 바에서 <strong><code>👦 초등 키즈 · 첫째</code></strong> 또는 <strong><code>👧 초등 키즈 · 둘째</code></strong>를 선택합니다. (형제·자매마다 진도와 오답, 연속 학습일이 완전히 따로 저장됩니다!)</li>
+<li><strong>오늘 풀 문제 수 정하기</strong>: <strong><code>하루 10문제 / 15문제 / 20문제 / 30문제</code></strong> 중 오늘 목표를 고릅니다. (초등 저학년은 <strong>10문제</strong>, 고학년은 <strong>15문제</strong> 권장)</li>
+<li><strong>1-Tap 바로 시작</strong>:</li>
+<li><strong>🇬🇧 영어</strong>: <code>초3·4 필수(240)</code> · <code>초5·6 완성(400)</code> · <code>중등 필수(500)</code> 중 내 단계를 고르고 <strong><code>[영어 시작]</code></strong> 클릭!</li>
+<li><strong>🀄 한자</strong>: <code>8급 기초(100)</code> · <code>7급 초등(150)</code> · <code>6~4급 중급(400)</code> · <code>중등 한자(450)</code> 중 내 급수를 고르고 <strong><code>[한자 시작]</code></strong> 클릭!</li>
+</ol>
+<h3>2단계. 초록색 코칭 배너 읽고 문제 풀기</h3>
+<ol>
+<li><strong>🔤 영어 카드 (자동 발음 + 파닉스 코칭)</strong>:</li>
+<li>새 영어 카드가 나오면 <strong>원어민 발음이 자동 재생</strong>됩니다. 다시 듣고 싶으면 <strong><code>[🔊 발음]</code></strong> 버튼(단축키 <code>R</code>)을 누릅니다.</li>
+<li>카드 상단 <strong>초록색 코칭 배너</strong>에 <strong><code>[ a _ _ _ e ] (5글자)</code></strong> 스펠링 블록 힌트와 파닉스 발음 규칙(<code>Magic-e</code>, <code>ee/ea 장모음</code>, <code>bread/head 단모음 [에] 예외</code>, <code>-tion/-sion</code> 등)이 함께 표시됩니다.</li>
+<li><strong>漢字 한자 카드 (1,728자 전수 부수·총획·활용어 코칭)</strong>:</li>
+<li>한자 카드가 나오면 초록색 코칭 배너에 <strong><code>漢字 조자 원리 — 글자: 校 | 부수: 木(나무 목) | 총획: 10획 | 활용 단어: 학교(學校) · 교실(教室)</code></strong>처럼 뜻의 뿌리(부수), 정확한 Unihan 표준 획수(예: <code>道 = 13획</code>, <code>學 = 16획</code>), 실생활 활용 단어가 자동 표시됩니다.</li>
+<li>영단어가 없는 순수 한자·국어 카드에서는 오작동 방지를 위해 영어 자동 발음이 자동으로 생략됩니다.</li>
+<li><strong>🎯 4지선다 풀고 키즈 3버튼으로 넘기기</strong>:</li>
+<li>4개 보기 중 정답을 누르면 <strong>다음 카드로 바로 넘어가지 않고</strong>, 같은 화면에서 정답과 해설이 먼저 펼쳐집니다.</li>
+<li>해설을 확인한 뒤 아이 눈높이에 맞춘 <strong>3개 버튼</strong> 중 하나를 눌러 다음 카드로 넘어갑니다:<ul>
+<li><strong><code>😢 몰랐어요 (다시)</code></strong>: 틀렸거나 몰랐던 카드 (오답 노트에 자동 기록되고 곧 다시 복습해요)</li>
+<li><strong><code>🤔 헷갈려요 (복습)</code></strong>: 맞혔지만 조금 헷갈렸던 카드 (짧은 간격 뒤 한 번 더 확인해요)</li>
+<li><strong><code>😊 알아요! (통과)</code></strong>: 확실히 아는 카드 (기억 주기에 맞춰 며칠 뒤 복습해요)</li>
+</ul>
+</li>
+</ol>
+<h3>3단계. 별 도장 10칸 완주 축하 &amp; 오늘 오답 다시 풀기</h3>
+<ol>
+<li><strong>⭐ 별 도장 10칸</strong>: 문제를 풀 때마다 상단 별 도장(<code>⭐⭐⭐⭐⚪⚪⚪⚪⚪⚪</code>)이 채워집니다.</li>
+<li><strong>🏅🎉 오늘의 목표 완주 축하 창</strong>: 목표 문제 수를 다 채우면 축하 모달이 자동으로 열립니다.</li>
+<li><strong><code>[🔥 오늘 틀린·모르는 문제만 다시 풀기]</code></strong>: 오늘 <code>몰랐어요</code> / <code>헷갈려요</code>를 눌렀던 카드만 모아서 깔끔하게 복습합니다.</li>
+<li><strong><code>[➕ 오늘 목표 10문제 더 풀기]</code></strong>: 힘이 남을 때 오늘 목표를 +10문제 연장합니다(앱을 껐다 켜도 당일 연장된 목표가 유지되며 다음 날 자정에 원래 기본 목표로 자동 복귀합니다).</li>
+<li><strong><code>[✅ 오늘 공부 기분 좋게 끝내기]</code></strong>: 기분 좋게 학습을 마치고 내일 연속 학습일(<code>🔥 연속 N일째</code>)을 이어갑니다.</li>
+<li><strong>📝 상단 <code>[오늘 오답 (N)]</code> 버튼</strong>: 학습 중 언제든 누르면 오늘 틀렸던 카드(여러 과목 덱을 오가며 틀린 카드 포함)만 즉시 모아 복습할 수 있습니다.</li>
+</ol>
+<hr />
+<h2>2. 🧑‍🎓 중고등 내신·수능 &amp; 👨 성인·프로 5대 탭 완전 활용 가이드</h2>
+<p>상단 프로필을 <strong><code>🧑‍🎓 중고등 내신·수능</code></strong> 또는 <strong><code>👨 성인·프로 워크스페이스</code></strong>로 전환하면 전체 5개 탭(<strong><code>🏠 학습</code> · <code>🏫 시험·급수</code> · <code>➕ 만들기</code> · <code>🛒 스토어</code> · <code>📊 내 정보</code></strong>)과 4단계 정밀 평가 버튼(<code>1·다시</code> / <code>2·어려움</code> / <code>3·알맞음</code> / <code>4·쉬움</code>), FSRS-5 기억 지표(<code>S</code> 안정성 · <code>D</code> 난이도 · <code>R</code> 인출 확률)가 활성화됩니다.</p>
+<h3>① <code>🏠 학습</code> 탭 — 3대 풀이 모드 &amp; 실전 학습 도구</h3>
+<ul>
+<li><strong>3가지 풀이 모드 전환</strong>:</li>
+<li><strong>4지선다 모드 (<code>choice</code>)</strong>: 품사·시대·수식 형태가 일치하는 고난도 동형 오답 보기로 개념을 빠르게 변별합니다. (오답·모름 상태에서는 기억 왜곡 방지를 위해 <code>1·다시</code>만 허용하는 <strong>메타인지 평가 가드</strong>가 작동합니다.)</li>
+<li><strong>카드 뒤집기 모드 (<code>flip</code> / 플래시카드 능동 인출)</strong>: 앞면 질문만 보고 머릿속으로 답을 떠올린 뒤 <strong><code>[정답 보기]</code></strong>(<code>Space</code>/<code>Enter</code>)를 눌러 스스로 <code>1~4</code> 난이도를 평가합니다.</li>
+<li><strong>서술형 인출 모드 (<code>typing</code>)</strong>: 정답을 직접 타이핑하여 제출하면 철자·핵심 키워드 일치도를 자동 채점합니다(오타였을 경우 <code>[정답으로 인정]</code> 오버라이드 지원).</li>
+<li><strong>카드 보조 액션 바</strong>:</li>
+<li><strong><code>✍️ 필기장</code></strong>: 한자 획순이나 영단어 철자를 손가락·애플펜슬·S펜·마우스로 직접 써 보며 외우는 드로잉 캔버스를 엽니다.</li>
+<li><strong><code>힌트</code> (단축키 <code>H</code>)</strong>: 정답 전체를 바로 노출하지 않고 글자 수·초성·구조 힌트를 단계별로 제시합니다. (힌트를 사용한 카드에서는 인출 강도 보정을 위해 최대 평가가 <code>2·어려움(Hard)</code>으로 자동 제한되며 <code>3·알맞음</code> / <code>4·쉬움</code>은 잠깁니다.)</li>
+<li><strong><code>☆ 중요</code> / <code>오늘 숨기기(Bury)</code> / <code>↩️ 되돌리기(Z)</code> / <code>🔄 초기화</code></strong>: 중요 카드 별표 필터링, 당일 형제 카드 숨김, 직전 평가 즉시 취소(FSRS 상태 완벽 복원), 현재 덱 진도 초기화를 지원합니다.</li>
+<li><strong><code>[필터·도구]</code> 및 D-Day 플래너</strong>:</li>
+<li><strong>D-Day 학습계획 (<code>D-7 / D-14 / D-30</code> 등)</strong>: 시험일까지 남은 기간과 하루 투자 시간(분)에 맞춰 일일 신규 카드 할당량을 자동 계산합니다.</li>
+<li><strong><code>전자 셀로판지 요약시트</code></strong>: 빨간 셀로판지로 정답을 가리고 터치해 확인하듯 전체 카드를 한눈에 훑어보는 시험 직전 요약표입니다.</li>
+<li><strong><code>2단 쪽지시험지 인쇄/PDF</code></strong>: 학원·가정 점검용 2단 편집 시험지 및 정답지를 즉시 생성·인쇄합니다.</li>
+<li><strong><code>통학 오디오 루프</code></strong>: 등하굣길·출퇴근길에 화면을 보지 않고 질문과 정답을 음성으로 반복 청취합니다.</li>
+<li><strong><code>무오염 벼락치기(CRAM)</code></strong>: 시험 전날 전 범위를 무한 반복해도 원본 FSRS 장기기억 스케줄(<code>Stability</code>)을 오염시키지 않는 샌드박스 모드입니다.</li>
+</ul>
+<h3>② <code>🏫 시험·급수</code> 탭 — 교과서 시험범위 &amp; 합본 덱 빌더</h3>
+<ul>
+<li><strong>교과서 단원·페이지 맞춤 시험범위 생성</strong>: 중·고교 주요 교과서와 출판사 단원(<code>Lesson 1</code>, <code>Lesson 2</code> 등) 및 시작~끝 페이지(예: <code>10p ~ 35p</code>)를 지정해 내신 시험범위 전용 덱을 즉시 생성합니다.</li>
+<li><strong>다과목 합본 시험 덱 (<code>중간/기말 합본</code>)</strong>: 영어·한자·역사·과학 등 여러 시험범위를 하나의 벼락치기 합본 덱으로 묶어 교차 인출(Interleaved Practice)할 수 있습니다.</li>
+</ul>
+<h3>③ <code>➕ 만들기</code> 탭 — 문서/사진·직접 입력·AI 자동 카드 생성</h3>
+<ul>
+<li><strong>📄 문서·사진 자동 추출 (<code>doc</code>)</strong>: 강의 교안 PDF, 텍스트 파일, 노트 사진을 올리면 핵심 용어와 정의를 추출해 미리보기 목록을 만들고 원하는 카드만 골라 일괄 저장합니다.</li>
+<li><strong>✍️ 직접 카드 추가 (<code>manual</code>)</strong>: 앞면·뒷면을 직접 입력하며, <strong><code>[빈칸 {{c1::...}} 삽입]</code></strong>(다중 Cloze <code>c1, c2, c3</code> 자동 분리 지원)과 <strong><code>[이미지 가림막(Image Occlusion)]</code></strong> 도형 마스킹 카드를 지원합니다.</li>
+<li><strong>🤖 텍스트·교안 스마트 생성 (<code>ai</code>)</strong>: 교과서 본문이나 요약 노트를 붙여넣고 난이도를 선택하면 핵심 문답 카드를 자동 생성·저장합니다.</li>
+</ul>
+<h3>④ <code>🛒 스토어</code> 탭 — 검증된 1,000+ 문항 브레인팩 마운트</h3>
+<ul>
+<li><strong>교육부 필수 9종 · 어학(영어/일본어 JLPT/한자/사자성어) · IT 자격증 · 공무원/헌법</strong>: 가짜 합성 문항 없이 CMUdict 발음기호·고유 예문·Unihan 정밀 획수·국어사전 뜻풀이가 검증된 대용량 코퍼스 팩을 1-Click으로 내 보관함에 즉시 마운트합니다.</li>
+</ul>
+<h3>⑤ <code>📊 내 정보</code> 탭 — 망각 곡선 · 복습 평탄화 · 표준 <code>.apkg</code> 패키지 호환</h3>
+<ul>
+<li><strong>FSRS-5 기억 분석</strong>: 실시간 망각 곡선(Forgetting Curve) 그래프, 평균 기억 안정성(일), 자주 틀리는 <strong>집중복습(<code>Leech</code>) 카드</strong> 건수를 확인합니다.</li>
+<li><strong><code>🏖️ 복습 폭탄 평탄화 (Decompress)</code></strong>: 며칠 공부를 쉬어 복습 카드가 밀렸을 때, 기억 인출 확률(<code>R</code>)이 가장 낮은 위험 카드는 오늘 남기고 나머지를 향후 7일로 안전하게 자동 분산합니다.</li>
+<li><strong>표준 플래시카드 패키지 완벽 호환 (<code>.apkg</code> / <code>.colpkg</code>) &amp; 오프라인 백업</strong>:</li>
+<li><strong><code>[.apkg 내보내기]</code> / 가져오기</strong>: 외부 표준 플래시카드 덱 패키지(<code>.apkg</code> / <code>.colpkg</code> · zstd 압축 · Cloze 다중 <code>ord</code> · 미디어 · 복습 이력)와 양방향 호환됩니다.</li>
+<li><strong><code>[오프라인 보관함 동기화]</code> &amp; <code>[JSON 백업/복원]</code></strong>: CRDT(G-Set + LWW) 무손실 병합 엔진으로 데이터 유실 없이 안전하게 백업·복원합니다.</li>
+</ul>
+<hr />
+<h2>3. 📱 갤럭시 Z 폴드7 &amp; 태블릿 대화면 적응형 레이아웃 가이드</h2>
+<p>Android 네이티브 앱(<code>BrainDeck v1.1.0</code>, Build 108)은 <code>320dp</code> 커버 화면부터 <code>900dp+</code> 펼침 화면·태블릿, 시스템 글꼴 크기(<code>1.0x ~ 1.35x</code>)까지 32가지 해상도 조합에 자동 반응합니다.</p>
+<ul>
+<li><strong>접힌 커버 화면 (<code>&lt; 380dp</code>)</strong>: 한 손 엄지 조작에 최적화된 컴팩트 헤더(<code>📖</code>, <code>↩️</code>, <code>🔄 초기화</code>) 및 하단 고정 평가 버튼 배치.</li>
+<li><strong>펼친 대화면 / 북모드 (<code>FoldingFeature.Orientation.VERTICAL</code>)</strong>: 물리적 힌지 경계를 피해 좌측 질문·코칭 영역과 우측 보기·평가 영역을 쾌적한 가독 폭(<code>max 720dp</code>)으로 배치.</li>
+<li><strong>절곡 테이블탑 모드 (<code>HALF_OPENED</code> + <code>HORIZONTAL</code>)</strong>: 책상 위에 반쯤 접어 세워 두면 상단 화면에는 플래시카드 문제·해설을, 하단 화면에는 터치 조작 버튼을 분리 배치합니다.</li>
+</ul>
+<hr />
+<h2>4. 👨‍👩‍👧 학부모 초기 3분 설정 &amp; 자주 묻는 질문 (FAQ)</h2>
+<h3>학년별 추천 시작 코스</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">대상</th>
+<th style="text-align: left;">추천 프로필</th>
+<th style="text-align: left;">추천 영어 단계</th>
+<th style="text-align: left;">추천 한자 단계</th>
+<th style="text-align: left;">권장 하루 목표</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>초등 1~2학년</strong></td>
+<td style="text-align: left;"><code>👦 첫째</code> / <code>👧 둘째</code></td>
+<td style="text-align: left;">초3·4 필수 (240단어)</td>
+<td style="text-align: left;">8급 기초 한자 (100자)</td>
+<td style="text-align: left;">하루 <strong>10문제</strong> (3~5분)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>초등 3~4학년</strong></td>
+<td style="text-align: left;"><code>👦 첫째</code> / <code>👧 둘째</code></td>
+<td style="text-align: left;">초3·4 필수 (240단어)</td>
+<td style="text-align: left;">8급 기초 → 7급 초등 (150자)</td>
+<td style="text-align: left;">하루 <strong>15문제</strong> (5~7분)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>초등 5~6학년</strong></td>
+<td style="text-align: left;"><code>👦 첫째</code> / <code>👧 둘째</code></td>
+<td style="text-align: left;">초5·6 완성 (400단어)</td>
+<td style="text-align: left;">7급 초등 → 6~4급 중급 (400자)</td>
+<td style="text-align: left;">하루 <strong>15~20문제</strong> (8분)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>중학생</strong></td>
+<td style="text-align: left;"><code>🧑‍🎓 중고등 내신·수능</code></td>
+<td style="text-align: left;">중등 필수 어휘 (500단어)</td>
+<td style="text-align: left;">중등 기초한자 (450자) · 6~4급</td>
+<td style="text-align: left;">하루 <strong>20~30문제</strong> (10분)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>고등·성인</strong></td>
+<td style="text-align: left;"><code>🧑‍🎓 중고등</code> / <code>👨 성인</code></td>
+<td style="text-align: left;">고등 내신 (500) · 수능·공무원 (450)</td>
+<td style="text-align: left;">6~4급 중급 · 사자성어 · 브레인팩</td>
+<td style="text-align: left;">하루 <strong>30문제+</strong> (10~15분)</td>
+</tr>
+</tbody>
+</table>
+<h3>자주 묻는 질문 (FAQ)</h3>
+<ol>
+<li><strong>Q. 상단 탭 메뉴(<code>시험·급수</code>, <code>스토어</code>, <code>만들기</code>)가 보이지 않아요!</strong></li>
+<li>현재 프로필이 <strong><code>👦/👧 초등 키즈</code></strong>로 선택되어 있으면 아이가 다른 메뉴로 이탈하지 않도록 상단 탭을 자동으로 숨깁니다. 상단 프로필을 <strong><code>🧑‍🎓 중고등</code></strong> 또는 <strong><code>👨 성인·프로</code></strong>로 바꾸면 모든 탭과 고급 도구가 즉시 나타납니다.</li>
+<li><strong>Q. 영어 발음 소리가 안 나거나 한자 카드에서 <code>[🔊 발음]</code> 버튼이 비활성화돼요.</strong></li>
+<li>상단 <strong><code>[🔊 자동발음 ON]</code></strong> 켜짐 여부와 기기 미디어 볼륨(iOS 매너모드 해제)을 확인해 주세요. 순수 한자·국어 카드는 엉뚱한 영어 기계음 방지를 위해 영어 자동 발음을 자동으로 건너뜁니다.</li>
+<li><strong>Q. 연속 학습일(<code>🔥 연속 N일</code>)과 오늘 목표는 언제 초기화되나요?</strong></li>
+<li>기기의 <strong>로컬 자정(밤 12시, <code>00:00</code>)</strong> 기준입니다. 전날 기본 목표 이상을 완주했다면 다음 날 접속 시 연속 학습일이 자동으로 <code>+1일</code> 이어집니다.</li>
+</ol>
+<hr />
+<h2>5. ⌨️ 키보드 단축키 일람표 (PC · Mac · 태블릿 블루투스 키보드)</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">단축키</th>
+<th style="text-align: left;">동작 설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong><code>Space</code></strong> 또는 <strong><code>Enter</code></strong></td>
+<td style="text-align: left;">카드 앞면에서 정답 및 해설 즉시 펼치기</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>1</code> / <code>2</code> / <code>3</code> / <code>4</code></strong></td>
+<td style="text-align: left;">난이도 평가 (<code>1</code>: 다시/몰랐어요 · <code>2</code>: 어려움/헷갈려요 · <code>3</code>: 알맞음/알아요 · <code>4</code>: 쉬움)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>R</code></strong></td>
+<td style="text-align: left;">현재 카드 영단어 원어민 발음 다시 듣기 (TTS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>H</code></strong></td>
+<td style="text-align: left;">단계별 초성·철자 힌트 열기</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>Z</code></strong></td>
+<td style="text-align: left;">방금 평가한 카드 즉시 되돌리기 (Undo)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>?</code> (물음표)</strong></td>
+<td style="text-align: left;">앱 내 사용설명서 모달 바로 열기</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>Esc</code></strong></td>
+<td style="text-align: left;">열려 있는 사용설명서 · 목표 완주 축하 모달 닫기</td>
+</tr>
+</tbody>
+</table>
+  </div>
+</body>
+</html>

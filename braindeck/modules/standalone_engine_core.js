@@ -297,11 +297,20 @@
     }
 
     function getCatalog() {
+      const priorityRank = (cid) => {
+        const s = String(cid || "").toLowerCase();
+        if (s.startsWith("moe-eng:") || s.startsWith("exam-eng:")) return 0;
+        if (s.startsWith("hanja-grade:") || s.startsWith("moe-hanja") || s.startsWith("ko-idiom:")) return 1;
+        return 2;
+      };
+      const orderedCollections = STANDALONE_COLLECTIONS.slice().sort(
+        (a, b) => priorityRank(a.collection_id) - priorityRank(b.collection_id)
+      );
       return {
         ok: true,
         standalone: true,
         textbooks: STANDALONE_TEXTBOOKS,
-        collections: STANDALONE_COLLECTIONS,
+        collections: orderedCollections,
       };
     }
 
@@ -881,10 +890,11 @@
       const unitSet = new Set(Array.isArray(p.unit_ids) && p.unit_ids.length > 0 ? p.unit_ids : tb.units.map((u) => u.unit_id));
       const matched = tb.entries.filter((e) => unitSet.has(e.unit_id));
       const diff = p.difficulty_level || "mixed";
-      const targetCap = Math.max(1000, Number(p.limit || 1000));
+      const rawLimit = Number(p.limit || p.target_count || 0);
+      const targetCap = rawLimit > 0 ? Math.max(20, rawLimit) : 0;
       const specs = padStandaloneSpecsToTarget(matched.length > 0 ? matched : tb.entries, tb.textbook_id, diff, targetCap);
       const deckName = (p.deck_name || "").trim() || `${tb.title} (${unitSet.size}개 단원)`;
-      return insertDeckWithSpecs(deckName, "시험범위 맞춤 덱 (1,000+ 문항)", specs, p.shuffle_mode || "interleaved");
+      return insertDeckWithSpecs(deckName, `시험범위 맞춤 덱 (${specs.length}문항)`, specs, p.shuffle_mode || "sequential");
     }
 
     function buildCollectionDeck(payload) {
@@ -892,10 +902,11 @@
       const cid = String(p.collection_id || "hanja-grade:8geup").trim();
       const col = STANDALONE_COLLECTIONS.find((c) => c.collection_id === cid);
       const diff = p.difficulty_level || "mixed";
-      const targetCap = Math.max(1000, Number(p.limit || 1000));
+      const rawLimit = Number(p.limit || p.target_count || 0);
+      const targetCap = rawLimit > 0 ? Math.max(20, rawLimit) : 0;
       const specs = padStandaloneSpecsToTarget(col ? col.items : [], col ? col.collection_id : cid, diff, targetCap);
       const deckName = (p.deck_name || "").trim() || (col ? col.level_label : cid);
-      return insertDeckWithSpecs(deckName, "급수·자격증 맞춤 덱 (1,000+ 문항)", specs, p.shuffle_mode || "interleaved");
+      return insertDeckWithSpecs(deckName, `급수·자격증 맞춤 덱 (${specs.length}문항)`, specs, p.shuffle_mode || "sequential");
     }
 
     function buildCombinedExamDeck(payload) {
@@ -923,11 +934,12 @@
         }
       });
 
-      const targetCap = Math.max(1000, Number(p.max_cards || 1000));
+      const rawMax = Number(p.max_cards || 0);
+      const targetCap = (rawMax > 0 && rawMax !== 1000) ? rawMax : Math.min(480, Math.max(120, scopes.length * 120));
       const specs = padStandaloneSpecsToTarget(seedPool, "combined_exam_scope", diff, targetCap);
       const deckName = (p.deck_name || "").trim() || `통합 시험범위 (${labels.slice(0, 2).join(" + ") || `${scopes.length}개 범위`})`;
       const shuffleMode = p.interleave_shuffle === false ? "sequential" : "interleaved";
-      return insertDeckWithSpecs(deckName, "다중 시험범위 교차 덱 (1,000+ 문항)", specs, shuffleMode);
+      return insertDeckWithSpecs(deckName, `다중 시험범위 교차 덱 (${specs.length}문항)`, specs, shuffleMode);
     }
 
     function extractContentPivotJs(sentence) {

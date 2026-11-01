@@ -10,6 +10,7 @@
   const VAULT_STORAGE_KEY = "braindeck_offline_vault_v1";
   const PROFILE_STORAGE_KEY = "braindeck_learner_profile_v55";
   let runtimeBackendMode = null; // "SERVER_API" | "STANDALONE_STATIC"
+  let kidsFocusCtrl = null;
 
   const _APP_MODULE_PATHS = {
     BrainDeckUiDialogsRender: "./modules/ui_dialogs_render.js",
@@ -318,7 +319,7 @@
     if (path.startsWith("/api/catalog/exam-scope") || path.startsWith("/api/catalog/generate-exam-scope-deck")) {
       return standaloneEngine.buildExamScopeDeck(p);
     }
-    if (path.startsWith("/api/catalog/collection-deck") || path.startsWith("/api/catalog/generate-collection-deck")) {
+    if (path.startsWith("/api/catalog/collection-deck") || path.startsWith("/api/catalog/generate-collection-deck") || path.startsWith("/api/catalog/build-collection-deck")) {
       return standaloneEngine.buildCollectionDeck(p);
     }
     if (path.startsWith("/api/catalog/combined-exam-deck") || path.startsWith("/api/catalog/generate-combined-exam-deck")) {
@@ -553,8 +554,9 @@
       }
     });
 
-    const wrongList =
-      vm && typeof vm.filterStudyQueue === "function"
+    const wrongList = state.dailyExactWrongSet
+      ? combinedPool.filter((c) => c && state.dailyExactWrongSet.has(Number(c.card_id)))
+      : vm && typeof vm.filterStudyQueue === "function"
         ? vm.filterStudyQueue(combinedPool, "wrong_only", state.sessionWrongCardIds, state.markedCardIds)
         : [];
     const leechList = combinedPool.filter(
@@ -994,7 +996,6 @@
         if (!fullDeck) {
           const autoRes = await apiPost("/api/catalog/generate-collection-deck", {
             collection_id: "hanja-grade:8geup",
-            limit: 1000,
             deck_name: "기초 한자 8급·초등 스타터",
             difficulty_level: "mixed",
             shuffle_mode: "interleaved",
@@ -1042,7 +1043,9 @@
     const newSel = el("bd-plan-daily-new");
     const targetDays = Number((daysSel && daysSel.value) || (state.currentDailyQuota && state.currentDailyQuota.target_days) || 30);
     const dailyMinutes = Number((minsSel && minsSel.value) || 30);
-    const customNew = newSel && newSel.value && newSel.value !== "auto" ? Number(newSel.value) : null;
+    const customNew = kidsFocusCtrl
+      ? kidsFocusCtrl.resolveEffectiveDailyNew(newSel)
+      : newSel && newSel.value && newSel.value !== "auto" ? Number(newSel.value) : null;
     const planRes = await apiPost("/api/study-plan", {
       deck_id: state.selectedDeckId || null,
       target_days: targetDays,
@@ -1070,6 +1073,7 @@
     }
     applyStudyFilter(refreshOpts);
     renderCurrentCard();
+    if (kidsFocusCtrl) kidsFocusCtrl.refreshSessionAndCoachingUi();
     await renderDeckExplorerPanel();
     if (planRes && planRes.ok) {
       await renderStudyPlanBanner(planRes);
@@ -1197,6 +1201,7 @@
           response_time_ms: rtMs,
         });
     if (res && res.ok) {
+      if (kidsFocusCtrl) kidsFocusCtrl.recordAnswer(safeRating, cid);
       const stab = (res.memory && res.memory.stability) ?? res.stability ?? card.stability ?? 0;
       const nextLbl = state.isCramSandbox
         ? "CRAM 샌드박스 (장기기억 S 보존)"
@@ -1466,6 +1471,32 @@
     }
   }
 
+  async function launchQuickFocusCollection(collectionId, limitCount, labelText) {
+    const res = await apiPost("/api/catalog/generate-collection-deck", {
+      collection_id: collectionId, difficulty_level: "standard", limit: limitCount, shuffle_mode: "sequential",
+    });
+    if (res && res.ok && res.deck_id) {
+      state.selectedDeckId = res.deck_id;
+      if (kidsFocusCtrl && typeof kidsFocusCtrl.saveSelectedDeck === "function") kidsFocusCtrl.saveSelectedDeck(res.deck_id);
+      const headerZoneEl = el("bd-collapsible-header-zone"), btnCompact = el("btn-toggle-compact-header");
+      if (headerZoneEl) headerZoneEl.style.display = "none";
+      if (btnCompact) { btnCompact.setAttribute("aria-expanded", "false"); btnCompact.textContent = "대시보드 펼치기"; }
+      await refreshDashboardAndQueue();
+      showUxToast(`🚀 ${labelText} 1번 기초 카드부터 집중 학습을 시작합니다!`, "emerald");
+    }
+  }
+
+  function setStudyFilterMode(mode) {
+    state.studyFilterMode = mode || "all";
+    if (state.studyFilterMode !== "wrong_only") state.dailyExactWrongSet = null;
+    document.querySelectorAll(".study-filter-btn").forEach((b) => {
+      if (b.getAttribute("data-filter") === state.studyFilterMode) b.classList.add("btn-primary");
+      else b.classList.remove("btn-primary");
+    });
+    applyStudyFilter();
+    renderCurrentCard();
+  }
+
   function bindEvents() {
     el("deck-select").addEventListener("change", (e) => {
       state.selectedDeckId = e.target.value;
@@ -1544,20 +1575,9 @@
     }
 
     // Study Filter Mode Buttons (All / Wrong-Unknown Only / Marked Only)
-    function setStudyFilterMode(mode) {
-      state.studyFilterMode = mode || "all";
-      document.querySelectorAll(".study-filter-btn").forEach((b) => {
-        if (b.getAttribute("data-filter") === state.studyFilterMode) {
-          b.classList.add("btn-primary");
-        } else {
-          b.classList.remove("btn-primary");
-        }
-      });
-      applyStudyFilter();
-      renderCurrentCard();
-    }
     document.querySelectorAll(".study-filter-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
+        state.dailyExactWrongSet = null;
         setStudyFilterMode(btn.getAttribute("data-filter") || "all");
       });
     });
@@ -1602,10 +1622,8 @@
     if (btnFocusMode) {
       btnFocusMode.addEventListener("click", () => {
         state.isFocusStudyMode = !state.isFocusStudyMode;
-        const navEl = el("main-tab-nav");
-        const headerZoneEl = el("bd-collapsible-header-zone");
-        const toolsDrawerEl = el("study-tools-drawer");
-        const explorerEl = el("deck-card-explorer-panel");
+        const navEl = el("main-tab-nav"), headerZoneEl = el("bd-collapsible-header-zone");
+        const toolsDrawerEl = el("study-tools-drawer"), explorerEl = el("deck-card-explorer-panel");
         btnFocusMode.setAttribute("aria-pressed", state.isFocusStudyMode ? "true" : "false");
         btnFocusMode.textContent = state.isFocusStudyMode ? "✕ 집중모드 종료" : "🎯 집중모드";
         if (navEl) navEl.style.display = state.isFocusStudyMode ? "none" : "grid";
@@ -1638,12 +1656,8 @@
         }
         btnMarkCard.textContent = isNowMarked ? "⭐ 별표됨" : "☆ 별표";
         btnMarkCard.style.color = isNowMarked ? "var(--amber)" : "var(--muted)";
-        if (state.studyFilterMode === "marked_only") {
-          applyStudyFilter();
-          renderCurrentCard();
-        } else {
-          refreshFilterBadgeCounts();
-        }
+        if (state.studyFilterMode === "marked_only") { applyStudyFilter(); renderCurrentCard(); }
+        else { refreshFilterBadgeCounts(); }
       });
     }
 
@@ -1653,9 +1667,7 @@
         const card = currentCard();
         if (!card) return;
         const cid = Number(card.card_id);
-        if (!state.buriedCardIds.includes(cid)) {
-          state.buriedCardIds.push(cid);
-        }
+        if (!state.buriedCardIds.includes(cid)) state.buriedCardIds.push(cid);
         applyStudyFilter();
         renderCurrentCard();
         showUxToast("💤 이 카드를 오늘 하루 학습 큐에서 숨겼습니다.", "accent");
@@ -2007,6 +2019,8 @@
     });
 
     window.addEventListener("keydown", (e) => {
+      const m1 = el("bd-user-manual-modal"), m2 = el("bd-session-complete-modal");
+      if ((m1 && m1.style.display === "flex") || (m2 && m2.style.display === "flex")) return;
       const activeTag = (document.activeElement && document.activeElement.tagName) || "";
       const isTyping = activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT";
       const wcag = _getAppModule("BrainDeckAnalyticsOnboardingVm").resolveWcagKeyboardShortcut(e.key, state.isRevealed, isTyping);
@@ -2059,6 +2073,13 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    if (globalThis.BrainDeckRustWasmCore && typeof globalThis.BrainDeckRustWasmCore.initBrowserWasm === "function") {
+      globalThis.BrainDeckRustWasmCore.initBrowserWasm("./wasm/braindeck_core.wasm").then((ok) => {
+        const rustBadge = el("bd-rust-engine-badge");
+        if (rustBadge && ok) rustBadge.textContent = "🦀 Rust/WASM Core ON";
+        if (ok && kidsFocusCtrl && kidsFocusCtrl.refreshSessionAndCoachingUi) kidsFocusCtrl.refreshSessionAndCoachingUi();
+      });
+    }
     bindEvents();
     const ageBtns = document.querySelectorAll(".age-tier-btn");
     async function applyAgeTierUiTokens(tier, syncServer = false) {
@@ -2218,8 +2239,9 @@
     }
 
     const syncBtn = el("btn-sync-offline-vault");
-    if (syncBtn) {
-      syncBtn.addEventListener("click", () => syncOfflineVault(true));
+    if (syncBtn) syncBtn.addEventListener("click", () => syncOfflineVault(true));
+    if (window.BrainDeckRustWasmCore && typeof window.BrainDeckRustWasmCore.bindCommercialKidsFocusExperience === "function") {
+      kidsFocusCtrl = window.BrainDeckRustWasmCore.bindCommercialKidsFocusExperience({ el, state, currentCard, showUxToast, setStudyFilterMode, launchQuickFocusCollection, applyLearnerProfile, refreshDashboardAndQueue });
     }
 
     // Delegates REA study tools, "btn-toggle-compact-header", ".bd-stage-btn", "syncStudyToolsSummaryBadge", and "switchCurriculumSegment"
@@ -2232,13 +2254,9 @@
     function switchCurriculumSegment(seg) { return reaPlannerCtrl.switchCurriculumSegment(seg); }
     // BD-F06: Hydrate unified IndexedDB & Register PWA Service Worker
     if (standaloneEngine && typeof standaloneEngine.hydrateFromIndexedDb === "function") {
-      standaloneEngine.hydrateFromIndexedDb(() => {
-        loadBrainPackStoreAndBind(); loadCatalogAndBind(); refreshDashboardAndQueue();
-      });
+      standaloneEngine.hydrateFromIndexedDb(() => { loadBrainPackStoreAndBind(); loadCatalogAndBind(); refreshDashboardAndQueue(); });
     }
-    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js").catch(() => {});
-    }
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
     loadBrainPackStoreAndBind(); loadCatalogAndBind(); refreshDashboardAndQueue();
     syncOfflineVault(false); syncStudyToolsSummaryBadge();
   });
