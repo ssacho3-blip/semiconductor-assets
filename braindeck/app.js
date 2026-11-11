@@ -1091,14 +1091,17 @@
       el("card-question").textContent = String(card.front_text).replace(/\{\{c\d+::([^:}]+)(?:::[^}]*)?\}\}/g, "【$1】");
     }
     el("card-answer").style.display = "block";
+    const qBox = el("interactive-quiz-box");
+    if (qBox) qBox.classList.add("bd-quiz-revealed");
     const svgBox = el("card-svg-diagram");
-    if (svgBox && svgBox.childElementCount > 0) svgBox.style.display = "block";
+    if (svgBox && svgBox.childElementCount > 0 && (!qBox || qBox.style.display === "none")) {
+      svgBox.style.display = "block";
+    }
     const extraEl = el("card-extra-explanation");
     if (extraEl && extraEl.textContent) extraEl.style.display = "block";
-    // Runs after the grading banner and answer dock have taken their space, so the answer lands inside the card body's own scrollport.
-    setTimeout(() => [extraEl, el("card-answer")].forEach((n) => n && typeof n.scrollIntoView === "function" && n.scrollIntoView({ block: "nearest" })), 0);
     const btnReveal = el("btn-reveal");
     if (btnReveal) btnReveal.textContent = "정답 확인됨 (아래 1~4 평가)";
+    if (kidsFocusCtrl) kidsFocusCtrl.refreshSessionAndCoachingUi();
     applyEvidenceRatingGuard();
   }
 
@@ -1231,6 +1234,7 @@
     if (!res || !res.ok) return;
 
     const activeSubmode = forcedSubmode || (res.mode === "tap_block" ? "tap_block" : "multiple_choice");
+    quizBox.classList.remove("bd-quiz-revealed");
     quizBox.textContent = "";
     quizBox.style.display = "block";
 
@@ -1313,18 +1317,24 @@
           if (evalBox) {
             evalBox.style.background = isCorrect ? "#e8faf0" : "#fff0f0";
             evalBox.style.color = isCorrect ? "#008a50" : "#be123c";
-            evalBox.textContent = isCorrect
-              ? `🎯 4지선다 정답! ('${res.target_answer}')\n아래 정답과 해설을 확인한 뒤 하단 난이도 버튼(추천: 3 · Good) 또는 Space/Enter를 눌러 다음 카드로 넘어가세요.`
-              : `❌ 오답입니다 (선택: '${optText}' ➔ 정답: '${res.target_answer}').\n아래 정답과 해설을 충분히 확인한 뒤 하단 '1 · Again' 버튼 또는 Space/Enter를 눌러 복습하세요.`;
+            evalBox.textContent = "";
+            const msgSpan = document.createElement("span");
+            msgSpan.style.cssText = "flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;";
+            msgSpan.textContent = isCorrect
+              ? `🎯 4지선다 정답! ('${res.target_answer}')`
+              : `❌ 오답 (선택: '${optText}' ➔ 정답: '${res.target_answer}')`;
             const fastCommitBtn = document.createElement("button");
             fastCommitBtn.type = "button";
             fastCommitBtn.id = "btn-fast-next-card";
             fastCommitBtn.className = "btn-primary";
-            fastCommitBtn.style.cssText = "margin-top:8px;padding:7px 14px;font-size:0.8rem;border-radius:999px;" + (isCorrect ? "background:#008a50;border-color:#008a50;" : "background:#be123c;border-color:#be123c;");
-            fastCommitBtn.textContent = isCorrect ? "⚡ 추천 평가(3)로 바로 다음 카드 (Space/Enter) ➔" : "🔁 다시(1)로 복습 등록 후 다음 카드 (Space/Enter) ➔";
+            fastCommitBtn.style.cssText = "flex:none;white-space:nowrap;padding:4px 10px;font-size:0.74rem;border-radius:999px;" + (isCorrect ? "background:#008a50;border-color:#008a50;" : "background:#be123c;border-color:#be123c;");
+            fastCommitBtn.textContent = isCorrect ? "⚡ 추천 평가(3)로 다음 (Space) ➔" : "🔁 다시(1)로 복습 (Space) ➔";
             fastCommitBtn.onclick = () => submitRating(isCorrect ? 3 : 1);
-            evalBox.append(document.createElement("br"), fastCommitBtn);
-            evalBox.style.display = "block";
+            evalBox.style.display = "flex";
+            evalBox.style.alignItems = "center";
+            evalBox.style.justifyContent = "space-between";
+            evalBox.style.gap = "8px";
+            evalBox.append(msgSpan, fastCommitBtn);
           }
           showUxToast(
             isCorrect ? "🎉 정답입니다! 아래 🎯 정답·해설을 확인한 뒤 난이도 버튼(3 · Good)을 눌러 다음 카드로 이동하세요." : `💡 오답입니다. 정답('${res.target_answer}')과 해설을 확인한 뒤 다시(1) 버튼을 눌러 복습하세요.`,
@@ -1345,7 +1355,6 @@
         clearRecommendedGlow,
       });
     }
-    setTimeout(() => typeof quizBox.scrollIntoView === "function" && quizBox.scrollIntoView({ block: "nearest" }), 0);
   }
 
   async function requestSocraticHint() {

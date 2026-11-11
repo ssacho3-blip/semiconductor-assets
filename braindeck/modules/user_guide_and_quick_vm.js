@@ -226,7 +226,7 @@
       const savedId = typeof localStorage !== "undefined" ? localStorage.getItem("braindeck_active_family_profile_v1") : null;
       if (savedId && ["kid1", "kid2", "teen", "adult"].includes(savedId)) activeProfile = savedId;
     } catch (_e) {}
-    let autoTtsEnabled = true;
+    let autoTtsEnabled = false;
     let lastSpokenCardId = null;
 
     function loadProfilePrefs(profileId) {
@@ -373,7 +373,10 @@
       }
 
       const card = typeof currentCard === "function" ? currentCard() : null;
-      const headword = card ? extractEnglishHeadword(card.front_text, card.back_text) : null;
+      const isRevealed = Boolean(state && state.isRevealed);
+      const safeFront = !card ? "" : isRevealed ? String(card.front_text || "") : String(card.front_text || "").replace(/\{\{c\d+::[^}]*\}\}/gi, "[...]");
+      const safeBack = isRevealed && card ? card.back_text : "";
+      const headword = card ? extractEnglishHeadword(safeFront, safeBack) : null;
       const btnSpeakNow = el("btn-quick-speak-now");
       if (btnSpeakNow) {
         btnSpeakNow.disabled = !headword;
@@ -384,16 +387,18 @@
       if (coachingEl) {
         if (!card) coachingEl.style.display = "none";
         else {
-          const hj = wasmApi.hanjaCoachingWasm(`${card.front_text || ""} ${card.back_text || ""}`);
+          const hj = wasmApi.hanjaCoachingWasm(`${safeFront} ${safeBack || ""}`);
           const en = !hj && headword ? wasmApi.englishPhonicsWasm(headword) : "";
           const tip = hj || en;
           coachingEl.textContent = tip;
           coachingEl.style.display = tip ? "block" : "none";
         }
       }
-      if (autoTtsEnabled && card && headword && card.card_id !== lastSpokenCardId) {
+      const unrevealedFront = card ? String(card.front_text || "").replace(/\{\{c\d+::[^}]*\}\}/gi, "[...]") : "";
+      const frontHeadword = card ? extractEnglishHeadword(unrevealedFront, "") : null;
+      if (autoTtsEnabled && card && frontHeadword && card.card_id !== lastSpokenCardId) {
         lastSpokenCardId = card.card_id;
-        speakEnglishWord(headword);
+        speakEnglishWord(frontHeadword);
       }
       if (summary.goal_reached && !sess.celebrated) {
         sess.celebrated = true;
@@ -471,7 +476,10 @@
     const btnSpeakNow = el("btn-quick-speak-now");
     if (btnSpeakNow) btnSpeakNow.addEventListener("click", () => {
       const card = typeof currentCard === "function" ? currentCard() : null;
-      const hw = card ? extractEnglishHeadword(card.front_text, card.back_text) : null;
+      const isRev = Boolean(state && state.isRevealed);
+      const safeFront = !card ? "" : isRev ? String(card.front_text || "") : String(card.front_text || "").replace(/\{\{c\d+::[^}]*\}\}/gi, "[...]");
+      const safeBack = isRev && card ? card.back_text : "";
+      const hw = card ? extractEnglishHeadword(safeFront, safeBack) : null;
       if (hw) speakEnglishWord(hw);
     });
 
