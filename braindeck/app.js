@@ -36,7 +36,7 @@
       candDirs.push(
         "./src/anki_studio/ui/static",
         "../src/anki_studio/ui/static",
-        "/Users/choyoungseo/Documents/개발/BrainDeck/src/anki_studio/ui/static"
+        "./docs"
       );
       for (let i = 0; i < candDirs.length; i += 1) {
         const resolved = path.resolve(candDirs[i], _APP_MODULE_PATHS[globalName]);
@@ -131,7 +131,7 @@
     const banner = el("ux-toast-banner");
     if (!banner) return;
     banner.textContent = "";
-    banner.style.display = "flex";
+    banner.style.display = "none"; void banner.offsetWidth; banner.style.display = "flex";
     banner.style.justifyContent = "space-between";
     banner.style.alignItems = "center";
     banner.style.gap = "10px";
@@ -484,7 +484,9 @@
     try {
       const res = await fetch(path, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
+      const data = await res.json();
+      if (data && data.csrf_token) state.csrfToken = String(data.csrf_token);
+      return data;
     } catch (_) {
       const stRes = fallbackStandaloneGet(path);
       if (stRes) return stRes;
@@ -499,20 +501,13 @@
   }
 
   async function apiPost(path, payload) {
-    if (resolveRuntimeBackendMode() === "STANDALONE_STATIC") {
-      return fallbackStandalonePost(path, payload);
-    }
+    if (resolveRuntimeBackendMode() === "STANDALONE_STATIC") return fallbackStandalonePost(path, payload);
     try {
-      const res = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        // If static host returns 404/405, use standalone engine
-        if (res.status === 404 || res.status === 405) {
-          return fallbackStandalonePost(path, payload);
-        }
+      const hdrs = { "Content-Type": "application/json" };
+      if (state.csrfToken) hdrs["X-BrainDeck-CSRF"] = state.csrfToken;
+      const res = await fetch(path, { method: "POST", headers: hdrs, body: JSON.stringify(payload) });
+      if (!res.ok && (res.status === 404 || res.status === 405)) {
+        return fallbackStandalonePost(path, payload);
       }
       return await res.json();
     } catch (_) {
@@ -757,10 +752,23 @@
       btn.disabled = !isAllowed;
       btn.style.opacity = isAllowed ? "1" : "0.28";
       btn.style.pointerEvents = isAllowed ? "auto" : "none";
-      if (Number(guard.recommendedRating) === r && isAllowed) {
-        btn.classList.add("recommended-glow");
-      }
+      if (Number(guard.recommendedRating) === r && isAllowed) btn.classList.add("recommended-glow");
     });
+    const recBtn = el(`rate-${guard.recommendedRating || 3}`);
+    if (recBtn && !recBtn.disabled && typeof recBtn.focus === "function") recBtn.focus();
+  }
+
+  // Drops active content from a parsed concept diagram: scripting/animation/reference/link elements, on* handlers, and non-fragment href/src attributes across all XML namespaces.
+  function sanitizeConceptSvg(svgRoot) {
+    svgRoot.querySelectorAll("script,foreignObject,use,animate,animateTransform,animateMotion,set,a").forEach((n) => n.remove());
+    [svgRoot, ...svgRoot.querySelectorAll("*")].forEach((node) => {
+      Array.from(node.attributes || []).forEach((attr) => {
+        const name = String(attr.name || "").toLowerCase(), local = String(attr.localName || name.split(":").pop()).toLowerCase();
+        const value = String(attr.value || "").replace(/[\s\u0000-\u001f]+/g, "").toLowerCase();
+        if (name.startsWith("on") || ((local === "href" || local === "src") && !value.startsWith("#"))) node.removeAttribute(attr.name);
+      });
+    });
+    return svgRoot;
   }
 
   function renderCurrentCard() {
@@ -768,20 +776,15 @@
     state.isRevealed = false;
     state.hintLevel = 0;
     state.cardShownAtMs = Date.now();
-    state.currentEvidence = {
-      isRevealed: false,
-      hintStep: 0,
-      choiceCorrect: null,
-      typedVerdict: null,
-      dontKnow: false,
-    };
+    state.currentEvidence = { isRevealed: false, hintStep: 0, choiceCorrect: null, typedVerdict: null, dontKnow: false, strokeScorePct: null, productionAccuracyPct: null, latencyMs: null };
+    const moreMenu = el("card-more-actions-menu");
+    if (moreMenu) moreMenu.open = false;
     clearRecommendedGlow();
     applyEvidenceRatingGuard();
-
     const btnReveal = el("btn-reveal");
-    if (btnReveal) {
-      btnReveal.textContent = "정답 보기";
-    }
+    if (btnReveal) btnReveal.textContent = "정답 보기";
+    if (el("card-arena")) { el("card-arena").style.transform = ""; if (el("card-arena").firstElementChild) el("card-arena").firstElementChild.scrollTop = 0; }
+    ["bd-scratchpad-drawer", "bd-active-production-drawer"].forEach((id) => { const d = el(id); if (d) d.style.display = "none"; });
     el("card-answer").style.display = "none";
     const extraEl = el("card-extra-explanation");
     if (extraEl) {
@@ -897,15 +900,7 @@
       if (card.svg_diagram && String(card.svg_diagram).includes("<svg") && typeof DOMParser !== "undefined") {
         const parsedSvg = new DOMParser().parseFromString(String(card.svg_diagram), "image/svg+xml").documentElement;
         if (parsedSvg && parsedSvg.tagName && parsedSvg.tagName.toLowerCase() === "svg") {
-          parsedSvg.querySelectorAll("script,foreignObject").forEach((n) => n.remove());
-          [parsedSvg, ...parsedSvg.querySelectorAll("*")].forEach((node) => {
-            Array.from(node.attributes || []).forEach((attr) => {
-              if (String(attr.name || "").toLowerCase().startsWith("on")) {
-                node.removeAttribute(attr.name);
-              }
-            });
-          });
-          svgBox.replaceChildren(document.importNode(parsedSvg, true));
+          svgBox.replaceChildren(document.importNode(sanitizeConceptSvg(parsedSvg), true));
         }
       }
     }
@@ -972,6 +967,10 @@
       if (modeBadge) modeBadge.textContent = "서술형 인출 모드";
       if (typingZone) typingZone.style.display = "flex";
       if (quizBox) quizBox.style.display = "none";
+      const recallInputEl = el("recall-input");
+      if (recallInputEl && typeof recallInputEl.focus === "function") {
+        recallInputEl.focus();
+      }
     } else {
       if (modeBadge) modeBadge.textContent = "카드 뒤집기 모드";
       if (typingZone) typingZone.style.display = "none";
@@ -1085,26 +1084,21 @@
     if (!card) return;
     state.isRevealed = true;
     state.currentEvidence.isRevealed = true;
+    if (state.currentEvidence.latencyMs == null) state.currentEvidence.latencyMs = state.cardShownAtMs ? Math.max(0, Date.now() - state.cardShownAtMs) : 0;
+    const recallInputEl = el("recall-input");
+    if (recallInputEl && typeof recallInputEl.blur === "function") recallInputEl.blur();
     if (card.note_type === "cloze" && card.front_text) {
-      const revealedCloze = String(card.front_text).replace(
-        /\{\{c\d+::([^:}]+)(?:::[^}]*)?\}\}/g,
-        "【$1】"
-      );
-      el("card-question").textContent = revealedCloze;
+      el("card-question").textContent = String(card.front_text).replace(/\{\{c\d+::([^:}]+)(?:::[^}]*)?\}\}/g, "【$1】");
     }
     el("card-answer").style.display = "block";
     const svgBox = el("card-svg-diagram");
-    if (svgBox && svgBox.childElementCount > 0) {
-      svgBox.style.display = "block";
-    }
+    if (svgBox && svgBox.childElementCount > 0) svgBox.style.display = "block";
     const extraEl = el("card-extra-explanation");
-    if (extraEl && extraEl.textContent) {
-      extraEl.style.display = "block";
-    }
+    if (extraEl && extraEl.textContent) extraEl.style.display = "block";
+    // Runs after the grading banner and answer dock have taken their space, so the answer lands inside the card body's own scrollport.
+    setTimeout(() => [extraEl, el("card-answer")].forEach((n) => n && typeof n.scrollIntoView === "function" && n.scrollIntoView({ block: "nearest" })), 0);
     const btnReveal = el("btn-reveal");
-    if (btnReveal) {
-      btnReveal.textContent = "정답 확인됨 (아래 1~4 평가)";
-    }
+    if (btnReveal) btnReveal.textContent = "정답 확인됨 (아래 1~4 평가)";
     applyEvidenceRatingGuard();
   }
 
@@ -1241,8 +1235,7 @@
     quizBox.style.display = "block";
 
     const topBar = document.createElement("div");
-    topBar.style.cssText =
-      "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;";
+    topBar.className = "bd-quiz-head";
 
     const header = document.createElement("div");
     header.style.cssText = "font-weight:700;color:var(--accent);";
@@ -1254,18 +1247,18 @@
     topBar.appendChild(header);
 
     const switchRow = document.createElement("div");
-    switchRow.style.cssText = "display:flex;gap:6px;";
+    switchRow.style.cssText = "display:flex;gap:6px;flex:none;";
     const btnMc = document.createElement("button");
     btnMc.type = "button";
     btnMc.className = activeSubmode === "multiple_choice" ? "btn-primary" : "";
-    btnMc.style.cssText = "padding:4px 9px;font-size:0.74rem;";
+    btnMc.style.cssText = "padding:3px 8px;font-size:0.72rem;";
     btnMc.textContent = "🎯 1단계: 4지선다";
     btnMc.onclick = () => requestInteractiveQuiz("multiple_choice");
 
     const btnTb = document.createElement("button");
     btnTb.type = "button";
     btnTb.className = activeSubmode === "tap_block" ? "btn-primary" : "";
-    btnTb.style.cssText = "padding:4px 9px;font-size:0.74rem;";
+    btnTb.style.cssText = "padding:3px 8px;font-size:0.72rem;";
     btnTb.textContent = "🧩 2단계: 탭 블록 조립";
     btnTb.onclick = () => requestInteractiveQuiz("tap_block");
 
@@ -1276,14 +1269,13 @@
 
     if (activeSubmode === "multiple_choice") {
       const grid = document.createElement("div");
-      grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;";
+      grid.className = "bd-quiz-grid";
 
       const rawOptions = Array.isArray(res.options) ? res.options.slice() : [];
       const optionButtons = [];
       rawOptions.forEach((optText, idx) => {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.style.cssText = "text-align:left;padding:10px 12px;font-size:0.84rem;";
         btn.textContent = `${idx + 1}. ${optText}`;
         optionButtons.push({ btn, optText, idx });
         btn.addEventListener("click", () => {
@@ -1322,22 +1314,22 @@
             evalBox.style.background = isCorrect ? "#e8faf0" : "#fff0f0";
             evalBox.style.color = isCorrect ? "#008a50" : "#be123c";
             evalBox.textContent = isCorrect
-              ? `🎯 4지선다 정답! ('${res.target_answer}')\n아래 정답과 해설을 확인한 뒤 하단 난이도 버튼(추천: 3 · Good)을 눌러 다음 카드로 넘어가세요.`
-              : `❌ 오답입니다 (선택: '${optText}' ➔ 정답: '${res.target_answer}').\n아래 정답과 해설을 충분히 확인한 뒤 하단 '1 · Again' 버튼을 눌러 복습하세요.`;
+              ? `🎯 4지선다 정답! ('${res.target_answer}')\n아래 정답과 해설을 확인한 뒤 하단 난이도 버튼(추천: 3 · Good) 또는 Space/Enter를 눌러 다음 카드로 넘어가세요.`
+              : `❌ 오답입니다 (선택: '${optText}' ➔ 정답: '${res.target_answer}').\n아래 정답과 해설을 충분히 확인한 뒤 하단 '1 · Again' 버튼 또는 Space/Enter를 눌러 복습하세요.`;
+            const fastCommitBtn = document.createElement("button");
+            fastCommitBtn.type = "button";
+            fastCommitBtn.id = "btn-fast-next-card";
+            fastCommitBtn.className = "btn-primary";
+            fastCommitBtn.style.cssText = "margin-top:8px;padding:7px 14px;font-size:0.8rem;border-radius:999px;" + (isCorrect ? "background:#008a50;border-color:#008a50;" : "background:#be123c;border-color:#be123c;");
+            fastCommitBtn.textContent = isCorrect ? "⚡ 추천 평가(3)로 바로 다음 카드 (Space/Enter) ➔" : "🔁 다시(1)로 복습 등록 후 다음 카드 (Space/Enter) ➔";
+            fastCommitBtn.onclick = () => submitRating(isCorrect ? 3 : 1);
+            evalBox.append(document.createElement("br"), fastCommitBtn);
             evalBox.style.display = "block";
           }
-
-          if (isCorrect) {
-            showUxToast(
-              "🎉 정답입니다! 아래 🎯 정답·해설을 확인한 뒤 난이도 버튼(3 · Good)을 눌러 다음 카드로 이동하세요.",
-              "emerald"
-            );
-          } else {
-            showUxToast(
-              `💡 오답입니다. 정답('${res.target_answer}')과 해설을 확인한 뒤 다시(1) 버튼을 눌러 복습하세요.`,
-              "rose"
-            );
-          }
+          showUxToast(
+            isCorrect ? "🎉 정답입니다! 아래 🎯 정답·해설을 확인한 뒤 난이도 버튼(3 · Good)을 눌러 다음 카드로 이동하세요." : `💡 오답입니다. 정답('${res.target_answer}')과 해설을 확인한 뒤 다시(1) 버튼을 눌러 복습하세요.`,
+            isCorrect ? "emerald" : "rose"
+          );
         });
         grid.appendChild(btn);
       });
@@ -1353,6 +1345,7 @@
         clearRecommendedGlow,
       });
     }
+    setTimeout(() => typeof quizBox.scrollIntoView === "function" && quizBox.scrollIntoView({ block: "nearest" }), 0);
   }
 
   async function requestSocraticHint() {
@@ -1466,9 +1459,7 @@
   }
 
   async function speakCurrentCard() {
-    if (uiDialogs && typeof uiDialogs.speakNaturalCardAudio === "function") {
-      return uiDialogs.speakNaturalCardAudio({ vm, state, currentCard, apiPost, showUxToast });
-    }
+    return _getAppModule("BrainDeckUiDialogsRender").speakNaturalCardAudio({ vm, state, currentCard, apiPost, showUxToast });
   }
 
   async function launchQuickFocusCollection(collectionId, limitCount, labelText) {
@@ -1622,12 +1613,12 @@
     if (btnFocusMode) {
       btnFocusMode.addEventListener("click", () => {
         state.isFocusStudyMode = !state.isFocusStudyMode;
-        const navEl = el("main-tab-nav"), headerZoneEl = el("bd-collapsible-header-zone");
+        const navEl = el("main-tab-nav");
         const toolsDrawerEl = el("study-tools-drawer"), explorerEl = el("deck-card-explorer-panel");
+        ["focus-study-mode", "bd-study-theater-active"].forEach((cls) => document.body.classList.toggle(cls, state.isFocusStudyMode));
         btnFocusMode.setAttribute("aria-pressed", state.isFocusStudyMode ? "true" : "false");
         btnFocusMode.textContent = state.isFocusStudyMode ? "✕ 집중모드 종료" : "🎯 집중모드";
         if (navEl) navEl.style.display = state.isFocusStudyMode ? "none" : "grid";
-        if (headerZoneEl) headerZoneEl.style.display = state.isFocusStudyMode ? "none" : "block";
         if (state.isFocusStudyMode) {
           if (toolsDrawerEl) toolsDrawerEl.style.display = "none";
           if (explorerEl) explorerEl.style.display = "none";
@@ -1731,6 +1722,7 @@
     }
 
     el("recall-input").addEventListener("keydown", (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === "Enter") {
         e.preventDefault();
         evaluateFreeRecall();
@@ -2019,43 +2011,59 @@
     });
 
     window.addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return; // never shadow browser/OS shortcuts (Ctrl+F, Cmd+Z, Cmd+R)
       const m1 = el("bd-user-manual-modal"), m2 = el("bd-session-complete-modal");
       if ((m1 && m1.style.display === "flex") || (m2 && m2.style.display === "flex")) return;
       const activeTag = (document.activeElement && document.activeElement.tagName) || "";
       const isTyping = activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT";
-      const wcag = _getAppModule("BrainDeckAnalyticsOnboardingVm").resolveWcagKeyboardShortcut(e.key, state.isRevealed, isTyping);
-      if (wcag && wcag.aria_announcement) {
-        const liveEl = el("aria-live-announcer");
-        if (liveEl) liveEl.textContent = wcag.aria_announcement;
-      }
-      const cmd = vm.mapKeyboardShortcut(e.key, state.isRevealed, isTyping, state.ageTier);
+      const guardNow = state.isRevealed && vm && typeof vm.resolveAllowedRatings === "function" ? vm.resolveAllowedRatings(state.currentEvidence, state.ageTier) : null;
+      const cmd = vm.mapKeyboardShortcut(e.key, state.isRevealed, isTyping, state.ageTier, guardNow && guardNow.recommendedRating);
       if (!cmd) return;
       e.preventDefault();
+      // Announce only shortcuts that actually run; a rating the evidence guard is about to override is not announced as done.
+      const ratingAllowed = cmd.action !== "rate" || !guardNow || (guardNow.allowedRatings || []).includes(cmd.rating);
+      const wcag = _getAppModule("BrainDeckAnalyticsOnboardingVm").resolveWcagKeyboardShortcut(cmd.action === "rate" ? String(cmd.rating) : e.key, false);
+      if (ratingAllowed && wcag && wcag.aria_announcement && el("aria-live-announcer")) el("aria-live-announcer").textContent = wcag.aria_announcement;
+      const clickEl = (id) => { const node = el(id); if (node) node.click(); };
+      const cardActionsHidden = document.body.getAttribute("data-persona-tier") === "kids"; // kids CSS hides bury/suspend, so their shortcuts stay off too
       if (cmd.action === "reveal") revealAnswer();
       else if (cmd.action === "rate") submitRating(cmd.rating);
       else if (cmd.action === "hint") requestSocraticHint();
       else if (cmd.action === "tts") speakCurrentCard();
       else if (cmd.action === "quiz") requestInteractiveQuiz("");
       else if (cmd.action === "undo") undoLastReview();
+      else if (cmd.action === "bury" && !cardActionsHidden) clickEl("btn-bury-card");
+      else if (cmd.action === "suspend" && !cardActionsHidden) clickEl("btn-suspend-card");
+      else if (cmd.action === "cycle_flag") {
+        const flagSel = el("select-card-flag"), flagCard = currentCard();
+        if (flagSel && flagCard) { flagSel.value = String((Number(flagCard.flag ?? flagSel.value ?? 0) + 1) % 8); flagSel.dispatchEvent(new Event("change")); }
+      } else if (cmd.action === "toggle_shortcut_help") { // tab switch is deferred: the guide module's own "?" listener reopens on its first tab
+        clickEl("btn-open-user-manual"); setTimeout(() => clickEl("btn-manual-tab-shortcuts"), 0);
+      }
     });
   }
 
   // Delegates catalog ("btn-toggle-all-units"), lock recovery ("formatApiErrorBanner"), and store ("store-bundle-cb", "/api/store/refund") to BrainDeckUiDialogsRender
   function _catalogStoreControllers() {
-    return _getAppModule("BrainDeckUiDialogsRender").createCatalogAndStoreControllers({
-      el, vm, state, apiGet, apiPost, refreshDashboardAndQueue, switchTabPage, showUxToast, syncOfflineVault,
-    });
+    return _getAppModule("BrainDeckUiDialogsRender").createCatalogAndStoreControllers({ el, vm, state, apiGet, apiPost, refreshDashboardAndQueue, switchTabPage, showUxToast, syncOfflineVault });
   }
-  function renderCatalogLockRecovery(statusEl, apiErrorRes, retryCallback) {
-    return _catalogStoreControllers().renderCatalogLockRecovery(statusEl, apiErrorRes, retryCallback);
-  }
+  function renderCatalogLockRecovery(statusEl, apiErrorRes, retryCallback) { return _catalogStoreControllers().renderCatalogLockRecovery(statusEl, apiErrorRes, retryCallback); }
   async function loadCatalogAndBind() { return _catalogStoreControllers().loadCatalogAndBind(); }
   async function loadBrainPackStoreAndBind() { return _catalogStoreControllers().loadBrainPackStoreAndBind(); }
+  // Stable per-browser CRDT replica id; caches a unique per-session id if localStorage is blocked.
+  function getOrCreateWebDeviceId() {
+    const genId = () => `web-${typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`}`;
+    try {
+      let deviceId = localStorage.getItem("braindeck_device_id");
+      if (!deviceId) { deviceId = genId(); localStorage.setItem("braindeck_device_id", deviceId); }
+      return deviceId;
+    } catch (_) {
+      return window._bdFallbackDeviceId || (window._bdFallbackDeviceId = genId());
+    }
+  }
   async function syncOfflineVault(showBanner = true) {
     try {
-      if (standaloneEngine && typeof standaloneEngine.syncCrdtDelta === "function") {
-        standaloneEngine.syncCrdtDelta({ schema_version: 1, device_id: "web-pwa", review_events: [] });
-      }
+      if (standaloneEngine && typeof standaloneEngine.syncCrdtDelta === "function") standaloneEngine.syncCrdtDelta({ schema_version: 1, device_id: getOrCreateWebDeviceId(), review_events: [] });
       const bundle = await apiGet("/api/bundle/offline-snapshot");
       if (bundle && bundle.ok) {
         saveLocalVaultSnapshot(bundle);
@@ -2063,9 +2071,7 @@
         if (badge) badge.textContent = "📱 온디바이스 올인원 내장 완료";
         if (showBanner) {
           const statusMsgEl = el("store-status-msg");
-          if (statusMsgEl) {
-            statusMsgEl.textContent = "✅ 보유 중인 모든 브레인팩과 학습 덱 데이터가 이 기기(localStorage + IndexedDB)에 안전하게 내장되었습니다!";
-          }
+          if (statusMsgEl) statusMsgEl.textContent = "✅ 보유 중인 모든 브레인팩과 학습 덱 데이터가 이 기기(localStorage + IndexedDB)에 안전하게 내장되었습니다!";
           showUxToast("💾 오프라인 금고 동기화 완료: 비행기 모드에서도 보유 브레인팩과 복습 큐가 100% 작동합니다.", "emerald");
         }
       }
@@ -2084,45 +2090,30 @@
     const ageBtns = document.querySelectorAll(".age-tier-btn");
     async function applyAgeTierUiTokens(tier, syncServer = false) {
       state.ageTier = tier || "teen";
-      if (syncServer) {
-        await apiPost("/api/profile/age-tier", { age_tier: state.ageTier }).catch(() => {});
-      }
+      if (syncServer) await apiPost("/api/profile/age-tier", { age_tier: state.ageTier }).catch(() => {});
       if (!vm || typeof vm.resolveUiUxTokens !== "function") return;
-      const isStandalone = Boolean(
-        (window.navigator && window.navigator.standalone) ||
-          (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
-      );
+      const isStandalone = Boolean((window.navigator && window.navigator.standalone) || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches));
       const tokens = vm.resolveUiUxTokens(tier, window.innerWidth || 1200, isStandalone);
       document.documentElement.style.setProperty("--question-font-size", `${tokens.questionFontPx}px`);
       document.documentElement.style.setProperty("--min-touch-target", `${tokens.minTouchTargetPx}px`);
       document.documentElement.style.setProperty("--card-radius", `${tokens.cardBorderRadiusPx}px`);
       const bannerEl = el("age-tier-banner");
-      if (bannerEl) {
-        bannerEl.textContent = tokens.bannerText;
-      }
+      if (bannerEl) bannerEl.textContent = tokens.bannerText;
+      const modeSetupBtn = el("btn-open-mode-setup");
+      if (modeSetupBtn) modeSetupBtn.textContent = `${tier === "junior" ? "👦 초등" : tier === "adult" || tier === "senior" ? "👨 성인·프로" : "🧑‍🎓 중고등"} · 프로필 설정`;
+      const famSel = el("bd-family-profile-select");
+      if (famSel) famSel.value = tier === "junior" ? (famSel.value === "kid2" ? "kid2" : "kid1") : tier === "adult" || tier === "senior" ? "adult" : "teen";
       if (typeof vm.formatRatingButtonsForAgeTier === "function") {
         const ratingList = vm.formatRatingButtonsForAgeTier(state.ageTier) || [];
         [1, 2, 3, 4].forEach((r) => {
-          const item = ratingList.find((b) => Number(b.rating) === r);
-          const titleEl = el(`rate-title-${r}`);
-          const btnEl = el(`rate-${r}`);
-          if (titleEl && item) {
-            titleEl.textContent = item.title;
-          }
-          if (btnEl) {
-            btnEl.style.display = item && item.visible ? "flex" : "none";
-          }
+          const item = ratingList.find((b) => Number(b.rating) === r), titleEl = el(`rate-title-${r}`), btnEl = el(`rate-${r}`);
+          if (titleEl && item) titleEl.textContent = item.title;
+          if (btnEl) btnEl.style.display = item && item.visible ? "flex" : "none";
         });
-      } else {
-        const easyBtn = el("rate-4");
-        if (easyBtn) {
-          easyBtn.style.display = tokens.allowEasyButton ? "flex" : "none";
-        }
+      } else if (el("rate-4")) {
+        el("rate-4").style.display = tokens.allowEasyButton ? "flex" : "none";
       }
-      if (syncServer) {
-        showUxToast(tokens.bannerText, "accent");
-        renderCurrentCard();
-      }
+      if (syncServer) { showUxToast(tokens.bannerText, "accent"); renderCurrentCard(); }
     }
     ageBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -2249,6 +2240,8 @@
       el, vm, state, apiGet, apiPost, currentCard, enrichStandaloneCard, applyStudyFilter,
       renderCurrentCard, renderStudyPlanBanner, refreshDashboardAndQueue,
       renderDeckExplorerPanel, loadBrainPackStoreAndBind, loadCatalogAndBind, showUxToast, submitRating,
+      revealAnswer, applyEvidenceRatingGuard,
+      getTrademarkCleanroomDisclaimers: vm && vm.getTrademarkCleanroomDisclaimers, loadThirdPartyNoticesRaw: standaloneEngine && standaloneEngine.loadThirdPartyNoticesRaw,
     });
     function syncStudyToolsSummaryBadge() { return reaPlannerCtrl.syncStudyToolsSummaryBadge(); }
     function switchCurriculumSegment(seg) { return reaPlannerCtrl.switchCurriculumSegment(seg); }

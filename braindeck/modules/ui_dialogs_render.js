@@ -268,7 +268,7 @@
               qInput.value = c.front_text;
               qInput.setAttribute("aria-label", `카드 ${idx + 1} 질문 편집`);
               qInput.style.cssText =
-                "width:100%;background:rgba(9,13,22,0.8);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:0.78rem;font-weight:600;";
+                "width:100%;background:#ffffff;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:0.8rem;font-weight:600;";
               qInput.addEventListener("input", () => {
                 c.front_text = qInput.value;
               });
@@ -278,7 +278,7 @@
               aInput.value = c.back_text;
               aInput.setAttribute("aria-label", `카드 ${idx + 1} 정답 편집`);
               aInput.style.cssText =
-                "width:100%;background:rgba(9,13,22,0.8);color:var(--emerald);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:0.78rem;";
+                "width:100%;background:#ffffff;color:var(--emerald);border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:0.8rem;font-weight:600;";
               aInput.addEventListener("input", () => {
                 c.back_text = aInput.value;
               });
@@ -430,12 +430,24 @@
         comboListEl.appendChild(emptyDiv);
         return;
       }
+      let totalEstCards = 0;
       state.combinedExamScopes.forEach((item, idx) => {
+        const colMatch =
+          item.source_type === "collection" && cat && Array.isArray(cat.collections)
+            ? cat.collections.find((c) => c.collection_id === item.ref_id)
+            : null;
+        const unitCnt = Array.isArray(item.unit_ids) ? item.unit_ids.length : 0;
+        const estCards = colMatch && Number(colMatch.item_count) > 0
+          ? Number(colMatch.item_count)
+          : unitCnt > 0
+          ? unitCnt * 60
+          : 120;
+        totalEstCards += estCards;
         const row = document.createElement("div");
         row.style.cssText =
           "display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:#ffffff;border:1px solid var(--border);font-size:0.82rem;font-weight:600;";
         const labelSpan = document.createElement("span");
-        labelSpan.textContent = `${idx + 1}. ${item.label} [${String(item.difficulty_level || "mixed").toUpperCase()}]`;
+        labelSpan.textContent = `${idx + 1}. ${item.label} [${String(item.difficulty_level || "mixed").toUpperCase()} · 약 ${estCards}장]`;
         const delBtn = document.createElement("button");
         delBtn.type = "button";
         delBtn.style.cssText = "padding:3px 8px;font-size:0.74rem;color:var(--rose);";
@@ -448,6 +460,12 @@
         row.appendChild(delBtn);
         comboListEl.appendChild(row);
       });
+      const summaryDiv = document.createElement("div");
+      summaryDiv.style.cssText =
+        "padding:7px 12px;border-radius:10px;background:#eef2ff;border:1px solid #c7d2fe;font-size:0.78rem;font-weight:800;color:#1d4ed8;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;";
+      const dedupCap = Math.min(480, Math.max(120, totalEstCards));
+      summaryDiv.textContent = `📦 총 ${state.combinedExamScopes.length}개 범위 조합 · 중복 제거 예상 출제 약 ${dedupCap}장`;
+      comboListEl.appendChild(summaryDiv);
     }
     renderCombinedScopesList();
 
@@ -863,6 +881,8 @@
       loadBrainPackStoreAndBind,
       loadCatalogAndBind,
       showUxToast,
+      revealAnswer,
+      applyEvidenceRatingGuard,
     } = ctx;
     let summaryMaskAll = true;
     function renderSummarySheetPanel() {
@@ -1096,6 +1116,33 @@
       b.addEventListener("click", syncStudyToolsSummaryBadge);
     });
 
+    // Zero-scroll study viewport: the page never scrolls, so a vertical wheel over a one-line chip rail moves it sideways.
+    document.querySelectorAll(".bd-rail").forEach((rail) => {
+      rail.addEventListener("wheel", (ev) => {
+        if (ev.ctrlKey || rail.scrollWidth <= rail.clientWidth || Math.abs(ev.deltaY) <= Math.abs(ev.deltaX)) return;
+        rail.scrollLeft += ev.deltaY;
+        ev.preventDefault();
+      }, { passive: false });
+    });
+
+    // Only the card body scrolls. When a hint, grading banner or the answer dock takes height away from it, or a block
+    // inside it opens, bring that block back into view: the answer once revealed, otherwise the 4-choice options.
+    const cardBodyEl = el("card-arena") && el("card-arena").firstElementChild;
+    if (cardBodyEl && typeof ResizeObserver === "function") {
+      const showInCardBody = (node) => {
+        if (node && node.offsetParent !== null) node.scrollIntoView({ block: "nearest" });
+      };
+      const cardBodyObserver = new ResizeObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.target !== cardBodyEl) showInCardBody(entry.target);
+          else (state.isRevealed ? ["card-extra-explanation", "card-answer"] : ["interactive-quiz-box"]).forEach((id) => showInCardBody(el(id)));
+        });
+      });
+      // Observation order is delivery order, so the answer is handled last and wins when several blocks change at once.
+      const liveBlockIds = ["bd-scratchpad-drawer", "bd-active-production-drawer", "interactive-quiz-box", "card-extra-explanation", "card-answer"];
+      [cardBodyEl, ...liveBlockIds.map((id) => el(id))].forEach((node) => node && cardBodyObserver.observe(node));
+    }
+
     // Contract C3: 3-Segment Switcher in Curriculum Tab (textbook | collection | combined)
     function switchCurriculumSegment(seg) {
       const stateObj =
@@ -1309,39 +1356,99 @@
       }
     });
 
-    // BD-C02: Inline Card Edit & Delete (Preserving FSRS state & revlog)
+    // BD-C02 & UX-03: Inline Card Edit & Delete (Modal-first with fallback)
     const btnEditCurrentCard = el("btn-edit-current-card");
+    const cardEditModal = el("card-edit-modal");
+    const cardEditFrontInput = el("card-edit-front-input");
+    const cardEditBackInput = el("card-edit-back-input");
+    const btnCardEditSave = el("btn-card-edit-save");
+    const btnCardEditCancel = el("btn-card-edit-cancel");
+    const btnCardEditCloze = el("btn-card-edit-insert-cloze");
+
+    async function applyCurrentCardUpdate(nextFront, nextBack) {
+      const card = currentCard();
+      if (!card || !nextFront.trim() || !nextBack.trim()) return;
+      const res = await apiPost("/api/cards/update", {
+        card_id: card.card_id,
+        front_text: nextFront.trim(),
+        back_text: nextBack.trim(),
+      });
+      if (res && res.ok) {
+        card.front_text = res.front_text || nextFront.trim();
+        card.back_text = res.back_text || nextBack.trim();
+        card.rendered_question = card.front_text;
+        card.rendered_answer = card.back_text;
+        if (res.target_answer) card.target_answer = res.target_answer;
+        renderCurrentCard();
+        showUxToast("✏️ 카드 내용이 수정되었습니다 (FSRS 학습 이력 100% 보존).", "emerald");
+      }
+    }
+
     if (btnEditCurrentCard) {
       btnEditCurrentCard.addEventListener("click", async () => {
         const card = currentCard();
         if (!card) return;
+        if (cardEditModal && cardEditFrontInput && cardEditBackInput) {
+          cardEditFrontInput.value = card.front_text || card.rendered_question || "";
+          cardEditBackInput.value = card.back_text || card.rendered_answer || "";
+          cardEditModal.style.display = "flex";
+          if (typeof cardEditFrontInput.focus === "function") cardEditFrontInput.focus();
+          return;
+        }
         const nextFront = window.prompt("카드 앞면(질문) 수정:", card.front_text || card.rendered_question || "");
         if (nextFront === null) return;
         const nextBack = window.prompt("카드 뒷면(정답·해설) 수정:", card.back_text || card.rendered_answer || "");
         if (nextBack === null) return;
-        const res = await apiPost("/api/cards/update", {
-          card_id: card.card_id,
-          front_text: nextFront.trim(),
-          back_text: nextBack.trim(),
-        });
-        if (res && res.ok) {
-          card.front_text = res.front_text || nextFront.trim();
-          card.back_text = res.back_text || nextBack.trim();
-          card.rendered_question = card.front_text;
-          card.rendered_answer = card.back_text;
-          if (res.target_answer) card.target_answer = res.target_answer;
-          renderCurrentCard();
-          showUxToast("✏️ 카드 내용이 수정되었습니다 (FSRS 학습 이력 100% 보존).", "emerald");
-        }
+        await applyCurrentCardUpdate(nextFront, nextBack);
+      });
+    }
+    if (btnCardEditCancel && cardEditModal) {
+      btnCardEditCancel.addEventListener("click", () => { cardEditModal.style.display = "none"; });
+    }
+    if (btnCardEditCloze && cardEditFrontInput) {
+      btnCardEditCloze.addEventListener("click", () => {
+        cardEditFrontInput.value = `${cardEditFrontInput.value || ""} {{c1::핵심어}}`.trim();
+      });
+    }
+    if (btnCardEditSave && cardEditModal && cardEditFrontInput && cardEditBackInput) {
+      btnCardEditSave.addEventListener("click", async () => {
+        cardEditModal.style.display = "none";
+        await applyCurrentCardUpdate(cardEditFrontInput.value || "", cardEditBackInput.value || "");
       });
     }
 
     const btnDeleteCurrentCard = el("btn-delete-current-card");
+    const cardDeleteModal = el("card-delete-confirm-modal");
+    const cardDeleteText = el("card-delete-confirm-text");
+    const btnCardDeleteCancel = el("btn-card-delete-cancel");
+    const btnCardDeleteConfirm = el("btn-card-delete-confirm");
     if (btnDeleteCurrentCard) {
       btnDeleteCurrentCard.addEventListener("click", async () => {
         const card = currentCard();
         if (!card) return;
+        if (cardDeleteModal && btnCardDeleteConfirm) {
+          if (cardDeleteText) {
+            cardDeleteText.textContent = `정말 이 카드(#${card.card_id})를 영구 삭제하시겠습니까? (기존 복습 이력 통계는 보존됩니다.)`;
+          }
+          cardDeleteModal.style.display = "flex";
+          return;
+        }
         if (!window.confirm(`정말 이 카드(#${card.card_id})를 영구 삭제하시겠습니까?`)) return;
+        const res = await apiPost("/api/cards/delete", { card_id: card.card_id });
+        if (res && res.ok) {
+          await refreshDashboardAndQueue();
+          showUxToast(`🗑️ 카드 #${card.card_id}가 삭제되었습니다.`, "amber");
+        }
+      });
+    }
+    if (btnCardDeleteCancel && cardDeleteModal) {
+      btnCardDeleteCancel.addEventListener("click", () => { cardDeleteModal.style.display = "none"; });
+    }
+    if (btnCardDeleteConfirm && cardDeleteModal) {
+      btnCardDeleteConfirm.addEventListener("click", async () => {
+        cardDeleteModal.style.display = "none";
+        const card = currentCard();
+        if (!card) return;
         const res = await apiPost("/api/cards/delete", { card_id: card.card_id });
         if (res && res.ok) {
           await refreshDashboardAndQueue();
@@ -1454,6 +1561,7 @@
           ? vm.resolveMobileErgonomicsSpec(0, 0, 64, state.oledDark ? "oled_dark" : "light")
           : null;
         if (spec && spec.theme_tokens && typeof document !== "undefined") {
+          document.documentElement.setAttribute("data-bd-theme", state.oledDark ? "oled-dark" : "light");
           const rootStyle = document.documentElement.style;
           rootStyle.setProperty("--bg", spec.theme_tokens.bg);
           rootStyle.setProperty("--panel", spec.theme_tokens.panel);
@@ -1472,7 +1580,12 @@
     const btnToggleScratch = el("btn-toggle-scratchpad");
     if (btnToggleScratch && scratchDrawer) {
       btnToggleScratch.addEventListener("click", () => {
-        scratchDrawer.style.display = scratchDrawer.style.display === "none" ? "block" : "none";
+        const nextOpen = scratchDrawer.style.display === "none";
+        scratchDrawer.style.display = nextOpen ? "block" : "none";
+        if (nextOpen) {
+          const prodD = el("bd-active-production-drawer");
+          if (prodD) prodD.style.display = "none";
+        }
       });
     }
     const btnCloseScratch = el("btn-scratchpad-close");
@@ -1486,10 +1599,18 @@
       let drawing = false;
       let recordedStrokes = [];
       let currentStrokePts = [];
+      const toScratchCanvasPoint = (ev) => {
+        const rect = scratchCanvas.getBoundingClientRect();
+        const scaleX = (scratchCanvas.width || rect.width || 1) / (rect.width || 1);
+        const scaleY = (scratchCanvas.height || rect.height || 1) / (rect.height || 1);
+        return [
+          Math.round((ev.clientX - rect.left) * scaleX),
+          Math.round((ev.clientY - rect.top) * scaleY),
+        ];
+      };
       scratchCanvas.addEventListener("pointerdown", (ev) => {
         drawing = true;
-        const rect = scratchCanvas.getBoundingClientRect();
-        const pt = [Math.round(ev.clientX - rect.left), Math.round(ev.clientY - rect.top)];
+        const pt = toScratchCanvasPoint(ev);
         currentStrokePts = [pt];
         if (!ctx2d) return;
         ctx2d.beginPath();
@@ -1497,8 +1618,7 @@
       });
       scratchCanvas.addEventListener("pointermove", (ev) => {
         if (!drawing || !ctx2d) return;
-        const rect = scratchCanvas.getBoundingClientRect();
-        const pt = [Math.round(ev.clientX - rect.left), Math.round(ev.clientY - rect.top)];
+        const pt = toScratchCanvasPoint(ev);
         currentStrokePts.push(pt);
         ctx2d.lineWidth = 2.6;
         ctx2d.lineCap = "round";
@@ -1540,6 +1660,11 @@
           const fb = el("bd-scratchpad-feedback");
           if (fb && res && res.evaluation) {
             const evObj = res.evaluation;
+            if (state && state.currentEvidence) {
+              state.currentEvidence.strokeScorePct = Number(evObj.score_pct || 0);
+            }
+            if (typeof revealAnswer === "function") revealAnswer();
+            if (typeof applyEvidenceRatingGuard === "function") applyEvidenceRatingGuard();
             fb.textContent = `✍️ 필순·방향 채점: ${evObj.score_pct}점 (입력 ${evObj.actual_strokes}획 / 기준 ${evObj.expected_strokes}획 · 방향 일치도 ${evObj.direction_similarity_pct || 85.0}% · 판정: ${evObj.verdict})`;
           }
         });
@@ -1617,7 +1742,10 @@
       btnToggleProd.addEventListener("click", () => {
         const nextOpen = prodDrawer.style.display === "none";
         prodDrawer.style.display = nextOpen ? "block" : "none";
-        if (nextOpen) renderActiveProductionMode(activeProdMode);
+        if (nextOpen) {
+          if (scratchDrawer) scratchDrawer.style.display = "none";
+          renderActiveProductionMode(activeProdMode);
+        }
       });
     }
     if (btnCloseProd && prodDrawer) {
@@ -1700,6 +1828,12 @@
           }).catch(() => null);
         }
 
+        if (state && state.currentEvidence) {
+          state.currentEvidence.productionAccuracyPct = Number(gradeObj.accuracy_pct || 0);
+        }
+        if (typeof revealAnswer === "function") revealAnswer();
+        if (typeof applyEvidenceRatingGuard === "function") applyEvidenceRatingGuard();
+
         if (prodFeedback) {
           const nextDual = dualStep && (dualStep.next_state || dualStep.dual_memory);
           const sRec = nextDual ? nextDual.recognition_stability : "-";
@@ -1746,15 +1880,21 @@
       }
       redrawIoCanvas();
 
-      ioBuilderCanvas.addEventListener("pointerdown", (ev) => {
+      // The canvas is stretched by CSS (width:100%), so pointer positions are converted from CSS pixels to canvas pixels.
+      function toIoCanvasPoint(ev) {
         const r = ioBuilderCanvas.getBoundingClientRect();
-        ioStart = { x: Math.round(ev.clientX - r.left), y: Math.round(ev.clientY - r.top) };
+        const scaleX = (ioBuilderCanvas.width || r.width || 1) / (r.width || 1);
+        const scaleY = (ioBuilderCanvas.height || r.height || 1) / (r.height || 1);
+        return { x: Math.round((ev.clientX - r.left) * scaleX), y: Math.round((ev.clientY - r.top) * scaleY) };
+      }
+      ioBuilderCanvas.addEventListener("pointerdown", (ev) => {
+        ioStart = toIoCanvasPoint(ev);
       });
       ioBuilderCanvas.addEventListener("pointerup", (ev) => {
         if (!ioStart) return;
-        const r = ioBuilderCanvas.getBoundingClientRect();
-        const endX = Math.round(ev.clientX - r.left);
-        const endY = Math.round(ev.clientY - r.top);
+        const end = toIoCanvasPoint(ev);
+        const endX = end.x;
+        const endY = end.y;
         const x = Math.max(0, Math.min(ioStart.x, endX));
         const y = Math.max(0, Math.min(ioStart.y, endY));
         const w = Math.max(28, Math.abs(endX - ioStart.x));
@@ -1819,7 +1959,18 @@
           touchStartY = ev.touches[0].clientY;
         }
       }, { passive: true });
+      arenaEl.addEventListener("touchmove", (ev) => {
+        if (!state.isRevealed || !ev.touches || !ev.touches[0]) return;
+        const dx = ev.touches[0].clientX - touchStartX;
+        const dy = ev.touches[0].clientY - touchStartY;
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 12) {
+          const clampedX = Math.max(-44, Math.min(44, dx * 0.35));
+          const rotDeg = (clampedX / 44) * 2.2;
+          arenaEl.style.transform = `translateX(${clampedX.toFixed(1)}px) rotateZ(${rotDeg.toFixed(2)}deg)`;
+        }
+      }, { passive: true });
       arenaEl.addEventListener("touchend", (ev) => {
+        arenaEl.style.transform = "";
         if (!state.isRevealed || !ev.changedTouches || !ev.changedTouches[0]) return;
         const dx = ev.changedTouches[0].clientX - touchStartX;
         const dy = ev.changedTouches[0].clientY - touchStartY;
@@ -1833,6 +1984,53 @@
           }
         }
       }, { passive: true });
+    }
+
+    const summaryText =
+      vm && typeof vm.formatTrademarkDisclaimerSummary === "function"
+        ? vm.formatTrademarkDisclaimerSummary()
+        : "";
+    if (summaryText) {
+      const storeDisclaimerEl = el("store-trademark-disclaimer-box");
+      if (storeDisclaimerEl) storeDisclaimerEl.textContent = summaryText;
+      const statsDisclaimerEl = el("bd-trademark-disclaimer-box");
+      if (statsDisclaimerEl) statsDisclaimerEl.textContent = summaryText;
+    }
+
+    const btnOpenOss = el("btn-open-oss-licenses");
+    const btnCloseOss = el("btn-close-oss-licenses");
+    const ossModal = el("oss-license-modal");
+    const ossBody = el("oss-license-modal-body");
+    if (btnOpenOss && ossModal && ossBody) {
+      btnOpenOss.addEventListener("click", async () => {
+        ossModal.style.display = "flex";
+        ossBody.style.color = "var(--text)";
+        ossBody.textContent = "라이선스 고지 전문을 불러오는 중입니다...";
+        const rawEnvelope =
+          ctx && typeof ctx.loadThirdPartyNoticesRaw === "function"
+            ? await ctx.loadThirdPartyNoticesRaw()
+            : { source: "http", ok: false, rawText: "" };
+        const resolved =
+          vm && typeof vm.resolveThirdPartyNoticesModalPayload === "function"
+            ? vm.resolveThirdPartyNoticesModalPayload(rawEnvelope)
+            : {
+                ok: false,
+                colorToken: "var(--rose)",
+                text: "FAIL_CLOSED: 라이선스 ViewModel 모듈을 불러올 수 없습니다.",
+              };
+        ossBody.style.color = resolved.colorToken;
+        ossBody.textContent = resolved.text;
+      });
+    }
+    if (btnCloseOss && ossModal) {
+      btnCloseOss.addEventListener("click", () => {
+        ossModal.style.display = "none";
+      });
+    }
+    if (ossModal) {
+      ossModal.addEventListener("click", (ev) => {
+        if (ev.target === ossModal) ossModal.style.display = "none";
+      });
     }
 
     refreshCommercialMasteryDashboard();

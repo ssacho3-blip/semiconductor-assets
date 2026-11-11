@@ -47,9 +47,12 @@
   }
 
   function computeRetrievability(elapsedDays, stability) {
-    const s = Math.max(0.05, Number(stability) || 0.1);
-    const t = Math.max(0.0, Number(elapsedDays) || 0.0);
-    return Math.pow(1.0 + (19.0 / 81.0) * (t / s), -0.5);
+    const s = Number(stability);
+    const t = Number(elapsedDays);
+    if (!Number.isFinite(s) || !Number.isFinite(t) || s <= 0.0) return 0.0;
+    if (t <= 0.0) return 1.0;
+    const r = Math.pow(1.0 + (19.0 / 81.0) * (t / s), -0.5);
+    return Number.isFinite(r) ? clamp(r, 0.0001, 1.0) : 0.0;
   }
 
   function stepFsrs5(memory, rating, elapsedDays = 0.0, desiredRetention = 0.90, weights = DEFAULT_FSRS5_WEIGHTS) {

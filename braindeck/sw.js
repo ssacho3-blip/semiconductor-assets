@@ -1,4 +1,4 @@
-const CACHE_NAME = "braindeck-shell-v1.1.0-b108";
+const CACHE_NAME = "braindeck-shell-v1.1.0-b109";
 const APP_SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -19,7 +19,8 @@ const APP_SHELL_ASSETS = [
   "./viewmodel.js",
   "./app.js",
   "./manifest.json",
-  "./icon.svg"
+  "./icon.svg",
+  "./THIRD_PARTY_NOTICES.txt"
 ];
 
 self.addEventListener("install", (event) => {
@@ -56,7 +57,8 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
   event.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((cached) => {
+    caches.match(req).then((exactCached) => {
+      const hasVersionQuery = url.searchParams.has("v");
       const networkFetch = fetch(req)
         .then((res) => {
           if (res && res.status === 200 && res.type === "basic") {
@@ -65,8 +67,20 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(() => cached);
-      return cached || networkFetch;
+        .catch(() =>
+          req.mode === "navigate" || hasVersionQuery
+            ? exactCached
+            : exactCached || caches.match(req, { ignoreSearch: true })
+        );
+      if (req.mode === "navigate" || hasVersionQuery) {
+        return networkFetch;
+      }
+      if (exactCached) {
+        return exactCached;
+      }
+      return caches.match(req, { ignoreSearch: true }).then((fallbackCached) => {
+        return fallbackCached || networkFetch;
+      });
     })
   );
 });

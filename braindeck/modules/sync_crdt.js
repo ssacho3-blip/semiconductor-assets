@@ -98,16 +98,16 @@
     if (!regA || !regB || String(regA.note_id) !== String(regB.note_id)) {
       throw new Error("SyncValidationError: Cannot merge NoteLwwRegisters with mismatched note_id");
     }
-    const tagsA = canonicalTags(regA.tags);
-    const tagsB = canonicalTags(regB.tags);
-    const hlcA = String(regA.hlc || "");
-    const hlcB = String(regB.hlc || "");
     const tombA = Boolean(regA.deleted_tombstone);
     const tombB = Boolean(regB.deleted_tombstone);
-    const frontA = String(regA.front_text || "");
-    const frontB = String(regB.front_text || "");
-    const backA = String(regA.back_text || "");
-    const backB = String(regB.back_text || "");
+    const tagsA = tombA ? [] : canonicalTags(regA.tags);
+    const tagsB = tombB ? [] : canonicalTags(regB.tags);
+    const hlcA = String(regA.hlc || "");
+    const hlcB = String(regB.hlc || "");
+    const frontA = tombA ? "" : String(regA.front_text || "");
+    const frontB = tombB ? "" : String(regB.front_text || "");
+    const backA = tombA ? "" : String(regA.back_text || "");
+    const backB = tombB ? "" : String(regB.back_text || "");
     const tagJoinA = tagsA.join("\x1f");
     const tagJoinB = tagsB.join("\x1f");
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BrainDeck v1.1.0 (Build 108) 공식 종합 사용설명서</title>
+<title>BrainDeck v1.1.0 (Build 109) 공식 종합 사용설명서</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: #0f172a; background: #f8fafc; margin: 0; padding: 24px 16px; line-height: 1.68; }
   .container { max-width: 860px; margin: 0 auto; background: #ffffff; border-radius: 18px; padding: 36px 40px; box-shadow: 0 8px 28px rgba(15,23,42,0.06); border: 1px solid #e2e8f0; }
@@ -24,7 +24,7 @@
   <div class="container">
     <h1>📖 BrainDeck (v1.1.0) 공식 종합 사용설명서</h1>
 <blockquote>
-<p><strong>BrainDeck (<code>v1.1.0</code> / Android Build 108 · Rust/WASM FSRS-5 엔진 탑재)</strong>은 초·중·고 필수 <strong>영어·한자·국어·수학·역사·과학</strong>부터 성인 <strong>자격증·공무원·법령·어학</strong>까지, 뇌과학 기억 반감기 알고리즘(<strong>FSRS-5</strong>)과 <strong>1,728자 한자 조자·파닉스 실시간 코칭</strong>으로 암기 효율을 극대화하는 올인원 학습 앱입니다.</p>
+<p><strong>BrainDeck (<code>v1.1.0</code> / Android Build 109 · <code>com.braindeck.app</code> · Rust/WASM FSRS-5 엔진 탑재)</strong>은 초·중·고 필수 <strong>영어·한자·국어·수학·역사·과학</strong>부터 성인 <strong>자격증·공무원·법령·어학</strong>까지, 뇌과학 기억 반감기 알고리즘(<strong>FSRS-5</strong>)과 <strong>1,728자 한자 조자·파닉스 실시간 코칭</strong>으로 암기 효율을 극대화하는 올인원 학습 앱입니다.</p>
 <p>💡 앱 화면 우측 상단 <strong><code>[📖 사용설명서]</code></strong> (안드로이드: <strong><code>[📖 설명서]</code></strong>) 버튼 또는 키보드 <strong><code>?</code></strong> 키를 누르면 학습 중 언제든지 앱 내부에서도 요약 가이드를 바로 열어볼 수 있습니다.</p>
 </blockquote>
 <hr />
@@ -137,7 +137,7 @@
 </ul>
 <hr />
 <h2>3. 📱 갤럭시 Z 폴드7 &amp; 태블릿 대화면 적응형 레이아웃 가이드</h2>
-<p>Android 네이티브 앱(<code>BrainDeck v1.1.0</code>, Build 108)은 <code>320dp</code> 커버 화면부터 <code>900dp+</code> 펼침 화면·태블릿, 시스템 글꼴 크기(<code>1.0x ~ 1.35x</code>)까지 32가지 해상도 조합에 자동 반응합니다.</p>
+<p>Android 네이티브 앱(<code>BrainDeck v1.1.0</code>, Build 109 · 패키지 ID <code>com.braindeck.app</code>)은 <code>320dp</code> 커버 화면부터 <code>900dp+</code> 펼침 화면·태블릿, 시스템 글꼴 크기(<code>1.0x ~ 1.35x</code>)까지 32가지 해상도 조합에 자동 반응합니다.</p>
 <ul>
 <li><strong>접힌 커버 화면 (<code>&lt; 380dp</code>)</strong>: 한 손 엄지 조작에 최적화된 컴팩트 헤더(<code>📖</code>, <code>↩️</code>, <code>🔄 초기화</code>) 및 하단 고정 평가 버튼 배치.</li>
 <li><strong>펼친 대화면 / 북모드 (<code>FoldingFeature.Orientation.VERTICAL</code>)</strong>: 물리적 힌지 경계를 피해 좌측 질문·코칭 영역과 우측 보기·평가 영역을 쾌적한 가독 폭(<code>max 720dp</code>)으로 배치.</li>
@@ -202,6 +202,10 @@
 <li>상단 <strong><code>[🔊 자동발음 ON]</code></strong> 켜짐 여부와 기기 미디어 볼륨(iOS 매너모드 해제)을 확인해 주세요. 순수 한자·국어 카드는 엉뚱한 영어 기계음 방지를 위해 영어 자동 발음을 자동으로 건너뜁니다.</li>
 <li><strong>Q. 연속 학습일(<code>🔥 연속 N일</code>)과 오늘 목표는 언제 초기화되나요?</strong></li>
 <li>기기의 <strong>로컬 자정(밤 12시, <code>00:00</code>)</strong> 기준입니다. 전날 기본 목표 이상을 완주했다면 다음 날 접속 시 연속 학습일이 자동으로 <code>+1일</code> 이어집니다.</li>
+<li><strong>Q. 이전 테스트 앱(<code>com.ankistudio.app</code>)에서 새 정식 패키지(<code>com.braindeck.app</code>, Build 109+)로 학습 기록을 옮기려면?</strong></li>
+<li>패키지 식별자가 상표권 클린룸 기준인 <code>com.braindeck.app</code>으로 독립 분리되어 두 앱이 기기에 나란히 설치될 수 있습니다. 구버전 앱의 <strong><code>[📊 내 정보]</code> ➔ <code>[.apkg 내보내기]</code></strong>(또는 <code>[JSON 백업]</code>)로 학습 금고를 저장한 뒤, 새 <code>BrainDeck</code> 앱에서 가져오기(Import)를 실행하면 복습 스케줄과 카드가 100% 그대로 이전됩니다.</li>
+<li><strong>Q. 오픈소스 라이선스 및 데이터·상표권 비제휴 고지문은 어디서 확인하나요?</strong></li>
+<li>웹앱 하단·스토어 탭 또는 Android 앱 내 <strong><code>[오픈소스 라이선스]</code></strong> 버튼을 누르면 인터넷 연결이 없는 오프라인 상태에서도 <code>THIRD_PARTY_NOTICES</code>(CMUdict <code>BSD-2-Clause</code>, Unicode Unihan <code>Unicode License v3</code>, <code>Apache-2.0</code>, <code>MIT</code>, Google ML Kit 고지 및 공유저작물 출처 388행 전문 + SHA-256 무결성 해시)를 즉시 열람할 수 있습니다.</li>
 </ol>
 <hr />
 <h2>5. ⌨️ 키보드 단축키 일람표 (PC · Mac · 태블릿 블루투스 키보드)</h2>

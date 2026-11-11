@@ -170,8 +170,8 @@
     },
     {
       pack_id: "pack.mid1.eng.donga_yoon.full",
-      title: "중1 영어 동아(윤정미)",
-      subtitle: "2022 개정 교육과정 · 단원별·쪽수별 시험범위 슬라이싱 + 영단어·문법",
+      title: "중1 영어 단원 어휘 [동아(윤정미) 진도 호환·비공식]",
+      subtitle: "2022 개정 교육과정 성취기준 기반 · 단원별·쪽수별 진도 호환 슬라이싱 + 영단어·문법 (비공식)",
       category: "k12_textbook",
       age_tier: "teen",
       price_krw: 990,
@@ -186,8 +186,8 @@
     },
     {
       pack_id: "pack.mid2.eng.donga_yoon.full",
-      title: "중2 영어 동아(윤정미)",
-      subtitle: "중학교 2학년 내신 대비 · 단원/쪽수 슬라이싱 & 4지선다 유의어 구성",
+      title: "중2 영어 단원 어휘 [동아(윤정미) 진도 호환·비공식]",
+      subtitle: "중학교 2학년 내신 대비 · 단원/쪽수 진도 호환 슬라이싱 & 4지선다 유의어 구성 (비공식)",
       category: "k12_textbook",
       age_tier: "teen",
       price_krw: 990,
@@ -197,13 +197,13 @@
       covered_ref_ids: ["kr.mid2.eng.donga_yoon.2022"],
       estimated_card_count: 240,
       badge_label: "중2 내신",
-      features: ["중2 동아(윤정미) 단원별 어휘·문법 핵심 수록 (240카드)"],
+      features: ["중2 영어(동아 윤정미 진도 호환) 단원별 어휘·문법 핵심 수록 (240카드)"],
       sample_cards: [{ front: "confident (p.16)", back: "자신감 있는 (형용사)", tag: "Lesson 1" }],
     },
     {
       pack_id: "pack.mid2.hist.miraeen.full",
-      title: "중2 역사① 미래엔",
-      subtitle: "중학교 역사 내신 출판사 단원 매핑 · 동시대 사건 보기 자동 구성",
+      title: "중2 역사① 핵심 개념 [미래엔 진도 호환·비공식]",
+      subtitle: "중학교 역사 내신 단원 진도 호환 매핑 · 동시대 사건 보기 자동 구성 (비공식)",
       category: "k12_textbook",
       age_tier: "teen",
       price_krw: 990,
@@ -213,13 +213,13 @@
       covered_ref_ids: ["kr.mid2.hist.miraeen.2022"],
       estimated_card_count: 240,
       badge_label: "역사 내신",
-      features: ["미래엔 중학교 역사① 단원·쪽수별 사건·연표·조약·문화재 정리 (240카드)"],
+      features: ["중학교 역사①(미래엔 진도 호환) 단원·쪽수별 사건·연표·조약·문화재 정리 (240카드)"],
       sample_cards: [{ front: "훈민정음 창제 (1443, 반포 1446)", back: "조선 세종 대 백성을 가르치는 바른 소리 28자 창제", tag: "Ⅰ단원" }],
     },
     {
       pack_id: "pack.high1.sci.visang.full",
-      title: "고1 통합과학1 비상",
-      subtitle: "고등학교 1학년 통합과학 물리·화학·생명·지구과학 공식 및 원소 대비",
+      title: "고1 통합과학1 공식·원소 [비상 진도 호환·비공식]",
+      subtitle: "고등학교 1학년 통합과학 물리·화학·생명·지구과학 공식 및 원소 진도 호환 (비공식)",
       category: "k12_textbook",
       age_tier: "teen",
       price_krw: 990,
@@ -229,13 +229,13 @@
       covered_ref_ids: ["kr.high1.sci.visang.2022", "sci-element-formula:core"],
       estimated_card_count: 240,
       badge_label: "고1 내신",
-      features: ["비상교육 고1 통합과학1 단원별 핵심 공식 및 필수 원소 매핑 (240카드)"],
+      features: ["고1 통합과학1(비상 진도 호환) 단원별 핵심 공식 및 필수 원소 매핑 (240카드)"],
       sample_cards: [{ front: "옴의 법칙: V = I × R", back: "전압(V)은 전류(I)와 저항(R)의 곱에 비례한다", tag: "통합과학1" }],
     },
     {
       pack_id: "pack.exam.hanja_master",
-      title: "어문회 한자 7급~3급·사자성어",
-      subtitle: "동음이의어·유사한자 함정선지 방어 + 두음법칙/다음자(樂 락·악·요) 채점",
+      title: "급수 대비 한자 7급~3급·사자성어 [어문회 급수 대비·비공식]",
+      subtitle: "동음이의어·유사한자 함정선지 방어 + 두음법칙/다음자(樂 락·악·요) 채점 (비공식 독립 콘텐츠)",
       category: "hanja_history",
       age_tier: "all",
       price_krw: 1500,
@@ -266,8 +266,8 @@
     },
     {
       pack_id: "pack.exam.lang_toeic_jlpt",
-      title: "토익(TOEIC)·JLPT N5~N3",
-      subtitle: "비즈니스 영어 어휘 + 일본어 한자·히라가나 발음/원어민 TTS 스피킹 드릴",
+      title: "비즈니스 영어(TOEIC® 대비)·일본어(JLPT N5~N3 대비) [비공식]",
+      subtitle: "자체 클린룸 비즈니스 영어 어휘 + 일본어 한자·히라가나 발음/원어민 TTS 드릴 (비공식)",
       category: "language_exam",
       age_tier: "adult",
       price_krw: 1900,
@@ -1174,6 +1174,26 @@
       return { ok: true, standalone: true, metadata: meta, staleness };
     }
 
+    async function loadThirdPartyNoticesRaw() {
+      const isFileProtocol = typeof location !== "undefined" && Boolean(location && location.protocol === "file:");
+      if (isFileProtocol || typeof fetch !== "function") {
+        return { source: "offline_embedded", ok: true, rawText: null };
+      }
+      try {
+        const resp = await fetch("./THIRD_PARTY_NOTICES.txt", { cache: "no-store" });
+        if (!resp || !resp.ok) {
+          return { source: "http", ok: false, status: resp ? resp.status : 0, rawText: "" };
+        }
+        return { source: "http", ok: true, status: resp.status, rawText: await resp.text() };
+      } catch (_netErr) {
+        const isOffline = typeof navigator !== "undefined" && Boolean(navigator && navigator.onLine === false);
+        if (isOffline) {
+          return { source: "offline_embedded", ok: true, rawText: null };
+        }
+        return { source: "http", ok: false, status: 0, rawText: "" };
+      }
+    }
+
     return {
       loadDb,
       saveDb,
@@ -1219,6 +1239,7 @@
       computeRetentionAndForgettingCurveVm,
       advanceOnboardingState,
       resolveWcagKeyboardShortcut,
+      loadThirdPartyNoticesRaw,
     };
   }
 

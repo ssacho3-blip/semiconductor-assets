@@ -129,11 +129,11 @@
     return obj;
   }
 
-  function mapKeyboardShortcut(key, isAnswerRevealed, isTypingInInput, ageTier) {
+  function mapKeyboardShortcut(key, isAnswerRevealed, isTypingInInput, ageTier, recommendedRating) {
     const wcag = _getModule("BrainDeckAnalyticsOnboardingVm").resolveWcagKeyboardShortcut(
       key,
-      Boolean(isAnswerRevealed),
-      Boolean(isTypingInInput)
+      Boolean(isTypingInInput),
+      true
     );
     if (isTypingInInput) {
       return null;
@@ -141,9 +141,12 @@
     const normalized = String(key || "").toLowerCase();
     const tierNorm = String(ageTier || "teen").toLowerCase();
     if (normalized === " " || normalized === "enter") {
-      return isAnswerRevealed
-        ? _withWcagMeta({ action: "rate", rating: 3 }, wcag)
-        : _withWcagMeta({ action: "reveal" }, wcag);
+      if (!isAnswerRevealed) {
+        return _withWcagMeta({ action: "reveal" }, wcag);
+      }
+      const rawRec = [1, 2, 3, 4].includes(Number(recommendedRating)) ? Number(recommendedRating) : 3;
+      const safeRec = tierNorm === "junior" ? Math.min(3, rawRec) : rawRec;
+      return _withWcagMeta({ action: "rate", rating: safeRec }, wcag);
     }
     if (isAnswerRevealed && ["1", "2", "3", "4"].includes(normalized)) {
       if (normalized === "4" && tierNorm === "junior") {
@@ -157,7 +160,7 @@
     if (normalized === "h") {
       return _withWcagMeta({ action: "hint" }, wcag);
     }
-    if (normalized === "t") {
+    if (normalized === "t" || normalized === "r") {
       return _withWcagMeta({ action: "tts" }, wcag);
     }
     if (normalized === "z" || normalized === "u") {
@@ -878,6 +881,61 @@
       };
     }
 
+    if (ev.strokeScorePct !== null && ev.strokeScorePct !== undefined && Number.isFinite(Number(ev.strokeScorePct))) {
+      const strokePct = Number(ev.strokeScorePct);
+      if (strokePct < 60) {
+        return {
+          allowedRatings: [1, 2],
+          recommendedRating: 1,
+          maxRating: 2,
+          lockedReason: "stroke_low_accuracy",
+          bannerText: "🔴 한자 필기 정확도(" + Math.round(strokePct) + "%)가 낮아 '다시(1)' 복습을 권장합니다.",
+        };
+      }
+      if (strokePct < 85) {
+        return {
+          allowedRatings: [1, 2, 3],
+          recommendedRating: 2,
+          maxRating: 3,
+          lockedReason: "stroke_partial_accuracy",
+          bannerText: "🟡 한자 필기 부분 일치(" + Math.round(strokePct) + "%) — '어려움(2)'을 권장합니다.",
+        };
+      }
+    }
+
+    if (ev.productionAccuracyPct !== null && ev.productionAccuracyPct !== undefined && Number.isFinite(Number(ev.productionAccuracyPct))) {
+      const prodPct = Number(ev.productionAccuracyPct);
+      if (prodPct < 65) {
+        return {
+          allowedRatings: [1, 2],
+          recommendedRating: 1,
+          maxRating: 2,
+          lockedReason: "production_low_accuracy",
+          bannerText: "🔴 능동 산출 정확도(" + Math.round(prodPct) + "%) 미달 — '다시(1)' 재인출을 권장합니다.",
+        };
+      }
+      if (prodPct < 85) {
+        return {
+          allowedRatings: [1, 2, 3],
+          recommendedRating: 2,
+          maxRating: 3,
+          lockedReason: "production_partial_accuracy",
+          bannerText: "🟡 능동 산출 부분 정확(" + Math.round(prodPct) + "%) — '어려움(2)'을 권장합니다.",
+        };
+      }
+    }
+
+    const latencyMs = ev.latencyMs !== null && ev.latencyMs !== undefined ? Number(ev.latencyMs) : 0;
+    if (Number.isFinite(latencyMs) && latencyMs > 15000) {
+      return {
+        allowedRatings: [1, 2, 3],
+        recommendedRating: 2,
+        maxRating: 3,
+        lockedReason: "slow_latency_cap",
+        bannerText: "🟡 인출 지연(" + (latencyMs / 1000).toFixed(1) + "초)이 감지되어 '어려움(2)' 또는 '보통(3)'을 권장합니다.",
+      };
+    }
+
     if (tier === "junior") {
       return {
         allowedRatings: [1, 2, 3],
@@ -893,7 +951,10 @@
       recommendedRating: 3,
       maxRating: 4,
       lockedReason: "none",
-      bannerText: "🟢 무보조 인출 성공! 기억 난이도에 맞춰 평가하세요 ('보통 3' 추천).",
+      bannerText:
+        Number.isFinite(latencyMs) && latencyMs > 0 && latencyMs <= 2500
+          ? "🟢 빠른 무보조 인출 성공(" + (latencyMs / 1000).toFixed(1) + "초)! Space/Enter 또는 '보통 3'으로 즉시 다음 카드로 이동하세요."
+          : "🟢 무보조 인출 성공! 기억 난이도에 맞춰 평가하세요 ('보통 3' 추천).",
     };
   }
 
@@ -1200,13 +1261,46 @@
     return `${ans}\n\n💡 해설: ${exp}`;
   }
 
-  const SSOT_CORPUS_SHA256 = "07117a5a84147fb8f1ad17f6a4e8b46e27f337fe7c27f29bbfcef05c8af1277e";
+  const SSOT_CORPUS_SHA256 = "55793ba015c042431aef29309f8f351e65bd8c30efe73bd365a89f70b1b40eb7";
+  const SSOT_GRADED_BANK_SHA256 = "f2a1a46cc6460b708ce65f08a2f5c277807662770db79b1e365b113971274988";
+  const WEB_MIN_REMEDIATED_VERSION_CODE = 109;
+  const WEB_CLIENT_VERSION_CODE = 109;
+  const WEB_PINNED_SIGNING_KEY_ID = "braindeck-ota-root-2026-v2";
+  /**
+   * Synchronous same-origin bundle pin & anti-rollback metadata gate (full RSA-2048 modular
+   * signature & re-computed SHA-256 verification are enforced at build/OTA ingest by Python & Kotlin).
+   */
   function verifyCorpusBundleIntegrity(bundle) {
-    if (!bundle || typeof bundle !== "object" || !bundle.tsv_bank) {
+    if (!bundle || typeof bundle !== "object" || !bundle.tsv_bank || typeof bundle.tsv_bank !== "object") {
       throw new Error("CorpusIntegrityError: missing tsv_bank in corpus bundle");
     }
-    if (bundle.tsv_sha256 && String(bundle.tsv_sha256) !== SSOT_CORPUS_SHA256) {
+    if (bundle.signing_key_id === "braindeck-ota-root-2026-v1") {
+      throw new Error("CorpusIntegrityError: retired legacy v1 signing_key_id rejected on client >= 109");
+    }
+    if (typeof bundle.signing_key_id !== "string" || bundle.signing_key_id.trim() !== WEB_PINNED_SIGNING_KEY_ID) {
+      throw new Error("CorpusIntegrityError: missing or untrusted signing_key_id");
+    }
+    if (
+      !Number.isInteger(bundle.min_client_version_code) ||
+      bundle.min_client_version_code < WEB_MIN_REMEDIATED_VERSION_CODE ||
+      WEB_CLIENT_VERSION_CODE < bundle.min_client_version_code
+    ) {
+      throw new Error("CorpusIntegrityError: missing, non-integer, or incompatible min_client_version_code");
+    }
+    if (typeof bundle.corpus_sha256 !== "string" || bundle.corpus_sha256 !== SSOT_CORPUS_SHA256) {
+      throw new Error("CorpusIntegrityError: missing or mismatched corpus_sha256");
+    }
+    if (bundle.tsv_sha256 !== undefined && String(bundle.tsv_sha256) !== SSOT_CORPUS_SHA256) {
       throw new Error("CorpusIntegrityError: corpus tsv_sha256 mismatch");
+    }
+    if (typeof bundle.graded_bank_sha256 !== "string" || bundle.graded_bank_sha256 !== SSOT_GRADED_BANK_SHA256) {
+      throw new Error("CorpusIntegrityError: missing or mismatched graded_bank_sha256");
+    }
+    if (!bundle.graded_bank || typeof bundle.graded_bank !== "object" || Object.keys(bundle.graded_bank).length === 0) {
+      throw new Error("CorpusIntegrityError: missing graded_bank for declared graded_bank_sha256");
+    }
+    if (typeof bundle.signature_rsa2048_hex !== "string" || !/^[0-9a-fA-F]{512}$/.test(bundle.signature_rsa2048_hex.trim())) {
+      throw new Error("CorpusIntegrityError: missing or invalid RSA-2048 signature_rsa2048_hex on corpus bundle");
     }
     if (bundle.signature_b64 !== undefined && (!String(bundle.signature_b64).trim() || String(bundle.signature_b64).length < 64)) {
       throw new Error("CorpusIntegrityError: invalid RSA-2048 signature_b64 on corpus bundle");
@@ -2413,8 +2507,448 @@
     return {
       toeic: "TOEIC®은 Educational Testing Service(ETS)의 등록상표입니다. 본 앱의 모든 어휘·예문은 ETS와 무관하게 자체 클린룸(Clean-Room) 방식으로 집필된 독립 학습 콘텐츠입니다.",
       csat: "대학수학능력시험(수능) 및 모의평가 명칭은 교육부·한국교육과정평가원(KICE)의 공개 성취기준을 참고한 학습 분류 표기이며, 수록된 모든 문항과 해설은 자체 창작물입니다.",
+      publishers: "교과서 출판사명(동아출판·미래엔·비상교육 등) 및 검정·자격 시험명(어문회·JLPT 등)은 학생의 학습 진도 호환 및 시험 대비 범위를 안내하기 위한 설명적 표기이며, 해당 출판사·주관사와 제휴되거나 공식 보증받지 않은 비공식 독립 콘텐츠입니다.",
       anki: "BrainDeck은 Anki® / Ankitects Pty Ltd와 제휴되거나 보증받지 않은 독립 소프트웨어이며, 공개된 FSRS-5 학술 수식 및 오픈 호환 규격을 준수합니다.",
       general: "BrainDeck의 모든 어휘 뜻풀이·예문·해설·시각 도식은 외부 출판사 교과서나 기출문제를 복제하지 않은 100% 독립 집필(Clean-Room) 자산입니다.",
+    };
+  }
+
+  function formatTrademarkDisclaimerSummary(headerText) {
+    const header = String(headerText || "⚖️ 상표권 비제휴 및 클린룸 독립 콘텐츠 고지");
+    const obj = getTrademarkCleanroomDisclaimers();
+    const lines = Object.keys(obj).map((k) => "• " + obj[k]).join("\n");
+    return header + "\n" + lines;
+  }
+
+  const CANONICAL_THIRD_PARTY_NOTICES_SHA256 = "971c7299467d06f7d28a3d4d89bf55e8788dc56b1af865747bcd2bf377ffbf0b";
+  const FULL_THIRD_PARTY_NOTICES_VERBATIM = [
+    "# BrainDeck (브레인덱) — 오픈소스 소프트웨어 · 데이터 라이선스 및 상표권 고지 (Third-Party Notices)",
+    "",
+    "본 문서는 BrainDeck(웹 PWA, macOS `BrainDeck.app`, Android 네이티브 앱 `com.braindeck.app`)에 포함된 오픈소스 컴포넌트, 공개 어학·유니코드 데이터셋, 온디바이스 SDK 및 설명적 상표 사용(Nominative Fair Use) 고지 사항을 명시합니다.",
+    "",
+    "---",
+    "",
+    "## 0. 독립 클린룸 개발 및 비제휴(Non-Affiliation) 상표권 고지",
+    "",
+    "- **Anki® 비제휴 고지**: BrainDeck은 **Anki® / Ankitects Pty Ltd**와 제휴되거나 공식 보증받지 않은 독립 소프트웨어이며, AGPLv3 소스코드를 일절 포함하지 않고 공개된 FSRS-5 학술 수식 및 오픈 호환 규격을 자체 클린룸(Clean-Room) 방식으로 구현합니다.",
+    "- **TOEIC® / JLPT 비제휴 고지**: `TOEIC®`은 **Educational Testing Service(ETS)**의 등록상표입니다. 본 앱의 어휘·예문·해설은 ETS 및 시험 주관사(일본국제교류기금·일본국제교육지원협회, 한국어문회 등)와 무관하게 자체 집필된 비공식 시험 대비 콘텐츠입니다.",
+    "- **교과서 출판사 비제휴 및 호환 표기 고지**: 교과서 출판사명(동아출판·미래엔·비상교육 등)은 학생의 학교 진도 호환 단원을 안내하기 위한 설명적 표기(Descriptive Fair Use)이며, 해당 출판사와 제휴되거나 공식 인증받지 않은 비공식 독립 학습 보조 콘텐츠입니다.",
+    "- **수능·교육부 성취기준 및 문학 해설 고지**: 대학수학능력시험(수능) 및 교육과정 성취기준 분류는 교육부·한국교육과정평가원(KICE)의 공개 교육과정을 참고한 것이며, 보호기간 내 한국 현대문학(시·소설·희곡·수필) 학습 카드는 원문 전문 또는 다행 발췌 없이 저작권법 제28조(공표된 저작물의 인용)에 부합하는 독자적 문학 비평·표현기법 분석과 1~2어절 핵심 어구 최소 인용으로만 구성됩니다(1962년까지 작고하여 구 저작권법 사후 50년 보호기간 만료로 2013년 7월 1일 사후 70년 연장 시행 전 만료 확정된 공유저작물 제외).",
+    "",
+    "---",
+    "",
+    "## 1. CMU Pronouncing Dictionary (`cmudict-0.7b`) — BSD 2-Clause License",
+    "",
+    "영단어 음소·IPA 발음 기호 변환에 사용된 CMU Pronouncing Dictionary 데이터는 아래 BSD 2-Clause 라이선스를 따릅니다.",
+    "",
+    "```text",
+    "Copyright (C) 1993-2015 Carnegie Mellon University. All rights reserved.",
+    "",
+    "Redistribution and use in source and binary forms, with or without",
+    "modification, are permitted provided that the following conditions",
+    "are met:",
+    "",
+    "1. Redistributions of source code must retain the above copyright",
+    "   notice, this list of conditions and the following disclaimer.",
+    "2. Redistributions in binary form must reproduce the above copyright",
+    "   notice, this list of conditions and the following disclaimer in",
+    "   the documentation and/or other materials provided with the",
+    "   distribution.",
+    "",
+    "THIS SOFTWARE IS PROVIDED BY CARNEGIE MELLON UNIVERSITY ``AS IS'' AND",
+    "ANY EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,",
+    "THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR",
+    "PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL CARNEGIE MELLON UNIVERSITY",
+    "NOR ITS EMPLOYEES BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,",
+    "SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT",
+    "LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,",
+    "DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY",
+    "THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT",
+    "(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE",
+    "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+    "```",
+    "",
+    "---",
+    "",
+    "## 2. Unicode® Unihan Database (`kRSUnicode` / `kTotalStrokes`) — Unicode License v3",
+    "",
+    "한자 부수 및 총획수 검증 데이터(`unihan_irg_radical_strokes.txt`, `unihan_ktotalstrokes_ref.json`)는 Unicode® Unihan Database로부터 추출되었으며 Unicode License v3를 따릅니다.",
+    "",
+    "```text",
+    "UNICODE LICENSE V3",
+    "",
+    "COPYRIGHT AND PERMISSION NOTICE",
+    "",
+    "Copyright © 1991-2026 Unicode, Inc.",
+    "",
+    "NOTICE TO USER: Carefully read the following legal agreement. BY",
+    "DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR",
+    "SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE",
+    "TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT",
+    "DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.",
+    "",
+    "Permission is hereby granted, free of charge, to any person obtaining a",
+    "copy of data files and any associated documentation (the \"Data Files\") or",
+    "software and any associated documentation (the \"Software\") to deal in the",
+    "Data Files or Software without restriction, including without limitation",
+    "the rights to use, copy, modify, merge, publish, distribute, and/or sell",
+    "copies of the Data Files or Software, and to permit persons to whom the",
+    "Data Files or Software are furnished to do so, provided that either (a)",
+    "this copyright and permission notice appear with all copies of the Data",
+    "Files or Software, or (b) this copyright and permission notice appear in",
+    "associated Documentation.",
+    "",
+    "THE DATA FILES AND SOFTWARE ARE PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY",
+    "KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF",
+    "MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF",
+    "THIRD PARTY RIGHTS.",
+    "",
+    "IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE",
+    "BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,",
+    "OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,",
+    "WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,",
+    "ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA",
+    "FILES OR SOFTWARE.",
+    "",
+    "Except as contained in this notice, the name of a copyright holder shall",
+    "not be used in advertising or otherwise to promote the sale, use or other",
+    "dealings in these Data Files or Software without prior written",
+    "authorization of the copyright holder.",
+    "",
+    "SPDX-License-Identifier: Unicode-3.0",
+    "```",
+    "",
+    "---",
+    "",
+    "## 3. FSRS-5 Mathematical Specification (`open-spaced-repetition`) & PyYAML — MIT License",
+    "",
+    "FSRS-5 기본 19개 가중치 수학 명세(Jarrett Ye / `open-spaced-repetition`) 및 Python 백엔드·빌드 파이프라인의 YAML 파서(`PyYAML`)는 MIT License를 따릅니다.",
+    "",
+    "```text",
+    "MIT License",
+    "",
+    "Copyright (c) 2022-2025 Jarrett Ye & Open Spaced Repetition Contributors",
+    "Copyright (c) 2017-2021 Ingy döt Net",
+    "Copyright (c) 2006-2016 Kirill Simonov",
+    "",
+    "Permission is hereby granted, free of charge, to any person obtaining a copy",
+    "of this software and associated documentation files (the \"Software\"), to deal",
+    "in the Software without restriction, including without limitation the rights",
+    "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell",
+    "copies of the Software, and to permit persons to whom the Software is",
+    "furnished to do so, subject to the following conditions:",
+    "",
+    "The above copyright notice and this permission notice shall be included in all",
+    "copies or substantial portions of the Software.",
+    "",
+    "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR",
+    "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,",
+    "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE",
+    "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER",
+    "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,",
+    "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE",
+    "SOFTWARE.",
+    "```",
+    "",
+    "---",
+    "",
+    "## 4. Python Cryptography (`pyca/cryptography`) — Dual Apache License 2.0 / BSD 3-Clause License",
+    "",
+    "Python 백엔드 및 코퍼스 서명 검증 파이프라인에서 사용되는 `pyca/cryptography` 패키지는 **Apache License, Version 2.0**(제5절 전문 수록) 또는 아래 **BSD 3-Clause License** 중 선택 적용되는 이중 라이선스 소프트웨어입니다.",
+    "",
+    "```text",
+    "This software is made available under the terms of *either* of the licenses",
+    "found in LICENSE.APACHE or LICENSE.BSD. Contributions to cryptography are made",
+    "under the terms of *both* these licenses.",
+    "",
+    "Copyright (c) Individual contributors.",
+    "All rights reserved.",
+    "",
+    "Redistribution and use in source and binary forms, with or without",
+    "modification, are permitted provided that the following conditions are met:",
+    "",
+    "    1. Redistributions of source code must retain the above copyright notice,",
+    "       this list of conditions and the following disclaimer.",
+    "",
+    "    2. Redistributions in binary form must reproduce the above copyright",
+    "       notice, this list of conditions and the following disclaimer in the",
+    "       documentation and/or other materials provided with the distribution.",
+    "",
+    "    3. Neither the name of PyCA Cryptography nor the names of its contributors",
+    "       may be used to endorse or promote products derived from this software",
+    "       without specific prior written permission.",
+    "",
+    "THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND",
+    "ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED",
+    "WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE",
+    "DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR",
+    "ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES",
+    "(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;",
+    "LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON",
+    "ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT",
+    "(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS",
+    "SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+    "```",
+    "",
+    "---",
+    "",
+    "## 5. AndroidX · Jetpack Compose · Room · Window · Kotlin Standard Library & Coroutines — Apache License 2.0",
+    "",
+    "Android 네이티브 앱(`com.braindeck.app`)에 직접 및 전이적(Transitive)으로 포함된 아래 컴포넌트들은 **Apache License, Version 2.0** 하에 배포됩니다(Rust/WebAssembly 코어 `braindeck-core`는 외부 서드파티 크레이트 의존성 없이 표준 라이브러리만으로 빌드됨):",
+    "",
+    "- **AndroidX Core / Lifecycle / Activity / Window / SavedState**: `androidx.core:core`, `androidx.core:core-ktx`, `androidx.activity:activity`, `androidx.activity:activity-compose`, `androidx.lifecycle:lifecycle-common`, `androidx.lifecycle:lifecycle-runtime-ktx`, `androidx.lifecycle:lifecycle-viewmodel`, `androidx.lifecycle:lifecycle-viewmodel-compose`, `androidx.lifecycle:lifecycle-viewmodel-savedstate`, `androidx.savedstate:savedstate`, `androidx.window:window`, `androidx.annotation:annotation`, `androidx.collection:collection`, `androidx.arch.core:core-common`, `androidx.arch.core:core-runtime`",
+    "- **Jetpack Compose Material 3 & UI Foundation**: `androidx.compose.runtime:runtime`, `androidx.compose.ui:ui`, `androidx.compose.ui:ui-graphics`, `androidx.compose.ui:ui-text`, `androidx.compose.ui:ui-unit`, `androidx.compose.ui:ui-tooling-preview`, `androidx.compose.foundation:foundation`, `androidx.compose.foundation:foundation-layout`, `androidx.compose.animation:animation`, `androidx.compose.material3:material3`",
+    "- **AndroidX Room & SQLite Wrapper**: `androidx.room:room-common`, `androidx.room:room-runtime`, `androidx.room:room-ktx`, `androidx.sqlite:sqlite`, `androidx.sqlite:sqlite-framework`",
+    "- **JetBrains Kotlin & Coroutines**: `org.jetbrains.kotlin:kotlin-stdlib`, `org.jetbrains:annotations`, `org.jetbrains.kotlinx:kotlinx-coroutines-core`, `org.jetbrains.kotlinx:kotlinx-coroutines-android`, `org.jetbrains.kotlinx:kotlinx-coroutines-play-services`",
+    "- **Google Transport / Firebase Encoders / ODML / Javax Inject (ML Kit Transitive Apache-2.0 Runtime)**: `com.google.android.datatransport:transport-api`, `com.google.android.datatransport:transport-backend-cct`, `com.google.android.datatransport:transport-runtime`, `com.google.firebase:firebase-components`, `com.google.firebase:firebase-encoders`, `com.google.firebase:firebase-encoders-json`, `com.google.android.odml:image`, `javax.inject:javax.inject`",
+    "",
+    "```text",
+    "Copyright (C) 2018-2026 The Android Open Source Project (AndroidX, Jetpack Compose Material 3, Room, SQLite, Window)",
+    "Copyright (C) 2010-2026 JetBrains s.r.o. and Kotlin Programming Language Contributors (Kotlin Standard Library, Annotations & Kotlinx Coroutines)",
+    "",
+    "                                 Apache License",
+    "                           Version 2.0, January 2004",
+    "                        http://www.apache.org/licenses/",
+    "",
+    "   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+    "",
+    "   1. Definitions.",
+    "",
+    "      \"License\" shall mean the terms and conditions for use, reproduction,",
+    "      and distribution as defined by Sections 1 through 9 of this document.",
+    "",
+    "      \"Licensor\" shall mean the copyright owner or entity authorized by",
+    "      the copyright owner that is granting the License.",
+    "",
+    "      \"Legal Entity\" shall mean the union of the acting entity and all",
+    "      other entities that control, are controlled by, or are under common",
+    "      control with that entity. For the purposes of this definition,",
+    "      \"control\" means (i) the power, direct or indirect, to cause the",
+    "      direction or management of such entity, whether by contract or",
+    "      otherwise, or (ii) ownership of fifty percent (50%) or more of the",
+    "      outstanding shares, or (iii) beneficial ownership of such entity.",
+    "",
+    "      \"You\" (or \"Your\") shall mean an individual or Legal Entity",
+    "      exercising permissions granted by this License.",
+    "",
+    "      \"Source\" form shall mean the preferred form for making modifications,",
+    "      including but not limited to software source code, documentation",
+    "      source, and configuration files.",
+    "",
+    "      \"Object\" form shall mean any form resulting from mechanical",
+    "      transformation or translation of a Source form, including but",
+    "      not limited to compiled object code, generated documentation,",
+    "      and conversions to other media types.",
+    "",
+    "      \"Work\" shall mean the work of authorship, whether in Source or",
+    "      Object form, made available under the License, as indicated by a",
+    "      copyright notice that is included in or attached to the work",
+    "      (an example is provided in the Appendix below).",
+    "",
+    "      \"Derivative Works\" shall mean any work, whether in Source or Object",
+    "      form, that is based on (or derived from) the Work and for which the",
+    "      editorial revisions, annotations, elaborations, or other modifications",
+    "      represent, as a whole, an original work of authorship. For the purposes",
+    "      of this License, Derivative Works shall not include works that remain",
+    "      separable from, or merely link (or bind by name) to the interfaces of,",
+    "      the Work and Derivative Works thereof.",
+    "",
+    "      \"Contribution\" shall mean any work of authorship, including",
+    "      the original version of the Work and any modifications or additions",
+    "      to that Work or Derivative Works thereof, that is intentionally",
+    "      submitted to Licensor for inclusion in the Work by the copyright owner",
+    "      or by an individual or Legal Entity authorized to submit on behalf of",
+    "      the copyright owner. For the purposes of this definition, \"submitted\"",
+    "      means any form of electronic, verbal, or written communication sent",
+    "      to the Licensor or its representatives, including but not limited to",
+    "      communication on electronic mailing lists, source code control systems,",
+    "      and issue tracking systems that are managed by, or on behalf of, the",
+    "      Licensor for the purpose of discussing and improving the Work, but",
+    "      excluding communication that is conspicuously marked or otherwise",
+    "      designated in writing by the copyright owner as \"Not a Contribution.\"",
+    "",
+    "      \"Contributor\" shall mean Licensor and any individual or Legal Entity",
+    "      on behalf of whom a Contribution has been received by Licensor and",
+    "      subsequently incorporated within the Work.",
+    "",
+    "   2. Grant of Copyright License. Subject to the terms and conditions of",
+    "      this License, each Contributor hereby grants to You a perpetual,",
+    "      worldwide, non-exclusive, no-charge, royalty-free, irrevocable",
+    "      copyright license to reproduce, prepare Derivative Works of,",
+    "      publicly display, publicly perform, sublicense, and distribute the",
+    "      Work and such Derivative Works in Source or Object form.",
+    "",
+    "   3. Grant of Patent License. Subject to the terms and conditions of",
+    "      this License, each Contributor hereby grants to You a perpetual,",
+    "      worldwide, non-exclusive, no-charge, royalty-free, irrevocable",
+    "      (except as stated in this section) patent license to make, have made,",
+    "      use, offer to sell, sell, import, and otherwise transfer the Work,",
+    "      where such license applies only to those patent claims licensable",
+    "      by such Contributor that are necessarily infringed by their",
+    "      Contribution(s) alone or by combination of their Contribution(s)",
+    "      with the Work to which such Contribution(s) was submitted. If You",
+    "      institute patent litigation against any entity (including a",
+    "      cross-claim or counterclaim in a lawsuit) alleging that the Work",
+    "      or a Contribution incorporated within the Work constitutes direct",
+    "      or contributory patent infringement, then any patent licenses",
+    "      granted to You under this License for that Work shall terminate",
+    "      as of the date such litigation is filed.",
+    "",
+    "   4. Redistribution. You may reproduce and distribute copies of the",
+    "      Work or Derivative Works thereof in any medium, with or without",
+    "      modifications, and in Source or Object form, provided that You",
+    "      meet the following conditions:",
+    "",
+    "      (a) You must give any other recipients of the Work or",
+    "          Derivative Works a copy of this License; and",
+    "",
+    "      (b) You must cause any modified files to carry prominent notices",
+    "          stating that You changed the files; and",
+    "",
+    "      (c) You must retain, in the Source form of any Derivative Works",
+    "          that You distribute, all copyright, patent, trademark, and",
+    "          attribution notices from the Source form of the Work,",
+    "          excluding those notices that do not pertain to any part of",
+    "          the Derivative Works; and",
+    "",
+    "      (d) If the Work includes a \"NOTICE\" text file as part of its",
+    "          distribution, then any Derivative Works that You distribute must",
+    "          include a readable copy of the attribution notices contained",
+    "          within such NOTICE file, excluding those notices that do not",
+    "          pertain to any part of the Derivative Works, in at least one",
+    "          of the following places: within a NOTICE text file distributed",
+    "          as part of the Derivative Works; within the Source form or",
+    "          documentation, if provided along with the Derivative Works; or,",
+    "          within a display generated by the Derivative Works, if and",
+    "          wherever such third-party notices normally appear. The contents",
+    "          of the NOTICE file are for informational purposes only and",
+    "          do not modify the License. You may add Your own attribution",
+    "          notices within Derivative Works that You distribute, alongside",
+    "          or as an addendum to the NOTICE text from the Work, provided",
+    "          that such additional attribution notices cannot be construed",
+    "          as modifying the License.",
+    "",
+    "      You may add Your own copyright statement to Your modifications and",
+    "      may provide additional or different license terms and conditions",
+    "      for use, reproduction, or distribution of Your modifications, or",
+    "      for any such Derivative Works as a whole, provided Your use,",
+    "      reproduction, and distribution of the Work otherwise complies with",
+    "      the conditions stated in this License.",
+    "",
+    "   5. Submission of Contributions. Unless You explicitly state otherwise,",
+    "      any Contribution intentionally submitted for inclusion in the Work",
+    "      by You to the Licensor shall be under the terms and conditions of",
+    "      this License, without any additional terms or conditions.",
+    "      Notwithstanding the above, nothing herein shall supersede or modify",
+    "      the terms of any separate license agreement you may have executed",
+    "      with Licensor regarding such Contributions.",
+    "",
+    "   6. Trademarks. This License does not grant permission to use the trade",
+    "      names, trademarks, service marks, or product names of the Licensor,",
+    "      except as required for reasonable and customary use in describing the",
+    "      origin of the Work and reproducing the content of the NOTICE file.",
+    "",
+    "   7. Disclaimer of Warranty. Unless required by applicable law or",
+    "      agreed to in writing, Licensor provides the Work (and each",
+    "      Contributor provides its Contributions) on an \"AS IS\" BASIS,",
+    "      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or",
+    "      implied, including, without limitation, any warranties or conditions",
+    "      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A",
+    "      PARTICULAR PURPOSE. You are solely responsible for determining the",
+    "      appropriateness of using or redistributing the Work and assume any",
+    "      risks associated with Your exercise of permissions under this License.",
+    "",
+    "   8. Limitation of Liability. In no event and under no legal theory,",
+    "      whether in tort (including negligence), contract, or otherwise,",
+    "      unless required by applicable law (such as deliberate and grossly",
+    "      negligent acts) or agreed to in writing, shall any Contributor be",
+    "      liable to You for damages, including any direct, indirect, special,",
+    "      incidental, or consequential damages of any character arising as a",
+    "      result of this License or out of the use or inability to use the",
+    "      Work (including but not limited to damages for loss of goodwill,",
+    "      work stoppage, computer failure or malfunction, or any and all",
+    "      other commercial damages or losses), even if such Contributor",
+    "      has been advised of the possibility of such damages.",
+    "",
+    "   9. Accepting Warranty or Additional Liability. While redistributing",
+    "      the Work or Derivative Works thereof, You may choose to offer,",
+    "      and charge a fee for, acceptance of support, warranty, indemnity,",
+    "      or other liability obligations and/or rights consistent with this",
+    "      License. However, in accepting such obligations, You may act only",
+    "      on Your own behalf and on Your sole responsibility, not on behalf",
+    "      of any other Contributor, and only if You agree to indemnify,",
+    "      defend, and hold each Contributor harmless for any liability",
+    "      incurred by, or claims asserted against, such Contributor by reason",
+    "      of your accepting any such warranty or additional liability.",
+    "",
+    "   END OF TERMS AND CONDITIONS",
+    "```",
+    "",
+    "---",
+    "",
+    "## 6. SQLite Database Engine — Public Domain",
+    "",
+    "로컬 학습 원장 및 읽기 전용 레퍼런스 브레인팩 저장에 사용되는 **SQLite** 엔진(D. Richard Hipp 및 기여자)은 저작권 제한 없는 퍼블릭 도메인(Public Domain) 자산입니다.",
+    "",
+    "```text",
+    "The author disclaims copyright to SQLite source code. In place of a legal notice,",
+    "here is a blessing:",
+    "  May you do good and not evil.",
+    "  May you find forgiveness for yourself and forgive others.",
+    "  May you share freely, never taking more than you give.",
+    "```",
+    "",
+    "---",
+    "",
+    "## 7. Google ML Kit Text Recognition Korean & Play Services Tasks On-Device SDK",
+    "",
+    "Android 앱의 사진·교재 온디바이스 한국어/라틴 문자 광학문자인식(OCR) 기능은 **Google ML Kit** 및 전이적 온디바이스 런타임 SDK(`com.google.mlkit:text-recognition-korean:16.0.1`, `com.google.mlkit:vision-common`, `com.google.android.gms:play-services-mlkit-text-recognition-korean`, `com.google.android.gms:play-services-base`, `com.google.android.gms:play-services-basement`, `com.google.android.gms:play-services-tasks`)를 사용합니다. 이미지 및 텍스트 추출은 외부 서버 전송 없이 사용자 기기 내부에서만 처리되며, 해당 SDK 컴포넌트는 Google APIs Terms of Service(`https://developers.google.com/terms`) 및 ML Kit Terms of Service(`https://developers.google.com/ml-kit/terms`)의 적용을 받습니다.",
+    "",
+    "---",
+    "",
+    "## 8. 공공저작물(KOGL · 저작권법 제24조의2) 및 저작권 만료 공유저작물(제39조)",
+    "",
+    "- **교육부 초·중·고 기본 어휘 목록 및 교육용 한자 1,800자 자종 목록 / 국립국어원·법제처 국가법령정보**: 대한민국 저작권법 제24조의2 및 공공누리(KOGL 제1유형, 출처표시)에 의거해 사실적 어휘·자종 기준을 참고하였으며, 모든 뜻풀이·예문·해설은 자체 집필하였습니다.",
+    "- **저작권 보호기간 만료 한국 근대문학(저작권법 제39조)**: 나도향(1926 작고), 최서해(1932 작고), 김소월(1934 작고), 심훈(1936 작고), 이상(1937 작고), 김유정(1937 작고), 박용철(1938 작고), 이효석(1942 작고), 이상화(1943 작고), 현진건(1943 작고), 이육사(1944 작고), 한용운(1944 작고), 윤동주(1945 작고), 정지용(1950 작고), 김영랑(1950 작고), 이광수(1950 작고), 채만식(1950 작고), 김동인(1951 작고), 최남선(1957 작고), 노천명(1957 작고) 등 1962년까지 작고(구 저작권법 사후 50년 보호기간 만료로 2013년 7월 1일 사후 70년 연장 시행 전 만료 확정)한 문인 20인의 공유저작물(Public Domain) 작품만을 원문 인용 대상으로 사용합니다."
+  ].join("\n");
+  const CANONICAL_THIRD_PARTY_NOTICES_NORMALIZED = FULL_THIRD_PARTY_NOTICES_VERBATIM.replace(/\r\n/g, "\n").trim();
+
+  function getFullThirdPartyNoticesText() {
+    return FULL_THIRD_PARTY_NOTICES_VERBATIM;
+  }
+
+  function resolveThirdPartyNoticesModalPayload(fetchedInput, allowOfflineEmbeddedFallback) {
+    const useEmbedded = allowOfflineEmbeddedFallback !== false;
+    let rawCandidate = "";
+    if (fetchedInput && typeof fetchedInput === "object") {
+      if (fetchedInput.source === "offline_embedded" && useEmbedded) {
+        rawCandidate =
+          fetchedInput.rawText !== undefined && fetchedInput.rawText !== null
+            ? String(fetchedInput.rawText)
+            : FULL_THIRD_PARTY_NOTICES_VERBATIM;
+      } else {
+        rawCandidate = fetchedInput.ok === false ? "" : String(fetchedInput.rawText || "");
+      }
+    } else {
+      rawCandidate =
+        fetchedInput !== undefined && fetchedInput !== null
+          ? String(fetchedInput)
+          : (useEmbedded ? FULL_THIRD_PARTY_NOTICES_VERBATIM : "");
+    }
+    const candidate = rawCandidate.replace(/\r\n/g, "\n").trim();
+    if (!candidate || candidate !== CANONICAL_THIRD_PARTY_NOTICES_NORMALIZED) {
+      return {
+        ok: false,
+        sha256: null,
+        colorToken: "var(--rose)",
+        text: "FAIL_CLOSED: THIRD_PARTY_NOTICES.txt 전문을 확인할 수 없거나 무결성 검증에 실패했습니다.",
+      };
+    }
+    return {
+      ok: true,
+      sha256: CANONICAL_THIRD_PARTY_NOTICES_SHA256,
+      colorToken: "var(--text)",
+      text: formatTrademarkDisclaimerSummary() + "\n\n" + candidate,
     };
   }
 
@@ -2677,8 +3211,10 @@
     const dist = levenshteinDistJs(t, u);
     const maxLen = Math.max(1, t.length, u.length);
     const acc = Number((Math.max(0, 1.0 - dist / maxLen) * 100.0).toFixed(1));
-    const rating = dist === 0 ? 4 : (acc >= 85.0 ? 3 : (acc >= 65.0 ? 2 : 1));
-    return { is_correct: dist <= 1, accuracy_pct: acc, recommended_rating: rating, verdict: rating >= 3 ? "PASS" : "RETRY" };
+    // Single acceptance rule: exact match, 1 typo with >=80% accuracy, or >=85% accuracy on longer phrases.
+    const isCorrect = Boolean(dist === 0 || (dist <= 1 && acc >= 80.0) || acc >= 85.0);
+    const rating = dist === 0 ? 4 : (isCorrect ? 3 : (acc >= 65.0 ? 2 : 1));
+    return { is_correct: isCorrect, accuracy_pct: acc, recommended_rating: rating, verdict: isCorrect ? "PASS" : "RETRY" };
   }
 
   function buildSentenceChunkChallenge(sentence) {
@@ -2814,6 +3350,10 @@
     renderMathAndCodeMarkup,
     resolveMobileErgonomicsSpec,
     getTrademarkCleanroomDisclaimers,
+    formatTrademarkDisclaimerSummary,
+    getFullThirdPartyNoticesText,
+    resolveThirdPartyNoticesModalPayload,
+    verifyCorpusBundleIntegrity,
     sanitizeTextForNaturalTts,
     buildNaturalTtsSegments,
     selectBestBrowserVoice,

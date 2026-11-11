@@ -12,11 +12,34 @@
   <title>BrainDeck (브레인덱) — 스마트 암기 & 브레인팩 스토어</title>
   <style>
     :root {
+      /* Quiet Precision design tokens */
+      --bd-canvas: #FAFAF8;
+      --bd-surface: #FFFFFF;
+      --bd-sunken: #F3F2EE;
+      --bd-line: #E7E5DF;
+      --bd-line-strong: #CFCCC3;
+      --bd-ink: #1A1A17;
+      --bd-ink-2: #55534C;
+      --bd-ink-3: #85827A;
+      --bd-accent: #1F4FD8;
+      --bd-on-accent: #FFFFFF;
+      --bd-accent-soft: #EAF0FE;
+      --bd-danger: #C2362B;
+      --bd-rate-again: #C2362B;
+      --bd-rate-hard: #9A5B00;
+      --bd-rate-good: #1F7A4D;
+      --bd-rate-easy: #1F4FD8;
+      --bd-scale: 1.0;
+      --bd-touch: 44px;
+      --bd-dock-offset: 12px;
+      /* Legacy aliases. --bg, --panel and --accent keep their literal values: the UI contract tests pin them. */
       --bg: #f2f4f6;
       --panel: #ffffff;
-      --border: #e5e8eb;
-      --text: #191f28;
-      --muted: #4e5968;
+      --surface: var(--bd-surface);
+      --surface-2: var(--bd-sunken);
+      --border: var(--bd-line);
+      --text: var(--bd-ink);
+      --muted: var(--bd-ink-2);
       --accent: #1b64da;
       --indigo: #1b64da;
       --emerald: #00a862;
@@ -27,6 +50,8 @@
       --card-radius: 22px;
     }
     body[data-persona-tier="kids"] {
+      --bd-scale: 1.25;
+      --bd-touch: 56px;
       --question-font-size: 1.55rem;
       --min-touch-target: 58px;
       --card-radius: 28px;
@@ -34,6 +59,7 @@
     }
     body[data-persona-tier="kids"] #main-tab-nav,
     body[data-persona-tier="kids"] #bd-collapsible-header-zone,
+    body[data-persona-tier="kids"] #btn-toggle-compact-header,
     body[data-persona-tier="kids"] #card-fsrs-meta,
     body[data-persona-tier="kids"] #btn-bury-card,
     body[data-persona-tier="kids"] #btn-suspend-card,
@@ -42,16 +68,24 @@
     body[data-persona-tier="kids"] #rate-4 {
       display: none !important;
     }
+    body[data-persona-tier="kids"][data-kids-parent-menu="open"] #main-tab-nav {
+      display: flex !important;
+    }
+    body:not([data-persona-tier="kids"]) #btn-kids-parent-unlock {
+      display: none !important;
+    }
     body[data-persona-tier="kids"] .card-arena {
-      background: #ffffff;
+      --bd-arena-bg: #ffffff;
       border: 2.5px solid #93c5fd;
       box-shadow: 0 10px 25px rgba(59, 130, 246, 0.08);
     }
     body[data-persona-tier="teen"] {
+      --bd-scale: 1.10;
+      --bd-touch: 48px;
       --question-font-size: 1.32rem;
       --min-touch-target: 50px;
       --card-radius: 22px;
-      background: #f8fafc;
+      background: var(--bd-canvas);
     }
     body[data-persona-tier="teen"] #card-fsrs-meta,
     body[data-persona-tier="teen"] #btn-decompose {
@@ -61,7 +95,7 @@
       --question-font-size: 1.15rem;
       --min-touch-target: 44px;
       --card-radius: 14px;
-      background: #f1f5f9;
+      background: var(--bd-canvas);
     }
     body[data-persona-tier="adult"] .app-shell {
       max-width: 860px;
@@ -72,11 +106,37 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
+      font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       padding: max(16px, env(safe-area-inset-top)) 18px max(96px, env(safe-area-inset-bottom));
+    }
+    button, select, textarea, input {
+      font-family: inherit;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    /* Counters, progress read-outs and review intervals keep fixed-width digits so they do not jitter. */
+    #study-queue-counters,
+    #bd-daily-session-counter,
+    #bd-deck-progress-dashboard,
+    #card-inline-progress-box,
+    #card-meta,
+    #card-fsrs-meta,
+    #sprint-progress-badge,
+    .metric-val,
+    .rating-grid .interval {
+      font-variant-numeric: tabular-nums;
     }
     .app-shell {
       max-width: 720px;
@@ -84,17 +144,23 @@
     }
     header {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
       gap: 10px;
       padding-bottom: 14px;
       margin-bottom: 14px;
     }
+    header button {
+      padding: 7px 11px;
+      font-size: 0.78rem;
+    }
     .brand-title {
       font-size: 1.3rem;
       font-weight: 800;
       letter-spacing: -0.03em;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 8px;
       color: var(--text);
@@ -177,6 +243,13 @@
         z-index: 100;
         box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
       }
+      /* Lift the sticky answer dock above the fixed bottom tab bar; kids mode hides that bar. */
+      body {
+        --bd-dock-offset: calc(max(10px, env(safe-area-inset-bottom)) + 76px);
+      }
+      body[data-persona-tier="kids"]:not([data-kids-parent-menu="open"]) {
+        --bd-dock-offset: max(12px, env(safe-area-inset-bottom));
+      }
     }
     .tab-page {
       display: none;
@@ -184,6 +257,29 @@
     }
     .tab-page.active {
       display: block;
+    }
+    /* UX-05: OLED True-Black Dark Mode Surface & Inline Style Overrides */
+    html[data-bd-theme="oled-dark"] body,
+    html[data-bd-theme="oled-dark"] .tab-nav,
+    html[data-bd-theme="oled-dark"] .panel,
+    html[data-bd-theme="oled-dark"] .card-arena,
+    html[data-bd-theme="oled-dark"] [style*="background:#ffffff"],
+    html[data-bd-theme="oled-dark"] [style*="background: #ffffff"],
+    html[data-bd-theme="oled-dark"] [style*="background:#f8fafc"],
+    html[data-bd-theme="oled-dark"] [style*="background: #f8fafc"],
+    html[data-bd-theme="oled-dark"] [style*="background:#fffbeb"],
+    html[data-bd-theme="oled-dark"] [style*="background:#f0fdf4"] {
+      background: var(--panel, #0a0a0f) !important;
+      color: var(--text, #f8fafc) !important;
+      border-color: var(--border, #1e1e2a) !important;
+    }
+    html[data-bd-theme="oled-dark"] input,
+    html[data-bd-theme="oled-dark"] select,
+    html[data-bd-theme="oled-dark"] textarea,
+    html[data-bd-theme="oled-dark"] button:not(.btn-primary) {
+      background: #111827 !important;
+      color: var(--text, #f8fafc) !important;
+      border-color: var(--border, #1e293b) !important;
     }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(4px); }
@@ -220,7 +316,8 @@
       font-weight: 500;
     }
     .card-arena {
-      background: #f9fafb;
+      --bd-arena-bg: #f9fafb;
+      background: var(--bd-arena-bg);
       border: 1px solid #e5e8eb;
       border-radius: var(--card-radius);
       padding: 28px 24px;
@@ -231,21 +328,23 @@
       margin-bottom: 14px;
     }
     .card-question {
-      font-size: var(--question-font-size);
-      line-height: 1.55;
+      /* The persona token still wins when it asks for a smaller size than the single-screen cap. */
+      font-size: min(var(--question-font-size), calc(1.22rem * var(--bd-scale)));
+      line-height: 1.38;
       font-weight: 800;
       color: var(--text);
       white-space: pre-wrap;
-      margin: 14px 0;
+      overflow-wrap: anywhere;
+      margin: 6px 0;
     }
     .card-answer {
-      margin-top: 16px;
-      padding: 16px;
-      border-radius: 16px;
+      margin-top: 6px;
+      padding: 8px 12px;
+      border-radius: 12px;
       background: #e8faf0;
       border-top: none;
-      font-size: 1.12rem;
-      line-height: 1.55;
+      font-size: calc(1.02rem * var(--bd-scale));
+      line-height: 1.45;
       color: #008a50;
       font-weight: 700;
       white-space: pre-wrap;
@@ -264,35 +363,510 @@
       display: none;
       white-space: pre-wrap;
     }
+    /* Thumb-zone answer dock: four equal columns pinned to the bottom of the study arena. */
     .rating-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
       margin-top: 14px;
+      position: sticky;
+      bottom: var(--bd-dock-offset);
+      z-index: 25;
+      background: rgba(255, 255, 255, 0.96);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      padding: 10px;
+      border: 1px solid var(--bd-line);
+      border-radius: 12px;
+    }
+    /* Three columns when the "easy" button is hidden (kids persona via CSS, junior tier via inline style). */
+    body[data-persona-tier="kids"] .rating-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .rating-grid:has(> .rate-btn[style*="display: none"]) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .rate-btn {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: var(--min-touch-target);
-      padding: 13px 8px;
-      border-radius: 16px;
-      border: none;
+      min-width: 0;
+      min-height: max(var(--min-touch-target), var(--bd-touch));
+      padding: 8px 6px;
+      border-radius: 10px;
+      border: 1.5px solid var(--rate-color, var(--bd-line-strong));
+      background: var(--bd-surface);
+      color: var(--rate-color, var(--bd-ink));
+      font-size: calc(0.92rem * var(--bd-scale));
       font-weight: 800;
+      line-height: 1.25;
+      text-align: center;
+      word-break: keep-all;
+    }
+    @media (max-width: 480px) {
+      .rating-grid {
+        gap: 6px;
+      }
+      .rate-btn {
+        padding: 6px 2px;
+        font-size: calc(0.78rem * var(--bd-scale));
+      }
+    }
+    .rate-btn:hover {
+      background: var(--bd-sunken);
+      border-color: var(--rate-color, var(--bd-line-strong));
+      color: var(--rate-color, var(--bd-ink));
     }
     .rate-sub {
-      font-size: 0.74rem;
-      opacity: 0.8;
-      margin-top: 3px;
+      font-size: calc(0.74rem * var(--bd-scale));
+      font-weight: 600;
+      opacity: 0.85;
+      margin-top: 2px;
     }
-    .rate-again { background: #fff0f0; color: #be123c; }
-    .rate-hard { background: #fff8e6; color: #b45309; }
-    .rate-good { background: #1b64da; color: #ffffff; }
-    .rate-good .rate-sub { color: rgba(255,255,255,0.9); }
-    .rate-easy { background: #e8f3ff; color: #1b64da; }
+    .rate-again { --rate-color: var(--bd-rate-again); }
+    .rate-hard { --rate-color: var(--bd-rate-hard); }
+    .rate-good { --rate-color: var(--bd-rate-good); }
+    .rate-easy { --rate-color: var(--bd-rate-easy); }
     .recommended-glow {
-      box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.35);
+      box-shadow: 0 0 0 3px rgba(31, 79, 216, 0.28);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--rate-color, var(--bd-accent)) 28%, transparent);
+    }
+    /* Study Theater: only the compact top bar, the card arena and the answer dock stay on screen. */
+    :is(body.focus-study-mode, body.bd-study-theater-active) {
+      --bd-dock-offset: max(12px, env(safe-area-inset-bottom));
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+    }
+    :is(body.focus-study-mode, body.bd-study-theater-active) #main-tab-nav,
+    :is(body.focus-study-mode, body.bd-study-theater-active)[data-kids-parent-menu="open"] #main-tab-nav,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #bd-kids-quick-start-bar,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #bd-collapsible-header-zone,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #deck-card-explorer-panel,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #study-tools-drawer,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #summary-sheet-panel,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #learner-policy-summary,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #btn-open-mode-setup,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #btn-reset-study,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #btn-toggle-compact-header,
+    :is(body.focus-study-mode, body.bd-study-theater-active) #btn-toggle-study-tools {
+      display: none !important;
+    }
+    :is(body.focus-study-mode, body.bd-study-theater-active) header {
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+    }
+    /* ==========================================================================
+       Zero-Scroll Study Viewport (100dvh)
+       One flex chain owns the height: body > .app-shell > #page-study > .panel > #card-arena.
+       Chrome rows are flex:none, the card arena takes whatever is left, and only the card body
+       (#card-arena > div:first-child) scrolls. The reveal toolbar and the answer dock never move.
+       The lock is scoped with :has(#page-study.active), so the other tabs keep their page scroll.
+       ========================================================================== */
+    html:has(#page-study.active) {
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+    body:has(#page-study.active) {
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+      padding: max(8px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
+    }
+    body:has(#page-study.active) .app-shell {
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    body:has(#page-study.active) header {
+      flex: none;
+      flex-wrap: nowrap;
+      margin-bottom: 6px;
+      padding: 2px 0;
+    }
+    body:has(#page-study.active) .brand-title {
+      flex: 1 1 auto;
+      min-width: 0;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow: hidden;
+      font-size: 1.12rem;
+      gap: 6px;
+    }
+    body:has(#page-study.active) .brand-title > span {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    body:has(#page-study.active) #learner-policy-summary {
+      flex: 1 1 0;
+    }
+    body:has(#page-study.active) header > div:last-child {
+      flex: none;
+    }
+    body:has(#page-study.active) header button {
+      white-space: nowrap;
+    }
+    /* Toasts float over the header instead of pushing the card down, let clicks through, and slide away on their own. */
+    body:has(#page-study.active) #ux-toast-banner {
+      position: fixed;
+      z-index: 150;
+      top: max(8px, env(safe-area-inset-top));
+      left: 50%;
+      width: min(692px, calc(100vw - 24px));
+      max-height: 32vh;
+      overflow: hidden;
+      margin: 0;
+      padding: 8px 12px;
+      transform: translateX(-50%);
+      font-size: 0.82rem;
+      line-height: 1.4;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+      pointer-events: none;
+      animation: bd-toast-leave 0.35s ease-in 6s forwards;
+    }
+    body:has(#page-study.active) #ux-toast-banner button {
+      pointer-events: auto;
+    }
+    @keyframes bd-toast-leave {
+      to { opacity: 0; transform: translate(-50%, calc(-100% - 32px)); }
+    }
+    body:has(#page-study.active) .tab-nav {
+      flex: none;
+      margin-bottom: 8px;
+      padding: 4px;
+    }
+    body:has(#page-study.active) .nav-tab-btn {
+      padding: 6px 4px;
+    }
+    @media (min-width: 769px) {
+      body:has(#page-study.active) .nav-tab-btn {
+        flex-direction: row;
+        gap: 6px;
+      }
+    }
+    @media (max-width: 768px) {
+      /* The bottom tab bar joins the flex chain, so nothing has to guess its height. */
+      body:has(#page-study.active) .tab-nav {
+        position: static;
+        order: 99;
+        margin: 8px 0 0;
+      }
+    }
+    body:has(#page-study.active) #page-study {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #page-study.active > .panel {
+      --bd-dock-offset: 0px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 16px;
+    }
+    body:has(#page-study.active) #page-study.active > .panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin-bottom: 0;
+      /* The panel itself never scrolls; only opened drawers and the card body (#card-arena > div:first-child) scroll internally. */
+      overflow: hidden;
+    }
+    #page-study.active > .panel > * {
+      flex: none;
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+    /* Horizontal chip rails: one line each, swipe or wheel sideways, never wrap downwards. */
+    .bd-rail {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+      min-width: 0;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .bd-rail::-webkit-scrollbar {
+      display: none;
+    }
+    .bd-rail > * {
+      flex: none;
+      white-space: nowrap;
+    }
+    #bd-kids-quick-start-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px 10px;
+    }
+    #bd-kids-quick-start-bar select {
+      max-width: 200px;
+    }
+    #page-study .panel-header {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      gap: 6px 8px;
+    }
+    #deck-select {
+      flex: 1 1 150px;
+      min-width: 0;
+      padding: 7px 12px;
+      font-size: 0.86rem;
+    }
+    #study-queue-counters {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+    #study-queue-counters > span,
+    #study-queue-counters > button {
+      padding: 5px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    #study-queue-counters > button {
+      font-size: 0.76rem;
+    }
+    @media (max-width: 768px) {
+      /* Pills share the deck row and the three toggles take one row below it. */
+      #study-queue-counters {
+        display: contents;
+      }
+      #deck-select {
+        flex-basis: 96px;
+      }
+    }
+    /* Opened panels are capped so they can never push the card off the screen. */
+    #bd-collapsible-header-zone,
+    #study-tools-drawer,
+    #deck-card-explorer-panel,
+    #summary-sheet-panel {
+      max-height: 30vh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    #deck-card-explorer-panel > div:first-child,
+    #summary-sheet-panel > div:first-child {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      margin-top: -6px;
+      padding: 6px 0;
+      background: #ffffff;
+    }
+    #page-study .ai-box {
+      margin-top: 6px;
+      padding: 8px 11px;
+    }
+    #page-study.active > .panel > #card-arena {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+    #card-arena {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+    #card-arena > div:first-child {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+    }
+    #card-inline-progress-box > div:first-child > span {
+      white-space: nowrap;
+    }
+    #card-inline-deck-pct {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .bd-card-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px 8px;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+    .bd-card-meta-row > div {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .bd-card-meta-row > div:first-child {
+      flex: 1 1 220px;
+      min-width: 0;
+    }
+    .bd-card-meta-row > div:first-child > * {
+      flex: none;
+      white-space: nowrap;
+    }
+    .bd-card-meta-row > div:first-child > #card-meta {
+      flex: 1 1 0;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #card-svg-diagram svg {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      max-height: min(150px, 20vh);
+      margin: 0 auto;
+    }
+    /* 4-choice quiz: always 2 x 2, so four options cost two rows instead of four. */
+    .bd-quiz-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px 8px;
+      margin-bottom: 6px;
+      font-size: 0.78rem;
+    }
+    .bd-quiz-head > div:first-child {
+      flex: 1 1 240px;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bd-quiz-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .bd-quiz-grid > button {
+      min-height: max(40px, calc(var(--bd-touch) - 8px));
+      padding: 8px 10px;
+      font-size: calc(0.84rem * var(--bd-scale));
+      line-height: 1.3;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+    /* Answer toolbar: one row. Secondary tools slide sideways under the pinned reveal button. */
+    .bd-card-toolbar {
+      flex: none;
+      margin-top: 8px;
+    }
+    .bd-card-toolbar > button {
+      padding: 7px 11px;
+      font-size: 0.8rem;
+    }
+    #solve-mode-badge {
+      order: -2;
+    }
+    #btn-hint {
+      order: -1;
+    }
+    #btn-reveal {
+      position: sticky;
+      right: 0;
+      max-width: 64%;
+      min-height: calc(var(--bd-touch) - 8px);
+      margin-left: auto;
+      padding: 7px 16px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.86rem;
+      box-shadow: -10px 0 8px -2px var(--bd-arena-bg);
+    }
+    #hint-box,
+    #eval-box {
+      max-height: 22vh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+    #typing-solve-zone > button {
+      padding: 9px 12px;
+    }
+    #recall-input {
+      padding: 9px 12px;
+    }
+    #page-study .rating-grid {
+      gap: 6px;
+      padding: 6px;
+    }
+    #page-study .rate-btn {
+      padding: 4px 6px;
+    }
+    @media (max-width: 480px) {
+      body:has(#page-study.active) {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+      body:has(#page-study.active) .brand-title {
+        font-size: 1rem;
+      }
+      /* The profile button and the profile rail already name the tier, so the header keeps one line. */
+      body:has(#page-study.active) #age-tier-banner,
+      body:has(#page-study.active) #learner-policy-summary {
+        display: none;
+      }
+      body:has(#page-study.active) header button {
+        padding: 6px 8px;
+        font-size: 0.72rem;
+      }
+      body:has(#page-study.active) #btn-open-mode-setup {
+        max-width: 8.5em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #page-study.active > .panel {
+        padding: 10px 12px;
+      }
+      /* Phones: both quick-start rails merge into one swipeable line, with the profile and the two start buttons first. */
+      #bd-kids-quick-start-bar {
+        flex-direction: row;
+        align-items: center;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+      }
+      #bd-kids-quick-start-bar::-webkit-scrollbar {
+        display: none;
+      }
+      #bd-kids-quick-start-bar > .bd-rail {
+        display: contents;
+      }
+      #bd-kids-quick-start-bar #bd-family-profile-select {
+        order: -2;
+        max-width: 7em;
+      }
+      #bd-quick-eng-level,
+      #btn-quick-start-english,
+      #bd-quick-hanja-level,
+      #btn-quick-start-hanja {
+        order: -1;
+      }
+      #card-arena {
+        padding: 10px 12px;
+      }
+      .card-question {
+        font-size: min(var(--question-font-size), calc(1.08rem * var(--bd-scale)));
+      }
+      #study-queue-counters > span,
+      #study-queue-counters > button {
+        padding: 4px 8px;
+        font-size: 0.72rem;
+      }
     }
     .metrics-grid {
       display: grid;
@@ -367,6 +941,7 @@
   </style>
 </head>
 <body>
+  <div id="aria-live-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <!-- Initial Mode & LearnerProfile v2 Setup Modal (Frame 1: 3 Questions) -->
   <div id="onboarding-modal" class="onboarding-overlay">
     <div class="onboarding-card" style="max-width:460px;">
@@ -429,26 +1004,26 @@
   </div>
 
   <div class="app-shell">
-    <header style="flex-wrap:wrap;">
-      <div class="brand-title" style="flex-wrap:wrap;">
+    <header>
+      <div class="brand-title">
         BrainDeck (브레인덱)
         <span id="age-tier-banner" class="badge-pill">중고등</span>
         <span id="learner-policy-summary" style="font-size:0.74rem;font-weight:600;color:var(--muted);"></span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button id="btn-open-mode-setup" type="button" style="padding:7px 11px;font-size:0.78rem;">
+        <button id="btn-open-mode-setup" type="button">
           프로필 설정
         </button>
-        <button id="btn-undo-review" type="button" style="padding:7px 11px;font-size:0.78rem;" title="방금 평가 되돌리기 (Z)">
+        <button id="btn-undo-review" type="button" title="방금 평가 되돌리기 (Z)">
           취소
         </button>
-        <button id="btn-reset-study" type="button" style="padding:7px 11px;font-size:0.78rem;background:#fff0f0;color:#be123c;border-color:#fecdd3;" title="현재 덱 학습 진도 및 복습 상태 처음부터 초기화">
+        <button id="btn-reset-study" type="button" style="background:#fff0f0;color:#be123c;border-color:#fecdd3;" title="현재 덱 학습 진도 및 복습 상태 처음부터 초기화">
           초기화
         </button>
       </div>
     </header>
 
-    <div id="ux-toast-banner" class="ai-box" style="margin:0 0 14px 0;display:none;align-items:center;justify-content:space-between;gap:10px;font-weight:600;"></div>
+    <div id="ux-toast-banner" class="ai-box" role="status" style="margin:0 0 14px 0;display:none;align-items:center;justify-content:space-between;gap:10px;font-weight:600;"></div>
 
     <!-- 5-Tab Multi-Page Navigation -->
     <nav id="main-tab-nav" class="tab-nav" aria-label="주요 메뉴">
@@ -478,16 +1053,14 @@
     <main id="page-study" class="tab-page active">
       <section class="panel">
         <!-- Unified Single-Screen Focus Bar (English & Hanja Level Selectors + Family Profile + Daily Goal + User Manual) -->
-        <div id="bd-kids-quick-start-bar" style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px;border-radius:16px;background:linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%);border:1.5px solid #93c5fd;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span id="bd-rust-engine-badge" class="badge-pill" style="background:#1e293b;color:#f8fafc;font-size:0.72rem;font-weight:800;">🦀 Rust/WASM Core</span>
+        <div id="bd-kids-quick-start-bar" style="border-radius:16px;background:linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%);border:1.5px solid #93c5fd;">
+          <div class="bd-rail">
             <select id="bd-family-profile-select" style="width:auto;padding:5px 10px;font-size:0.78rem;font-weight:800;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="연령·목적별 맞춤 UI 및 기억 엔진 전환">
               <option value="kid1" selected>👦 초등 키즈 · 첫째 (놀이·3버튼)</option>
               <option value="kid2">👧 초등 키즈 · 둘째 (놀이·3버튼)</option>
               <option value="teen">🧑‍🎓 중고등 내신·수능 (오답·스프린트)</option>
               <option value="adult">👨 성인·프로 워크스페이스 (정밀지표·전체도구)</option>
             </select>
-            <span id="bd-persona-mode-badge" class="badge-pill" style="background:#dbeafe;color:#1e40af;font-size:0.73rem;font-weight:800;">🎈 초등 키즈 놀이학습 (큰 글씨 · 3버튼 · 4지선다)</span>
             <select id="bd-daily-goal-select" style="width:auto;padding:5px 9px;font-size:0.76rem;font-weight:800;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="오늘의 목표 문제 수">
               <option value="10">하루 10문제</option>
               <option value="15" selected>하루 15문제</option>
@@ -496,17 +1069,10 @@
             </select>
             <span id="bd-daily-session-counter" style="font-size:0.8rem;font-weight:800;color:#0f172a;">🎯 오늘의 목표 0 / 15문제</span>
             <span id="bd-daily-stamp-strip" style="font-size:0.78rem;letter-spacing:1px;">⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪</span>
+            <span id="bd-persona-mode-badge" class="badge-pill" style="background:#dbeafe;color:#1e40af;font-size:0.73rem;font-weight:800;">🎈 초등 키즈 놀이학습 (큰 글씨 · 3버튼 · 4지선다)</span>
+            <span id="bd-rust-engine-badge" class="badge-pill" style="background:#1e293b;color:#f8fafc;font-size:0.72rem;font-weight:800;">🦀 Rust/WASM Core</span>
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-            <button type="button" id="btn-quick-speak-now" style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#ffffff;color:#1d4ed8;border:1px solid #93c5fd;" title="현재 영단어 발음 듣기 (단축키 R)">
-              🔊 발음 듣기
-            </button>
-            <button type="button" id="btn-toggle-auto-tts" aria-pressed="true" style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#ffffff;color:#1d4ed8;border:1px solid #93c5fd;">
-              🔊 자동발음 ON
-            </button>
-            <button type="button" id="btn-quick-today-wrong" disabled style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;">
-              📝 오늘 오답 (0)
-            </button>
+          <div class="bd-rail">
             <select id="bd-quick-eng-level" style="width:auto;padding:5px 8px;font-size:0.76rem;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="영어 단계 선택">
               <option value="moe-eng:elem-3-4" selected>🇬🇧 초3·4 필수(240)</option>
               <option value="moe-eng:elementary">🇬🇧 초5·6 완성(400)</option>
@@ -526,32 +1092,44 @@
             <button type="button" id="btn-quick-start-hanja" class="btn-primary" style="padding:6px 12px;font-size:0.8rem;border-radius:999px;background:#047857;border-color:#047857;">
               한자 시작
             </button>
+            <button type="button" id="btn-quick-speak-now" style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#ffffff;color:#1d4ed8;border:1px solid #93c5fd;" title="현재 영단어 발음 듣기 (단축키 R)">
+              🔊 발음 듣기
+            </button>
+            <button type="button" id="btn-toggle-auto-tts" aria-pressed="true" style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#ffffff;color:#1d4ed8;border:1px solid #93c5fd;">
+              🔊 자동발음 ON
+            </button>
+            <button type="button" id="btn-quick-today-wrong" disabled style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;">
+              📝 오늘 오답 (0)
+            </button>
             <button type="button" id="btn-open-user-manual" style="padding:6px 11px;font-size:0.76rem;font-weight:800;border-radius:999px;background:#0f172a;color:#ffffff;border:1px solid #0f172a;" title="아이·학부모 눈높이 사용설명서 열기 (단축키 ?)">
               📖 사용설명서
             </button>
+            <button type="button" id="btn-kids-parent-unlock" aria-expanded="false" style="padding:6px 11px;font-size:0.76rem;font-weight:800;border-radius:999px;background:#ffffff;color:#334155;border:1px solid #cbd5e1;" title="키즈 모드에서 부모님 전체 메뉴(5탭) 열기/닫기">
+              👨‍👩‍👧 전체메뉴
+            </button>
           </div>
         </div>
-        <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
-          <select id="deck-select" style="flex:1;min-width:180px;"></select>
+        <div class="panel-header">
+          <select id="deck-select"></select>
           <!-- 3-Color Queue Counter Pills + Progressive Disclosure Study Tools Toggle (Contract C1 + BD-P0-02 Compact Header Toggle) -->
-          <div id="study-queue-counters" style="display:flex;gap:6px;align-items:center;font-size:0.78rem;font-weight:800;flex-wrap:wrap;">
-            <span id="count-new" style="padding:5px 10px;border-radius:999px;background:#e8f3ff;color:#1b64da;">새 카드 0</span>
-            <span id="count-learn" style="padding:5px 10px;border-radius:999px;background:#fff0f0;color:#be123c;">학습·오답 0</span>
-            <span id="count-review" style="padding:5px 10px;border-radius:999px;background:#e8faf0;color:#008a50;">복습 0</span>
-            <span id="active-study-filter-summary" class="badge-pill" style="display:none;background:#eef2ff;color:#1d4ed8;font-size:0.74rem;"></span>
-            <button type="button" id="btn-focus-study-mode" aria-pressed="false" style="padding:5px 11px;font-size:0.76rem;border-radius:999px;background:#eef2ff;color:#1d4ed8;border-color:#c7d2fe;" title="하단 탭과 상단 대시보드를 모두 숨기고 플래시카드에만 몰입하는 집중 모드">
+          <div id="study-queue-counters">
+            <span id="count-new" style="background:#e8f3ff;color:#1b64da;">새 카드 0</span>
+            <span id="count-learn" style="background:#fff0f0;color:#be123c;">학습·오답 0</span>
+            <span id="count-review" style="background:#e8faf0;color:#008a50;">복습 0</span>
+            <span id="active-study-filter-summary" class="badge-pill" style="display:none;background:#eef2ff;color:#1d4ed8;"></span>
+            <button type="button" id="btn-focus-study-mode" aria-pressed="false" style="background:#eef2ff;color:#1d4ed8;border-color:#c7d2fe;" title="하단 탭과 상단 대시보드를 모두 숨기고 플래시카드에만 몰입하는 집중 모드">
               🎯 집중모드
             </button>
-            <button type="button" id="btn-toggle-compact-header" aria-expanded="true" style="padding:5px 11px;font-size:0.76rem;border-radius:999px;" title="상단 학습계획 및 대시보드 접기/펼치기 (카드 집중 뷰)">
-              대시보드 접기
+            <button type="button" id="btn-toggle-compact-header" aria-expanded="false" aria-controls="bd-collapsible-header-zone" title="상단 학습계획 및 대시보드 접기/펼치기 (카드 집중 뷰)">
+              대시보드 펼치기
             </button>
-            <button type="button" id="btn-toggle-study-tools" aria-expanded="false" style="padding:5px 11px;font-size:0.76rem;border-radius:999px;" title="필터 · 문제유형 · 요약시트 · 인쇄 · 오디오 도구 열기">
+            <button type="button" id="btn-toggle-study-tools" aria-expanded="false" title="필터 · 문제유형 · 요약시트 · 인쇄 · 오디오 도구 열기">
               필터·도구
             </button>
           </div>
         </div>
 
-        <div id="bd-collapsible-header-zone">
+        <div id="bd-collapsible-header-zone" style="display:none;">
         <!-- Always-Visible D-Day Study Planner & Daily Quota Controller (v5.9 Upgrade) -->
         <div id="bd-planner-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:10px 12px;border-radius:16px;background:#eef2ff;border:1px solid #c7d2fe;">
           <span style="font-size:0.78rem;font-weight:800;color:#1d4ed8;">D-Day 학습계획 · 일일 할당량:</span>
@@ -597,12 +1175,11 @@
         </div>
 
         <!-- IMPL-V61: 0.5-Second Multi-Dimensional Progress & Mastery Dashboard (Today % + 1,000-Card Coverage % + 4-Tier Maturity Bar + Lv1~Lv4 Stage Filter) -->
-        <div id="bd-deck-progress-dashboard" style="margin-bottom:12px;padding:12px 14px;border-radius:16px;background:#ffffff;border:1px solid #cbd5e1;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+        <div id="bd-deck-progress-dashboard" style="padding:12px 14px;border-radius:16px;background:#ffffff;border:1px solid #cbd5e1;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
           <!-- Row 1: Today's Daily Goal Progress Bar -->
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;font-size:0.8rem;">
             <div>
-              <strong style="color:#0f172a;">오늘 목표 진척률:</strong>
-              <span id="bd-today-progress-label" style="font-weight:800;color:#2563eb;font-variant-numeric:tabular-nums;">0 / 30장 완료 (0.0%)</span>
+              <span id="bd-today-progress-label" style="font-weight:800;color:#2563eb;font-variant-numeric:tabular-nums;">오늘 목표 진척률: 0 / 30장 완료 (0.0%)</span>
             </div>
             <div id="bd-today-eta-label" style="font-size:0.75rem;font-weight:700;color:#475569;font-variant-numeric:tabular-nums;">
               남은 시간 약 7분
@@ -615,11 +1192,9 @@
           <!-- Row 2: 1,000-Card Whole-Deck Coverage % & FSRS Mastery % + 4-Tier Stacked Bar -->
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;font-size:0.79rem;">
             <div>
-              <strong style="color:#0f172a;">전체 덱 진도율:</strong>
-              <span id="bd-deck-coverage-label" style="font-weight:800;color:#047857;font-variant-numeric:tabular-nums;">0 / 1,020장 (0.0%)</span>
+              <span id="bd-deck-coverage-label" style="font-weight:800;color:#047857;font-variant-numeric:tabular-nums;">전체 덱 진도율 (1회 이상 학습): 0.0% (0 / 1,020장)</span>
               <span style="color:#94a3b8;margin:0 4px;">|</span>
-              <strong style="color:#0f172a;">기억 마스터리:</strong>
-              <span id="bd-deck-mastery-label" style="font-weight:800;color:#4f46e5;font-variant-numeric:tabular-nums;">0.0%</span>
+              <span id="bd-deck-mastery-label" style="font-weight:800;color:#4f46e5;font-variant-numeric:tabular-nums;">FSRS 가중 숙련도: 0.0% · 장기마스터 0.0%</span>
             </div>
             <div id="bd-deck-milestone-label" style="font-size:0.74rem;font-weight:700;color:#0f766e;">
               첫 10% 돌파까지 102장
@@ -676,7 +1251,7 @@
         </div>
 
         <!-- IMPL-V61 AC-5: Deck Card Explorer & Instant Search Drawer -->
-        <div id="deck-card-explorer-panel" style="display:none;margin-bottom:14px;padding:14px;border-radius:18px;background:#ffffff;border:2px solid #818cf8;box-shadow:0 8px 24px rgba(15,23,42,0.08);">
+        <div id="deck-card-explorer-panel" style="display:none;padding:12px;border-radius:18px;background:#ffffff;border:2px solid #818cf8;box-shadow:0 8px 24px rgba(15,23,42,0.08);">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
             <div style="font-weight:800;color:#312e81;font-size:0.9rem;">
               덱 전체 카드 진도표 · 키워드 검색 (<span id="explorer-total-label">0장</span>)
@@ -700,11 +1275,11 @@
               <option value="lv4">Lv.4 최고급</option>
             </select>
           </div>
-          <div id="explorer-card-rows" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;"></div>
+          <div id="explorer-card-rows" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
 
         <!-- Contract C1: Collapsible Study Tools & Filter Drawer (Default closed for Zen focus, Zero Feature Loss) -->
-        <div id="study-tools-drawer" style="display:none;margin-bottom:12px;padding:12px;border-radius:16px;background:#f8fafc;border:1px solid var(--border);">
+        <div id="study-tools-drawer" style="display:none;padding:12px;border-radius:16px;background:#f8fafc;border:1px solid var(--border);">
           <!-- Study Filter Chips (All / Wrong-Unknown Only / Marked Only + Smart Interleaved Shuffle Toggle) -->
           <div id="study-filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
             <button type="button" class="study-filter-btn btn-primary" data-filter="all" style="padding:7px 13px;font-size:0.8rem;">
@@ -763,7 +1338,7 @@
         </div>
 
         <!-- Electronic Red-Cellophane Summary Sheet Panel (v5.6 RN-1) -->
-        <div id="summary-sheet-panel" style="display:none;margin-bottom:14px;padding:16px;border-radius:18px;background:#ffffff;border:2px solid #fecdd3;">
+        <div id="summary-sheet-panel" style="display:none;padding:12px;border-radius:18px;background:#ffffff;border:2px solid #fecdd3;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
             <div style="font-weight:800;color:#be123c;font-size:0.92rem;">시험 5분 전 전자 빨간 셀로판지 요약시트 (정답 탭하여 확인)</div>
             <div style="display:flex;gap:6px;">
@@ -771,15 +1346,15 @@
               <button type="button" id="btn-summary-close" style="padding:5px 10px;font-size:0.76rem;">닫기</button>
             </div>
           </div>
-          <div id="summary-sheet-rows" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;"></div>
+          <div id="summary-sheet-rows" style="display:flex;flex-direction:column;gap:8px;"></div>
         </div>
 
-        <div id="leech-banner" class="ai-box" style="border-color:var(--rose);color:var(--rose);margin-bottom:10px;"></div>
+        <div id="leech-banner" class="ai-box" style="border-color:var(--rose);color:var(--rose);"></div>
 
-        <div class="card-arena">
+        <div class="card-arena" id="card-arena">
           <div>
             <!-- Rust/WASM Hanja Radical/Stroke & English Phonics Live Coaching Banner -->
-            <div id="bd-card-coaching-banner" style="display:none;margin-bottom:10px;padding:9px 12px;border-radius:12px;background:#f0fdf4;border:1px solid #86efac;color:#065f46;font-size:0.8rem;font-weight:700;"></div>
+            <div id="bd-card-coaching-banner" style="display:none;margin-bottom:6px;padding:5px 10px;border-radius:10px;background:#f0fdf4;border:1px solid #86efac;color:#065f46;font-size:0.76rem;font-weight:700;"></div>
 
             <!-- Daily 15-Card Session Completion Celebration Modal -->
             <div id="bd-session-complete-modal" role="dialog" aria-modal="true" aria-label="오늘의 학습 목표 완주" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
@@ -812,46 +1387,57 @@
             </div>
 
             <!-- In-Card Live Progress Bar & Percentage Header (Always Visible Inside Flashcard Arena) -->
-            <div id="card-inline-progress-box" style="margin-bottom:12px;padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.78rem;font-weight:800;margin-bottom:6px;">
+            <div id="card-inline-progress-box" style="margin-bottom:6px;padding:5px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:0.72rem;font-weight:800;margin-bottom:4px;">
                 <span id="card-inline-today-pct" style="color:var(--accent);">오늘 진척률: 0.0% (0/30장 완료)</span>
                 <span id="card-inline-deck-pct" style="color:#047857;">전체 덱 진도율: 0.0% (0/1,020장) · 숙련도 0.0%</span>
               </div>
-              <div style="width:100%;height:7px;border-radius:999px;background:#e2e8f0;overflow:hidden;position:relative;">
+              <div style="width:100%;height:5px;border-radius:999px;background:#e2e8f0;overflow:hidden;position:relative;">
                 <div id="card-inline-today-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#3182f6,#10b981);transition:width 0.25s ease;"></div>
               </div>
             </div>
 
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.78rem;color:var(--muted);">
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div class="bd-card-meta-row">
+              <div>
                 <span id="card-qtype-badge" class="badge-pill" style="font-size:0.74rem;background:#eef2ff;color:#1d4ed8;">단어 뜻·어휘</span>
                 <span id="sprint-progress-badge" class="badge-pill" style="font-size:0.72rem;background:#ecfdf5;color:#047857;">스프린트 1</span>
                 <span id="card-meta">준비 중...</span>
               </div>
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <div>
                 <span id="card-fsrs-meta" style="display:none;"></span>
-                <select id="select-card-flag" style="width:auto;padding:3px 7px;font-size:0.72rem;border-radius:10px;" title="7색 플래그 지정 (단축키 F)">
-                  <option value="0">플래그 없음</option>
-                  <option value="1">[Red] 집중 요주의</option>
-                  <option value="2">[Orange] 시험 전 재확인</option>
-                  <option value="3">[Green] 암기 완료 후보</option>
-                  <option value="4">[Blue] 예문 보충</option>
-                  <option value="5">[Pink] 오답 노트</option>
-                  <option value="6">[Teal] 발음 체크</option>
-                  <option value="7">[Purple] 심화 변별</option>
-                </select>
                 <button id="btn-play-tts" type="button" style="padding:4px 9px;font-size:0.74rem;color:#1d4ed8;border-color:#bfdbfe;" title="표제어 발음 듣기 (Web Speech TTS)">🔊 발음 듣기</button>
                 <button id="btn-mark-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="중요 표시">☆ 중요</button>
-                <button id="btn-bury-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="오늘 하루 숨기기 (단축키 -)">숨김</button>
-                <button id="btn-suspend-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="카드 일시 정지 (단축키 @)">정지</button>
-                <button id="btn-edit-current-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="카드 앞·뒷면 수정 (FSRS 이력 보존)">편집</button>
-                <button id="btn-delete-current-card" type="button" style="padding:4px 9px;font-size:0.74rem;color:#be123c;border-color:#fecdd3;" title="카드 삭제">삭제</button>
+                <details id="card-more-actions-menu" style="position:relative;display:inline-block;">
+                  <summary id="btn-card-more-actions" style="list-style:none;cursor:pointer;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#f8fafc;font-size:0.74rem;font-weight:800;color:var(--text);" title="플래그 · 숨김 · 정지 · 편집 · 삭제 · 오류제보 · 다크모드">⋯ 카드 관리</summary>
+                  <div style="position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:230px;padding:10px;border-radius:14px;background:#ffffff;border:1px solid var(--border);box-shadow:0 12px 28px rgba(15,23,42,0.14);display:flex;flex-direction:column;gap:6px;">
+                    <select id="select-card-flag" style="width:100%;padding:5px 8px;font-size:0.74rem;border-radius:10px;" title="7색 플래그 지정 (단축키 F)">
+                      <option value="0">플래그 없음</option>
+                      <option value="1">[Red] 집중 요주의</option>
+                      <option value="2">[Orange] 시험 전 재확인</option>
+                      <option value="3">[Green] 암기 완료 후보</option>
+                      <option value="4">[Blue] 예문 보충</option>
+                      <option value="5">[Pink] 오답 노트</option>
+                      <option value="6">[Teal] 발음 체크</option>
+                      <option value="7">[Purple] 심화 변별</option>
+                    </select>
+                    <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                      <button id="btn-bury-card" type="button" style="flex:1;padding:5px 8px;font-size:0.74rem;" title="오늘 하루 숨기기 (단축키 -)">숨김</button>
+                      <button id="btn-suspend-card" type="button" style="flex:1;padding:5px 8px;font-size:0.74rem;" title="카드 일시 정지 (단축키 @)">정지</button>
+                      <button id="btn-edit-current-card" type="button" style="flex:1;padding:5px 8px;font-size:0.74rem;" title="카드 앞·뒷면 수정 (FSRS 이력 보존)">편집</button>
+                      <button id="btn-delete-current-card" type="button" style="flex:1;padding:5px 8px;font-size:0.74rem;color:#be123c;border-color:#fecdd3;" title="카드 삭제">삭제</button>
+                    </div>
+                    <div style="display:flex;gap:5px;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--border);">
+                      <button id="btn-report-errata" type="button" title="오타·해설 개선 1클릭 제보" style="flex:1;font-size:0.74rem;padding:5px 8px;">🚨 오류제보</button>
+                      <button id="btn-oled-theme-toggle" type="button" title="OLED True-Black 다크모드 전환" style="flex:1;font-size:0.74rem;padding:5px 8px;">🌙 다크모드</button>
+                    </div>
+                  </div>
+                </details>
               </div>
             </div>
             <div class="card-question" id="card-question">오늘 카드를 모두 끝냈어요!</div>
-            <div id="card-svg-diagram" role="region" aria-label="개념 시각 다이어그램" style="display:none;margin:8px 0;"></div>
+            <div id="card-svg-diagram" role="region" aria-label="개념 시각 다이어그램" style="display:none;margin:6px 0;"></div>
             <div class="card-answer" id="card-answer"></div>
-            <div id="card-extra-explanation" class="ai-box" style="margin-top:8px;display:none;background:#ffffff;color:#4e5968;border:1px solid #e5e8eb;"></div>
+            <div id="card-extra-explanation" class="ai-box" style="display:none;background:#ffffff;color:#4e5968;border:1px solid #e5e8eb;"></div>
             <!-- v13.0 Contract C11: Hanja & Spelling Handwriting Scratchpad Canvas -->
             <div id="bd-scratchpad-drawer" style="display:none;margin-top:10px;padding:12px;border-radius:14px;background:#fffbeb;border:1.5px solid #f59e0b;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:0.78rem;font-weight:800;color:#b45309;flex-wrap:wrap;gap:6px;">
@@ -886,10 +1472,10 @@
               </div>
               <div id="bd-prod-feedback" style="margin-top:6px;font-size:0.78rem;font-weight:700;color:#047857;"></div>
             </div>
-            <div id="interactive-quiz-box" class="ai-box" style="margin-top:12px;"></div>
+            <div id="interactive-quiz-box" class="ai-box"></div>
 
             <!-- Post-Session Wrong/Unknown Retry Box -->
-            <div id="post-session-retry-box" style="display:none;margin-top:14px;padding:16px;border-radius:16px;background:#fff0f0;text-align:center;">
+            <div id="post-session-retry-box" style="display:none;margin-top:8px;padding:12px;border-radius:16px;background:#fff0f0;text-align:center;">
               <div id="post-session-summary" style="font-size:0.9rem;font-weight:700;color:#be123c;margin-bottom:10px;"></div>
               <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
                 <button id="btn-retry-wrong-now" type="button" class="btn-primary" style="background:#be123c;border-color:#be123c;">
@@ -902,17 +1488,15 @@
             </div>
           </div>
 
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;align-items:center;">
+          <div class="bd-rail bd-card-toolbar">
             <span id="solve-mode-badge" class="badge-pill" style="font-size:0.74rem;">4지선다 모드</span>
-            <button id="btn-tts" type="button">발음</button>
+            <button id="btn-tts" type="button" style="display:none;" aria-hidden="true">발음</button>
             <button id="btn-quiz-mode" type="button" title="현재 카드 풀이 방식 전환">풀이방식 전환</button>
             <button id="btn-toggle-active-production" type="button" title="받아쓰기 · 어순배열 · 발음 섀도잉 능동 인출 훈련 열기">🎧 능동훈련</button>
             <button id="btn-toggle-scratchpad" type="button" title="한자·영단어 손글씨 연습장 열기">✍️ 필기장</button>
             <button id="btn-hint" type="button">힌트</button>
-            <button id="btn-report-errata" type="button" title="오타·해설 개선 1클릭 제보" style="font-size:0.76rem;padding:7px 10px;">🚨 오류제보</button>
-            <button id="btn-oled-theme-toggle" type="button" title="OLED True-Black 다크모드 전환" style="font-size:0.76rem;padding:7px 10px;">🌙 다크모드</button>
             <button id="btn-decompose" type="button" title="어려운 카드를 쉽게 쪼개기" style="display:none;">쪼개기</button>
-            <button id="btn-reveal" class="btn-primary" type="button" style="margin-left:auto;padding:10px 18px;">
+            <button id="btn-reveal" class="btn-primary" type="button">
               정답 보기
             </button>
           </div>
@@ -921,37 +1505,37 @@
         <div id="hint-box" class="ai-box"></div>
 
         <!-- Typing Answer Input + 3-Tier Understanding Grader (Shown only in typing mode under 1-Card 1-Mode) -->
-        <div id="typing-solve-zone" style="margin-top:12px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div id="typing-solve-zone" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           <button id="btn-dont-know" type="button" style="white-space:nowrap;background:#fff0f0;color:#be123c;border-color:#fecdd3;">
             모름
           </button>
-          <input type="text" id="recall-input" placeholder="답을 직접 입력해 기억을 인출해 보세요..." style="flex:1;min-width:180px;" />
+          <input type="text" id="recall-input" placeholder="답을 직접 입력해 기억을 인출해 보세요..." style="flex:1 1 120px;min-width:0;" />
           <button id="btn-eval" type="button" class="btn-primary" style="white-space:nowrap;">채점 확인</button>
           <button id="btn-override-correct" type="button" style="display:none;white-space:nowrap;background:#ecfdf5;color:#047857;border-color:#6ee7b7;" title="오타·유의어로 부분점수가 나왔을 때 정답으로 인정하고 바로 넘어갑니다">
             내 답이 맞아요
           </button>
         </div>
-        <div id="eval-box" class="ai-box" style="margin-bottom:12px;"></div>
+        <div id="eval-box" class="ai-box"></div>
 
         <!-- Metacognitive Rating Calibration Banner (Frame 3: EvidenceRatingGuard) -->
-        <div id="rating-guard-banner" style="display:none;margin-bottom:8px;padding:9px 12px;border-radius:12px;background:#f8fafc;border:1px solid var(--border);font-size:0.8rem;font-weight:700;color:var(--muted);"></div>
+        <div id="rating-guard-banner" style="display:none;padding:5px 10px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);font-size:0.76rem;font-weight:700;color:var(--muted);"></div>
 
         <div class="rating-grid" id="rating-grid-box" style="display:none;">
           <button class="rate-btn rate-again" id="rate-1" data-rating="1">
             <span id="rate-title-1">다시</span>
-            <span class="rate-sub" id="preview-1">&lt;1분</span>
+            <span class="rate-sub interval" id="preview-1">&lt;1분</span>
           </button>
           <button class="rate-btn rate-hard" id="rate-2" data-rating="2">
             <span id="rate-title-2">어려움</span>
-            <span class="rate-sub" id="preview-2">6분</span>
+            <span class="rate-sub interval" id="preview-2">6분</span>
           </button>
           <button class="rate-btn rate-good" id="rate-3" data-rating="3">
             <span id="rate-title-3">알맞음</span>
-            <span class="rate-sub" id="preview-3">10분</span>
+            <span class="rate-sub interval" id="preview-3">10분</span>
           </button>
           <button class="rate-btn rate-easy" id="rate-4" data-rating="4">
             <span id="rate-title-4">쉬움</span>
-            <span class="rate-sub" id="preview-4">4일</span>
+            <span class="rate-sub interval" id="preview-4">4일</span>
           </button>
         </div>
       </section>
@@ -1073,9 +1657,9 @@
             <option value="lv3">Lv.3 심화·역방향</option>
             <option value="mixed">통합 (Lv.1~3)</option>
           </select>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--muted);cursor:pointer;">
-            <input type="checkbox" id="doc-auto-save" checked />
-            바로 저장
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--muted);cursor:pointer;" title="체크 해제 시 추출된 카드를 미리보기로 편집·제외한 뒤 일괄 저장합니다">
+            <input type="checkbox" id="doc-auto-save" />
+            즉시 저장 (해제 시 미리보기·편집)
           </label>
         </div>
 
@@ -1184,6 +1768,7 @@
 
         <div id="store-status-msg" style="font-size:0.82rem;color:var(--emerald);margin-bottom:8px;"></div>
         <div id="store-pack-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <div id="store-trademark-disclaimer-box" style="margin-top:14px;padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid var(--border);font-size:0.74rem;color:var(--muted);line-height:1.5;white-space:pre-line;">⚖️ 비제휴 및 호환성 안내: 본 스토어의 교과서 출판사명 및 검정 시험명은 학생의 학습 진도 호환과 시험 대비 범위를 안내하기 위한 설명적 표기이며, 해당 출판사·주관사와 제휴되거나 공식 보증받지 않은 비공식 독립 콘텐츠입니다.</div>
       </div>
     </section>
 
@@ -1255,26 +1840,68 @@
         <div id="bd-forgetting-alert-banner" style="font-size:0.8rem;color:var(--amber);font-weight:700;margin-bottom:8px;"></div>
         <div style="font-size:0.78rem;font-weight:800;color:var(--muted);margin-bottom:6px;">🔥 365일 연간 복습 잔디 히트맵 & 스트릭 프리즈 보호</div>
         <div id="bd-heatmap-365-grid" style="display:grid;grid-template-columns:repeat(53,1fr);gap:2px;padding:8px;border-radius:10px;background:#0f172a;overflow-x:auto;"></div>
-        <div id="bd-trademark-disclaimer-box" style="margin-top:10px;font-size:0.72rem;color:var(--muted);line-height:1.45;">
+        <div id="bd-trademark-disclaimer-box" style="margin-top:10px;font-size:0.72rem;color:var(--muted);line-height:1.45;white-space:pre-line;">
           ⚖️ 클린룸(Clean-Room) 및 상표권 고지: TOEIC®은 ETS의 등록상표이며, 수능·교과서 분류 표기는 한국교육과정평가원(KICE)·교육부 공개 성취기준을 참고한 학습 분류입니다. BrainDeck은 타사 상표권자와 제휴되지 않은 독립 소프트웨어이며 모든 예문과 해설은 100% 자체 창작 자산입니다.
+        </div>
+        <div style="margin-top:10px;">
+          <button id="btn-open-oss-licenses" type="button" style="padding:7px 13px;font-size:0.78rem;">⚖️ 오픈소스 및 데이터 라이선스 고지</button>
         </div>
       </div>
     </section>
+
+    <div id="oss-license-modal" role="dialog" aria-modal="true" aria-label="오픈소스 및 데이터 라이선스 고지" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
+      <div style="max-width:640px;width:100%;max-height:84vh;display:flex;flex-direction:column;background:#ffffff;border-radius:24px;padding:22px;box-shadow:0 20px 48px rgba(15,23,42,0.22);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">
+          <h3 style="margin:0;font-size:1.05rem;color:#0f172a;">⚖️ 오픈소스 · 데이터 라이선스 및 비제휴 상표권 고지</h3>
+          <button type="button" id="btn-close-oss-licenses" style="padding:5px 12px;font-size:0.8rem;border-radius:999px;">✕ 닫기</button>
+        </div>
+        <pre id="oss-license-modal-body" style="margin:0;padding:14px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;font-size:0.75rem;line-height:1.55;color:#1e293b;white-space:pre-wrap;overflow-y:auto;flex:1;"></pre>
+      </div>
+    </div>
+
+    <!-- UX-03: Non-Blocking Inline Card Edit & Delete Modals -->
+    <div id="card-edit-modal" role="dialog" aria-modal="true" aria-label="카드 내용 수정" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
+      <div style="max-width:520px;width:100%;display:flex;flex-direction:column;gap:12px;background:#ffffff;border-radius:20px;padding:20px;box-shadow:0 20px 48px rgba(15,23,42,0.22);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;font-size:1rem;">✏️ 카드 앞면·뒷면 편집 (FSRS 이력 보존)</h3>
+          <button type="button" id="btn-card-edit-insert-cloze" style="padding:4px 10px;font-size:0.76rem;border-radius:999px;">+ {{c1::빈칸}} 삽입</button>
+        </div>
+        <label style="font-size:0.8rem;font-weight:700;color:var(--muted);">앞면 (질문 · Cloze 문장)</label>
+        <textarea id="card-edit-front-input" rows="3" style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);font-size:0.9rem;resize:vertical;"></textarea>
+        <label style="font-size:0.8rem;font-weight:700;color:var(--muted);">뒷면 (정답 · 핵심 해설)</label>
+        <textarea id="card-edit-back-input" rows="3" style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);font-size:0.9rem;resize:vertical;"></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
+          <button type="button" id="btn-card-edit-cancel" style="padding:8px 14px;border-radius:10px;">취소</button>
+          <button type="button" id="btn-card-edit-save" class="btn-primary" style="padding:8px 16px;border-radius:10px;">저장하기</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="card-delete-confirm-modal" role="dialog" aria-modal="true" aria-label="카드 삭제 확인" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
+      <div style="max-width:400px;width:100%;display:flex;flex-direction:column;gap:12px;background:#ffffff;border-radius:20px;padding:20px;box-shadow:0 20px 48px rgba(15,23,42,0.22);">
+        <h3 style="margin:0;font-size:1rem;">🗑️ 카드 영구 삭제 확인</h3>
+        <div id="card-delete-confirm-text" style="font-size:0.86rem;color:var(--muted);">이 카드를 삭제하시겠습니까? (기존 복습 이력 통계는 보존됩니다.)</div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
+          <button type="button" id="btn-card-delete-cancel" style="padding:8px 14px;border-radius:10px;">취소</button>
+          <button type="button" id="btn-card-delete-confirm" style="padding:8px 16px;border-radius:10px;background:#e11d48;color:#ffffff;border-color:#e11d48;">영구 삭제</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="./curriculum_corpus_v8.js?v=10.0.0"></script>
-  <script src="./modules/user_guide_and_quick_vm.js?v=10.0.0"></script>
-  <script src="./modules/rust_wasm_core.js?v=10.0.0"></script>
-  <script src="./modules/fsrs_core.js?v=10.0.0"></script>
-  <script src="./modules/sync_crdt.js?v=10.0.0"></script>
-  <script src="./modules/curriculum_standards.js?v=10.0.0"></script>
-  <script src="./modules/analytics_onboarding_vm.js?v=10.0.0"></script>
-  <script src="./modules/study_planner_mastery_core.js?v=10.0.0"></script>
-  <script src="./modules/catalog_store_core.js?v=10.0.0"></script>
-  <script src="./modules/standalone_engine_core.js?v=10.0.0"></script>
-  <script src="./modules/standalone_engine_ops.js?v=10.0.0"></script>
-  <script src="./modules/ui_dialogs_render.js?v=10.0.0"></script>
-  <script src="./viewmodel.js?v=10.0.0"></script>
-  <script src="./app.js?v=10.0.0"></script>
+  <script src="./curriculum_corpus_v8.js?v=10.1.0-b109"></script>
+  <script src="./modules/user_guide_and_quick_vm.js?v=10.1.0-b109"></script>
+  <script src="./modules/rust_wasm_core.js?v=10.1.0-b109"></script>
+  <script src="./modules/fsrs_core.js?v=10.1.0-b109"></script>
+  <script src="./modules/sync_crdt.js?v=10.1.0-b109"></script>
+  <script src="./modules/curriculum_standards.js?v=10.1.0-b109"></script>
+  <script src="./modules/analytics_onboarding_vm.js?v=10.1.0-b109"></script>
+  <script src="./modules/study_planner_mastery_core.js?v=10.1.0-b109"></script>
+  <script src="./modules/catalog_store_core.js?v=10.1.0-b109"></script>
+  <script src="./modules/standalone_engine_core.js?v=10.1.0-b109"></script>
+  <script src="./modules/standalone_engine_ops.js?v=10.1.0-b109"></script>
+  <script src="./modules/ui_dialogs_render.js?v=10.1.0-b109"></script>
+  <script src="./viewmodel.js?v=10.1.0-b109"></script>
+  <script src="./app.js?v=10.1.0-b109"></script>
 </body>
 </html>

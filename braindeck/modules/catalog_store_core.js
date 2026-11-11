@@ -425,7 +425,7 @@
   const STANDALONE_TEXTBOOKS = [
     {
       textbook_id: "kr.mid1.eng.donga_yoon.2022",
-      title: "중1 영어 (동아 윤정미)",
+      title: "중1 영어 단원 어휘 [동아(윤정미) 진도 호환·비공식]",
       subject_code: "eng",
       unlocked: true,
       units: [
@@ -451,7 +451,7 @@
     },
     {
       textbook_id: "kr.mid2.eng.donga_yoon.2022",
-      title: "중2 영어 (동아 윤정미)",
+      title: "중2 영어 단원 어휘 [동아(윤정미) 진도 호환·비공식]",
       subject_code: "eng",
       unlocked: true,
       units: [
@@ -468,7 +468,7 @@
     },
     {
       textbook_id: "kr.mid2.hist.miraeen.2022",
-      title: "중2 역사① (미래엔)",
+      title: "중2 역사① 핵심 개념 [미래엔 진도 호환·비공식]",
       subject_code: "hist",
       unlocked: true,
       units: [
@@ -484,7 +484,7 @@
     },
     {
       textbook_id: "kr.high1.sci.visang.2022",
-      title: "고1 통합과학1 (비상)",
+      title: "고1 통합과학1 공식·원소 [비상 진도 호환·비공식]",
       subject_code: "sci",
       unlocked: true,
       units: [

@@ -261,6 +261,17 @@
       if (typeof document !== "undefined" && document.body) {
         document.body.setAttribute("data-persona-tier", policy.persona_tier);
         document.body.setAttribute("data-age-tier", policy.age_tier);
+        document.body.setAttribute("data-kids-parent-menu", "closed");
+      }
+      const btnKidsUnlock = el("btn-kids-parent-unlock");
+      if (btnKidsUnlock) {
+        btnKidsUnlock.setAttribute("aria-expanded", "false");
+        btnKidsUnlock.textContent = "👨‍👩‍👧 전체메뉴";
+      }
+      const modeSetupBtn = el("btn-open-mode-setup");
+      if (modeSetupBtn) {
+        const pLbl = profileId === "kid1" ? "👦 첫째(초등)" : profileId === "kid2" ? "👧 둘째(초등)" : profileId === "teen" ? "🧑‍🎓 중고등" : "👨 성인·프로";
+        modeSetupBtn.textContent = `${pLbl} · 프로필 설정`;
       }
       const modeBadge = el("bd-persona-mode-badge");
       if (modeBadge) {
@@ -413,6 +424,18 @@
           applyPersonaTierDomAndLogic(activeProfile, false);
           refreshSessionAndCoachingUi();
         });
+      });
+    }
+
+    const btnKidsParentUnlock = el("btn-kids-parent-unlock");
+    if (btnKidsParentUnlock) {
+      btnKidsParentUnlock.addEventListener("click", () => {
+        if (typeof document === "undefined" || !document.body) return;
+        const isOpen = document.body.getAttribute("data-kids-parent-menu") === "open";
+        const nextState = isOpen ? "closed" : "open";
+        document.body.setAttribute("data-kids-parent-menu", nextState);
+        btnKidsParentUnlock.setAttribute("aria-expanded", isOpen ? "false" : "true");
+        btnKidsParentUnlock.textContent = isOpen ? "👨‍👩‍👧 전체메뉴" : "👨‍👩‍👧 전체메뉴 닫기";
       });
     }
 
