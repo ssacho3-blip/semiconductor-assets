@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="BrainDeck" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self';" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link rel="manifest" href="./manifest.json" />
   <title>BrainDeck (브레인덱) — 스마트 암기 & 브레인팩 스토어</title>
@@ -48,6 +49,11 @@
       --question-font-size: 21px;
       --min-touch-target: 48px;
       --card-radius: 22px;
+      --bd-surface-elevated: #f8fafc;
+      --bd-tint-blue: #eff6ff;
+      --bd-tint-rose: #fef2f2;
+      --bd-tint-green: #f0fdf4;
+      --bd-tint-amber: #fffbeb;
     }
     body[data-persona-tier="kids"] {
       --bd-scale: 1.25;
@@ -258,20 +264,49 @@
     .tab-page.active {
       display: block;
     }
-    /* UX-05: OLED True-Black Dark Mode Surface & Inline Style Overrides */
+    /* UX-05: OLED True-Black Dark Mode Semantic Tokens & Inline Surface Overrides */
+    html[data-bd-theme="oled-dark"] {
+      --bg: #05070d;
+      --panel: #0b0f19;
+      --bd-canvas: #05070d;
+      --bd-surface: #0b0f19;
+      --bd-surface-elevated: #111827;
+      --bd-sunken: #0f172a;
+      --bd-line: #1e293b;
+      --bd-line-strong: #334155;
+      --bd-ink: #f8fafc;
+      --bd-ink-2: #cbd5e1;
+      --bd-ink-3: #94a3b8;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #1e293b;
+      --bd-tint-blue: #0f1f38;
+      --bd-tint-rose: #2a1219;
+      --bd-tint-green: #0d261b;
+      --bd-tint-amber: #291e0b;
+    }
     html[data-bd-theme="oled-dark"] body,
     html[data-bd-theme="oled-dark"] .tab-nav,
     html[data-bd-theme="oled-dark"] .panel,
     html[data-bd-theme="oled-dark"] .card-arena,
+    html[data-bd-theme="oled-dark"] .metric-card,
+    html[data-bd-theme="oled-dark"] .onboarding-card,
     html[data-bd-theme="oled-dark"] [style*="background:#ffffff"],
     html[data-bd-theme="oled-dark"] [style*="background: #ffffff"],
     html[data-bd-theme="oled-dark"] [style*="background:#f8fafc"],
     html[data-bd-theme="oled-dark"] [style*="background: #f8fafc"],
+    html[data-bd-theme="oled-dark"] [style*="background:#f9fafb"],
+    html[data-bd-theme="oled-dark"] [style*="background:#f1f5f9"],
+    html[data-bd-theme="oled-dark"] [style*="background:#eff6ff"],
+    html[data-bd-theme="oled-dark"] [style*="background:#e8f3ff"],
+    html[data-bd-theme="oled-dark"] [style*="background:#eef2ff"],
+    html[data-bd-theme="oled-dark"] [style*="background:#ecfdf5"],
+    html[data-bd-theme="oled-dark"] [style*="background:#fef2f2"],
     html[data-bd-theme="oled-dark"] [style*="background:#fffbeb"],
     html[data-bd-theme="oled-dark"] [style*="background:#f0fdf4"] {
-      background: var(--panel, #0a0a0f) !important;
+      background: var(--panel, #0b0f19) !important;
       color: var(--text, #f8fafc) !important;
-      border-color: var(--border, #1e1e2a) !important;
+      border-color: var(--border, #1e293b) !important;
     }
     html[data-bd-theme="oled-dark"] input,
     html[data-bd-theme="oled-dark"] select,
@@ -698,7 +733,8 @@
       overflow-y: auto;
     }
     body:has(#page-study.active) #card-inline-progress-box {
-      display: none !important;
+      padding: 3px 8px;
+      margin-bottom: 4px;
     }
     #card-inline-progress-box > div:first-child > span {
       white-space: nowrap;
@@ -1958,9 +1994,20 @@
         </div>
       </div>
     </div>
+
+    <div id="deck-share-import-modal" role="dialog" aria-modal="true" aria-label="공유 토큰으로 단어장 받기" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
+      <div style="max-width:480px;width:100%;display:flex;flex-direction:column;gap:12px;background:var(--panel);border-radius:20px;padding:20px;box-shadow:0 20px 48px rgba(15,23,42,0.22);">
+        <h3 style="margin:0;font-size:1rem;">📥 공유 토큰으로 단어장 받기 (오프라인 지원)</h3>
+        <div style="font-size:0.82rem;color:var(--muted);">전달받은 bdshare1: 공유 토큰을 붙여넣으면 서버 없이도 내 단어장으로 추가됩니다.</div>
+        <textarea id="deck-share-token-input" rows="4" placeholder="bdshare1:..." style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);font-size:0.84rem;resize:vertical;"></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button type="button" id="btn-deck-share-import-cancel" style="padding:8px 14px;border-radius:10px;">취소</button>
+          <button type="button" id="btn-deck-share-import-submit" class="btn-primary" style="padding:8px 16px;border-radius:10px;">단어장 추가</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="./curriculum_corpus_v8.js?v=10.1.0-b109"></script>
   <script src="./modules/user_guide_and_quick_vm.js?v=10.1.0-b109"></script>
   <script src="./modules/rust_wasm_core.js?v=10.1.0-b109"></script>
   <script src="./modules/fsrs_core.js?v=10.1.0-b109"></script>

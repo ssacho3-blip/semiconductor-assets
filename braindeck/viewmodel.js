@@ -1344,16 +1344,148 @@
     }
     return { tsv_bank: {}, graded_bank: {} };
   })();
-  const AUTHENTIC_SUBJECT_TSV_BANK = _LOADED_CORPUS_BUNDLE.tsv_bank || {};
-  const AUTHENTIC_GRADED_TSV_BANK = _LOADED_CORPUS_BUNDLE.graded_bank || {};
+  const AUTHENTIC_SUBJECT_TSV_BANK = Object.assign({}, _LOADED_CORPUS_BUNDLE.tsv_bank || {});
+  const AUTHENTIC_GRADED_TSV_BANK = Object.assign({}, _LOADED_CORPUS_BUNDLE.graded_bank || {});
   const _PARSED_SUBJECT_BANK_CACHE = {};
   const _PARSED_GRADED_BANK_CACHE = {};
+  let _corpusLoadState = {
+    loaded: Object.keys(AUTHENTIC_SUBJECT_TSV_BANK).length > 0,
+    transport: Object.keys(AUTHENTIC_SUBJECT_TSV_BANK).length > 0 ? "sync_preload" : "pending_async",
+    sha256_verified: Object.keys(AUTHENTIC_SUBJECT_TSV_BANK).length > 0,
+    corpus_sha256: _LOADED_CORPUS_BUNDLE.corpus_sha256 || "",
+  };
+  let _inflightCorpusLoadPromise = null;
+
+  async function _computeCanonicalTsvBankSha256Async(tsvBank) {
+    if (!tsvBank || typeof tsvBank !== "object") return null;
+    if (typeof crypto === "undefined" || !crypto || !crypto.subtle || typeof TextEncoder === "undefined") {
+      return null;
+    }
+    const sortedKeys = Object.keys(tsvBank).sort();
+    const canonicalJson =
+      "{" +
+      sortedKeys
+        .map((k) => {
+          const arr = Array.isArray(tsvBank[k]) ? tsvBank[k] : [];
+          return JSON.stringify(k) + ": [" + arr.map((s) => JSON.stringify(String(s))).join(", ") + "]";
+        })
+        .join(", ") +
+      "}";
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalJson));
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  function reloadCorpusBundle(bundle, meta) {
+    verifyCorpusBundleIntegrity(bundle);
+    Object.keys(_PARSED_SUBJECT_BANK_CACHE).forEach((k) => { delete _PARSED_SUBJECT_BANK_CACHE[k]; });
+    Object.keys(_PARSED_GRADED_BANK_CACHE).forEach((k) => { delete _PARSED_GRADED_BANK_CACHE[k]; });
+    Object.keys(AUTHENTIC_SUBJECT_TSV_BANK).forEach((k) => { delete AUTHENTIC_SUBJECT_TSV_BANK[k]; });
+    Object.keys(AUTHENTIC_GRADED_TSV_BANK).forEach((k) => { delete AUTHENTIC_GRADED_TSV_BANK[k]; });
+    Object.assign(AUTHENTIC_SUBJECT_TSV_BANK, bundle.tsv_bank || {});
+    Object.assign(AUTHENTIC_GRADED_TSV_BANK, bundle.graded_bank || {});
+    if (typeof globalThis !== "undefined" && globalThis) {
+      globalThis.__BRAINDECK_CORPUS_V8__ = bundle;
+    }
+    _corpusLoadState = {
+      loaded: Object.keys(AUTHENTIC_SUBJECT_TSV_BANK).length > 0,
+      transport: (meta && meta.transport) || "manual_reload",
+      sha256_verified: Boolean(meta && meta.sha256_verified),
+      corpus_sha256: String(bundle.corpus_sha256 || ""),
+    };
+    return getCorpusLoadStatus();
+  }
+
+  function getCorpusLoadStatus() {
+    return Object.assign({}, _corpusLoadState, {
+      subject_count: Object.keys(AUTHENTIC_SUBJECT_TSV_BANK).length,
+      graded_count: Object.keys(AUTHENTIC_GRADED_TSV_BANK).length,
+    });
+  }
+
+  function ensureCorpusBundleLoaded(customUrl) {
+    if (_corpusLoadState.loaded && Object.keys(AUTHENTIC_SUBJECT_TSV_BANK).length > 0) {
+      return Promise.resolve(Object.assign({ ok: true, already_loaded: true }, getCorpusLoadStatus()));
+    }
+    if (typeof globalThis !== "undefined" && globalThis.__BRAINDECK_CORPUS_V8__ && globalThis.__BRAINDECK_CORPUS_V8__.tsv_bank) {
+      reloadCorpusBundle(globalThis.__BRAINDECK_CORPUS_V8__, { transport: "global_preloaded", sha256_verified: false });
+      return Promise.resolve(Object.assign({ ok: true, already_loaded: false }, getCorpusLoadStatus()));
+    }
+    if (_inflightCorpusLoadPromise) {
+      return _inflightCorpusLoadPromise;
+    }
+    const targetUrl = String(customUrl || "./curriculum_corpus_v8.json");
+    _inflightCorpusLoadPromise = (async () => {
+      try {
+        const isFileProto = typeof location !== "undefined" && location && location.protocol === "file:";
+        if (!isFileProto && typeof fetch === "function") {
+          const resp = await fetch(targetUrl);
+          if (!resp || !resp.ok) {
+            throw new Error("CorpusFetchError: HTTP " + (resp ? resp.status : 0));
+          }
+          const bundle = await resp.json();
+          verifyCorpusBundleIntegrity(bundle);
+          const computedSha = await _computeCanonicalTsvBankSha256Async(bundle.tsv_bank);
+          if (computedSha !== null && computedSha !== SSOT_CORPUS_SHA256) {
+            throw new Error("CorpusIntegrityError: recomputed SHA-256 mismatch (" + computedSha + ")");
+          }
+          reloadCorpusBundle(bundle, {
+            transport: "fetch_json",
+            sha256_verified: computedSha === SSOT_CORPUS_SHA256,
+          });
+          return Object.assign({ ok: true }, getCorpusLoadStatus());
+        }
+        if (typeof document !== "undefined" && document && typeof document.createElement === "function") {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement("script");
+            s.src = "./curriculum_corpus_v8.js";
+            s.async = true;
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error("CorpusScriptFallbackError"));
+            (document.head || document.documentElement).appendChild(s);
+          });
+          const fallbackBundle = (typeof globalThis !== "undefined" && globalThis.__BRAINDECK_CORPUS_V8__) || null;
+          if (!fallbackBundle) throw new Error("CorpusIntegrityError: missing fallback global corpus");
+          reloadCorpusBundle(fallbackBundle, {
+            transport: "script_fallback_unverified_transport",
+            sha256_verified: false,
+          });
+          return Object.assign({ ok: true }, getCorpusLoadStatus());
+        }
+        throw new Error("CorpusUnavailableError: no async corpus loader available");
+      } finally {
+        _inflightCorpusLoadPromise = null;
+      }
+    })();
+    return _inflightCorpusLoadPromise;
+  }
 
   function resolveGradedBankKeyJs(sourceTag) {
     const s = String(sourceTag || "").toLowerCase();
     if (s.includes("elem-3-4") || s.includes("elem34")) return "eng_elem34";
-    if (s.includes("moe-eng:elementary") || s.includes("elem56") || s.includes("elem-5-6")) return "eng_elem56";
-    if (s.includes("middle-1200") || s.includes("mid1200") || s.includes("mid1.eng") || s.includes("mid2.eng") || s.includes("mid1-eng")) return "eng_mid1200";
+    if (s.includes("elem-5-6") || s.includes("elem56") || s.includes("moe-eng:elementary")) return "eng_elem56";
+    const isNonEngSubject = /hist|khist|sci|kor|math|hanja|law|cert|jlpt|exam-ja/.test(s);
+    if (
+      !isNonEngSubject &&
+      (s.includes("middle-1200") ||
+        s.includes("mid1200") ||
+        s.includes("mid1.eng") ||
+        s.includes("mid2.eng") ||
+        s.includes("mid1-eng") ||
+        s.includes("mid2-eng") ||
+        s.includes("en.m1") ||
+        s.includes("en.m2") ||
+        s.includes("neungyul") ||
+        s.includes("donga") ||
+        s.includes("ybm") ||
+        s.includes("chunjae") ||
+        s.includes("miraeen") ||
+        s.includes("jihak") ||
+        s.includes("visang"))
+    ) {
+      return "eng_mid1200";
+    }
     if (s.includes("high-csat") || s.includes("high_csat")) return "eng_high_csat";
     if (s.includes("toeic")) return "eng_toeic";
     if (s.includes("jlpt") || s.includes("exam-ja")) return "ja_jlpt";
@@ -1370,6 +1502,187 @@
     if (s.includes("law-statute") || s.includes("constitution")) return "law_statute";
     if (s.includes("cert-it")) return "cert_it";
     return "";
+  }
+
+  function _decodePdfTokenJs(token) {
+    if (!token) return "";
+    if (token.startsWith("<") && token.endsWith(">")) {
+      const hex = token.slice(1, -1).replace(/\s+/g, "");
+      if (hex.length < 2) return "";
+      const bytes = [];
+      for (let i = 0; i + 1 < hex.length; i += 2) {
+        const b = parseInt(hex.slice(i, i + 2), 16);
+        if (!Number.isNaN(b)) bytes.push(b);
+      }
+      if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+        let out = "";
+        for (let j = 2; j + 1 < bytes.length; j += 2) {
+          out += String.fromCharCode((bytes[j] << 8) | bytes[j + 1]);
+        }
+        return out;
+      }
+      if (typeof TextDecoder !== "undefined") {
+        return new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(bytes));
+      }
+      return "";
+    }
+    if (token.startsWith("(") && token.endsWith(")")) {
+      const inner = token.slice(1, -1);
+      let res = "";
+      for (let i = 0; i < inner.length; i += 1) {
+        const ch = inner[i];
+        if (ch === "\\" && i + 1 < inner.length) {
+          const nx = inner[i + 1];
+          if (nx === "n") { res += "\n"; i += 1; }
+          else if (nx === "r") { res += "\r"; i += 1; }
+          else if (nx === "t") { res += "\t"; i += 1; }
+          else if (/[0-7]/.test(nx)) {
+            const oct = inner.slice(i + 1, i + 4).match(/^[0-7]{1,3}/)[0];
+            res += String.fromCharCode(parseInt(oct, 8));
+            i += oct.length;
+          } else {
+            res += nx;
+            i += 1;
+          }
+        } else {
+          res += ch;
+        }
+      }
+      return res;
+    }
+    return "";
+  }
+
+  async function _inflatePdfStreamBoundedAsync(rawBytes, maxBytes) {
+    if (typeof require === "function") {
+      try {
+        const zlib = require("zlib");
+        for (const fn of [zlib.inflateSync, zlib.inflateRawSync]) {
+          try {
+            const buf = fn(Buffer.from(rawBytes), { maxOutputLength: maxBytes });
+            return new Uint8Array(buf);
+          } catch (_ze) {}
+        }
+      } catch (_re) {}
+    }
+    if (typeof DecompressionStream !== "undefined") {
+      for (const fmt of ["deflate", "deflate-raw"]) {
+        try {
+          const ds = new DecompressionStream(fmt);
+          const writer = ds.writable.getWriter();
+          writer.write(rawBytes).catch(() => {});
+          writer.close().catch(() => {});
+          const reader = ds.readable.getReader();
+          const chunks = [];
+          let total = 0;
+          while (true) {
+            const step = await reader.read();
+            if (step.done) break;
+            if (step.value) {
+              total += step.value.byteLength;
+              if (total > maxBytes) {
+                try { await reader.cancel(); } catch (_ce) {}
+                throw new Error("PDF_STREAM_DECOMPRESSION_LIMIT_EXCEEDED");
+              }
+              chunks.push(step.value);
+            }
+          }
+          const merged = new Uint8Array(total);
+          let off = 0;
+          chunks.forEach((c) => { merged.set(c, off); off += c.byteLength; });
+          return merged;
+        } catch (err) {
+          if (err && String(err.message || "").includes("LIMIT_EXCEEDED")) throw err;
+        }
+      }
+    }
+    return null;
+  }
+
+  async function extractTextFromPdfBuffer(arrayBuffer) {
+    const MAX_INPUT_PDF_BYTES = 16 * 1024 * 1024;
+    const MAX_STREAMS = 64;
+    const MAX_PER_STREAM_BYTES = 2 * 1024 * 1024;
+    const MAX_CUMULATIVE_BYTES = 8 * 1024 * 1024;
+    const bytes = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer || 0);
+    if (bytes.byteLength < 8) {
+      return { ok: false, error_code: "EMPTY_PDF", text: "", pages: 0 };
+    }
+    if (bytes.byteLength > MAX_INPUT_PDF_BYTES) {
+      return { ok: false, error_code: "PDF_TOO_LARGE", text: "", pages: 0 };
+    }
+    const latin = new TextDecoder("latin1").decode(bytes);
+    if (!latin.startsWith("%PDF-")) {
+      return { ok: false, error_code: "INVALID_PDF_HEADER", text: "", pages: 0 };
+    }
+    if (/\/Encrypt\b/.test(latin)) {
+      return { ok: false, error_code: "ENCRYPTED_PDF_UNSUPPORTED", text: "", pages: 0 };
+    }
+    const pageMatches = latin.match(/\/Type\s*\/Page\b/g);
+    const pageCount = Math.max(1, pageMatches ? pageMatches.length : 1);
+    const lines = [];
+    let cumulativeBytes = 0;
+    let streamCount = 0;
+    let cursor = 0;
+    while (streamCount < MAX_STREAMS) {
+      const sIdx = latin.indexOf("stream", cursor);
+      if (sIdx < 0) break;
+      const eIdx = latin.indexOf("endstream", sIdx + 6);
+      if (eIdx < 0) break;
+      cursor = eIdx + 9;
+      const dictHead = latin.slice(Math.max(0, sIdx - 320), sIdx);
+      if (/\/Subtype\s*\/(?:Image|Form)\b/.test(dictHead)) continue;
+      let dataStart = sIdx + 6;
+      if (bytes[dataStart] === 0x0d && bytes[dataStart + 1] === 0x0a) dataStart += 2;
+      else if (bytes[dataStart] === 0x0a || bytes[dataStart] === 0x0d) dataStart += 1;
+      let dataEnd = eIdx;
+      while (dataEnd > dataStart && (bytes[dataEnd - 1] === 0x0a || bytes[dataEnd - 1] === 0x0d)) dataEnd -= 1;
+      if (dataEnd <= dataStart) continue;
+      streamCount += 1;
+      const rawSlice = bytes.subarray(dataStart, dataEnd);
+      let decodedStreamBytes = rawSlice;
+      if (/\/FlateDecode\b/.test(dictHead)) {
+        const inflated = await _inflatePdfStreamBoundedAsync(rawSlice, MAX_PER_STREAM_BYTES);
+        if (!inflated) continue;
+        decodedStreamBytes = inflated;
+      } else if (rawSlice.byteLength > MAX_PER_STREAM_BYTES) {
+        return { ok: false, error_code: "PDF_STREAM_DECOMPRESSION_LIMIT_EXCEEDED", text: "", pages: pageCount };
+      }
+      cumulativeBytes += decodedStreamBytes.byteLength;
+      if (cumulativeBytes > MAX_CUMULATIVE_BYTES) {
+        return { ok: false, error_code: "PDF_CUMULATIVE_DECOMPRESSION_LIMIT_EXCEEDED", text: "", pages: pageCount };
+      }
+      const contentStr = new TextDecoder("latin1").decode(decodedStreamBytes);
+      if (!contentStr.includes("BT") || !contentStr.includes("ET")) continue;
+      const btBlocks = contentStr.match(/BT[\s\S]*?ET/g) || [];
+      btBlocks.forEach((blk) => {
+        const parts = [];
+        const opRe = /(\[(?:[^[\]]|\([^)]*\)|<[0-9A-Fa-f\s]*>)*\]\s*TJ)|((?:\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>)\s*(?:Tj|'|"))/g;
+        let m;
+        while ((m = opRe.exec(blk)) !== null) {
+          const chunk = m[0];
+          const tokRe = /\((?:\\.|[^\\)])*\)|<[0-9A-Fa-f\s]+>/g;
+          let tm;
+          while ((tm = tokRe.exec(chunk)) !== null) {
+            const txt = _decodePdfTokenJs(tm[0]);
+            if (txt) parts.push(txt);
+          }
+        }
+        const joined = parts.join("").replace(/\s+/g, " ").trim();
+        if (joined.length >= 2) lines.push(joined);
+      });
+    }
+    const fullText = lines.join("\n").trim();
+    const readableChars = (fullText.match(/[A-Za-z0-9가-힣\u4e00-\u9fff]/g) || []).length;
+    if (!fullText || readableChars / pageCount < 8) {
+      return {
+        ok: false,
+        error_code: "SCANNED_OR_IMAGE_PDF_NEEDS_APP_OCR",
+        text: "",
+        pages: pageCount,
+      };
+    }
+    return { ok: true, text: fullText, pages: pageCount, streams_parsed: streamCount };
   }
 
   const _DISCARD_MATH_SECTION_RE_JS =
@@ -1959,6 +2272,7 @@
       computeAnkiStudyPlan,
       computeStudyPlan: computeAnkiStudyPlan,
       computeDeckMasteryProgress,
+      computeRetrievability,
       computeRetentionAndForgettingCurveVm,
       computeStudyDayKey,
       deduplicateSessionSiblings,
@@ -3354,6 +3668,11 @@
     getFullThirdPartyNoticesText,
     resolveThirdPartyNoticesModalPayload,
     verifyCorpusBundleIntegrity,
+    reloadCorpusBundle,
+    ensureCorpusBundleLoaded,
+    getCorpusLoadStatus,
+    resolveGradedBankKeyJs,
+    extractTextFromPdfBuffer,
     sanitizeTextForNaturalTts,
     buildNaturalTtsSegments,
     selectBestBrowserVoice,

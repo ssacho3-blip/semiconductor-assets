@@ -329,6 +329,7 @@
       checkStatuteStaleness,
       classifyScriptProfileJs,
       cleanCardFrontForDisplayJs,
+      computeRetrievability,
       computeRetentionAndForgettingCurveVm,
       enrichConceptCurriculumMetadata,
       evaluateTypedAnswerUnderstanding,
@@ -524,6 +525,33 @@
         already_unlocked: wasUnlocked,
         unlocked_pack_ids: finalDb.unlockedPackIds || ["pack.free.starter_k12"],
         mounted_deck: mountedDeck,
+      };
+    }
+
+    function installStorePack(packOrSlug, difficultyLevel, targetLimit) {
+      const slug = String((packOrSlug && packOrSlug.pack_id) || packOrSlug || "starter_k12").trim();
+      const pack =
+        STANDALONE_STORE_PACKS.find(
+          (it) => it.pack_id === slug || it.pack_id.endsWith("." + slug) || it.primary_ref_id === slug
+        ) || STANDALONE_STORE_PACKS[0];
+      const db = loadDb();
+      if (!Array.isArray(db.unlockedPackIds)) db.unlockedPackIds = ["pack.free.starter_k12"];
+      if (!db.unlockedPackIds.includes(pack.pack_id)) db.unlockedPackIds.push(pack.pack_id);
+      saveDb(db);
+      const diff = String(difficultyLevel || (packOrSlug && packOrSlug.difficulty_level) || "mixed");
+      const lim = Number(targetLimit || (packOrSlug && packOrSlug.limit) || pack.estimated_card_count || 240);
+      const mounted =
+        pack.link_kind === "textbook"
+          ? buildExamScopeDeck({ textbook_id: pack.primary_ref_id, deck_name: pack.title, difficulty_level: diff, limit: lim })
+          : buildCollectionDeck({ collection_id: pack.primary_ref_id, deck_name: pack.title, difficulty_level: diff, limit: lim });
+      return {
+        ok: true,
+        standalone: true,
+        pack_id: pack.pack_id,
+        deck_id: mounted.deck_id,
+        deck_name: mounted.deck_name,
+        saved_count: mounted.saved_count,
+        mounted_deck: mounted,
       };
     }
 
@@ -876,27 +904,86 @@
 
     function decompressBacklog(payload) {
       const p = payload || {};
-      const spreadDays = Math.max(1, Math.min(30, Number(p.days || p.spread_days || 3)));
+      const hasExplicitCap = p.daily_cap !== undefined || p.dailyCap !== undefined;
+      const horizonDays = Math.max(1, Math.min(30, Number(p.horizon_days || p.horizonDays || p.days || p.spread_days || 7)));
+      const dailyCap = hasExplicitCap ? Math.max(1, Math.min(500, Number(p.daily_cap ?? p.dailyCap))) : 0;
       const deckId = p.deckId !== undefined ? p.deckId : p.deck_id;
       const hasDeck = deckId !== undefined && deckId !== null && deckId !== "" && deckId !== "all";
       const db = loadDb();
       const nowMs = Date.now();
-      let rescheduled = 0;
-      db.cards.forEach((c, idx) => {
-        if (!c || c.suspended || c.state === "suspended") return;
+
+      if (!hasExplicitCap) {
+        let rescheduledLegacy = 0;
+        db.cards.forEach((c, idx) => {
+          if (!c || c.suspended || c.state === "suspended") return;
+          if (hasDeck && Number(c.deck_id) !== Number(deckId)) return;
+          const dueMs = c.due_at ? Date.parse(c.due_at) : nowMs;
+          if (!Number.isFinite(dueMs) || dueMs <= nowMs) {
+            const offsetDays = (idx % horizonDays) + 1;
+            c.due_at = new Date(nowMs + offsetDays * 86400000).toISOString();
+            rescheduledLegacy += 1;
+          }
+        });
+        saveDb(db);
+        return {
+          ok: true,
+          standalone: true,
+          spread_days: horizonDays,
+          horizon_days: horizonDays,
+          total_due_evaluated: rescheduledLegacy,
+          kept_today: 0,
+          deferred_across_days: rescheduledLegacy,
+          rescheduled_count: rescheduledLegacy,
+          decompressed_count: rescheduledLegacy,
+        };
+      }
+
+      const overdue = [];
+      db.cards.forEach((c) => {
+        if (!c || c.suspended || c.state === "suspended" || c.state === "new") return;
         if (hasDeck && Number(c.deck_id) !== Number(deckId)) return;
         const dueMs = c.due_at ? Date.parse(c.due_at) : nowMs;
-        if (!Number.isFinite(dueMs) || dueMs <= nowMs) {
-          const offsetDays = (idx % spreadDays) + 1;
-          c.due_at = new Date(nowMs + offsetDays * 86400000).toISOString();
+        if (Number.isFinite(dueMs) && dueMs > nowMs) return;
+        const stability = Math.max(0.1, Number(c.stability || 1.2));
+        const elapsedDays = Number.isFinite(dueMs)
+          ? Math.max(0.1, stability + Math.max(0, (nowMs - dueMs) / 86400000))
+          : 1.0;
+        const rNow =
+          typeof computeRetrievability === "function"
+            ? Number(computeRetrievability(elapsedDays, stability))
+            : Math.pow(1 + (19 / 81) * (elapsedDays / stability), -0.5);
+        const lapses = Math.max(0, Number(c.lapses || 0));
+        const urgencyKey = rNow - Math.min(0.15, lapses * 0.03);
+        overdue.push({ card: c, urgencyKey, cid: Number(c.card_id || 0) });
+      });
+
+      overdue.sort((a, b) => (a.urgencyKey !== b.urgencyKey ? a.urgencyKey - b.urgencyKey : a.cid - b.cid));
+      let keptToday = 0;
+      let rescheduled = 0;
+      overdue.forEach((entry, idx) => {
+        const dayOffset = Math.floor(idx / dailyCap);
+        if (dayOffset <= 0) {
+          keptToday += 1;
+        } else {
+          entry.card.due_at = new Date(nowMs + dayOffset * 86400000).toISOString();
           rescheduled += 1;
         }
       });
+      const effectiveHorizonDays =
+        overdue.length > 0 ? Math.max(horizonDays, Math.ceil(overdue.length / dailyCap)) : horizonDays;
+      const overflowCards = Math.max(0, overdue.length - dailyCap * horizonDays);
       saveDb(db);
       return {
         ok: true,
         standalone: true,
-        spread_days: spreadDays,
+        spread_days: effectiveHorizonDays,
+        horizon_days: effectiveHorizonDays,
+        requested_horizon_days: horizonDays,
+        overflow_cards: overflowCards,
+        daily_cap: dailyCap,
+        total_due_evaluated: overdue.length,
+        kept_today: keptToday,
+        deferred_across_days: rescheduled,
         rescheduled_count: rescheduled,
         decompressed_count: rescheduled,
       };
@@ -935,7 +1022,7 @@
       };
     }
 
-    function _computeBackupChecksumJs(decks, cards, history) {
+    function _computeLegacyBackupChecksumV80Js(decks, cards, history) {
       const raw = `${(decks || []).length}:${(cards || []).length}:${(history || []).length}:${JSON.stringify(
         (cards || []).slice(0, 50).map((c) => [c.card_id, c.front_text, c.back_text, c.reps])
       )}`;
@@ -947,19 +1034,164 @@
       return `bd80_${h1.toString(16).padStart(8, "0")}`;
     }
 
+    const _SHA256_K_JS = new Uint32Array([
+      0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+      0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+      0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+      0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+      0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+      0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+      0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+      0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+    ]);
+
+    function _utf8BytesJs(str) {
+      if (typeof TextEncoder !== "undefined") {
+        return new TextEncoder().encode(String(str));
+      }
+      const b = Buffer.from(String(str), "utf8");
+      return new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+    }
+
+    function _utf8DecodeJs(bytes) {
+      if (typeof TextDecoder !== "undefined") {
+        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      }
+      return Buffer.from(bytes).toString("utf8");
+    }
+
+    function _sha256BytesJs(msgBytes) {
+      const len = msgBytes.length;
+      const bitHi = Math.floor(len / 0x20000000);
+      const bitLo = (len << 3) >>> 0;
+      const padLen = ((len + 9 + 63) & ~63);
+      const buf = new Uint8Array(padLen);
+      buf.set(msgBytes);
+      buf[len] = 0x80;
+      const dv = new DataView(buf.buffer);
+      dv.setUint32(padLen - 8, bitHi, false);
+      dv.setUint32(padLen - 4, bitLo, false);
+
+      let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+      let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+      const w = new Uint32Array(64);
+      const rotr = (x, n) => ((x >>> n) | (x << (32 - n))) >>> 0;
+
+      for (let off = 0; off < padLen; off += 64) {
+        for (let i = 0; i < 16; i += 1) w[i] = dv.getUint32(off + i * 4, false);
+        for (let i = 16; i < 64; i += 1) {
+          const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+          const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+          w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+        }
+        let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+        for (let i = 0; i < 64; i += 1) {
+          const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+          const ch = (e & f) ^ (~e & g);
+          const temp1 = (h + S1 + ch + _SHA256_K_JS[i] + w[i]) >>> 0;
+          const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+          const maj = (a & b) ^ (a & c) ^ (b & c);
+          const temp2 = (S0 + maj) >>> 0;
+          h = g; g = f; f = e; e = (d + temp1) >>> 0;
+          d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
+        }
+        h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+        h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + h) >>> 0;
+      }
+      const out = new Uint8Array(32);
+      const odv = new DataView(out.buffer);
+      [h0, h1, h2, h3, h4, h5, h6, h7].forEach((v, idx) => odv.setUint32(idx * 4, v, false));
+      return out;
+    }
+
+    function _bytesToHexJs(bytes) {
+      let hex = "";
+      for (let i = 0; i < bytes.length; i += 1) hex += bytes[i].toString(16).padStart(2, "0");
+      return hex;
+    }
+
+    function _hmacSha256HexJs(keyBytes, msgBytes) {
+      const k = keyBytes.length > 64 ? _sha256BytesJs(keyBytes) : keyBytes;
+      const ipad = new Uint8Array(64);
+      const opad = new Uint8Array(64);
+      for (let i = 0; i < 64; i += 1) {
+        const kb = i < k.length ? k[i] : 0;
+        ipad[i] = kb ^ 0x36;
+        opad[i] = kb ^ 0x5c;
+      }
+      const inner = new Uint8Array(64 + msgBytes.length);
+      inner.set(ipad, 0);
+      inner.set(msgBytes, 64);
+      const innerDigest = _sha256BytesJs(inner);
+      const outer = new Uint8Array(64 + 32);
+      outer.set(opad, 0);
+      outer.set(innerDigest, 64);
+      return _bytesToHexJs(_sha256BytesJs(outer));
+    }
+
+    function _canonicalJsonForChecksumJs(val) {
+      if (val === null || val === undefined) return "null";
+      if (typeof val === "number") return Number.isFinite(val) ? JSON.stringify(val) : "null";
+      if (typeof val === "boolean" || typeof val === "string") return JSON.stringify(val);
+      if (Array.isArray(val)) {
+        return "[" + val.map((item) => _canonicalJsonForChecksumJs(item)).join(",") + "]";
+      }
+      if (typeof val === "object") {
+        const keys = Object.keys(val).filter((k) => val[k] !== undefined).sort();
+        return "{" + keys.map((k) => JSON.stringify(k) + ":" + _canonicalJsonForChecksumJs(val[k])).join(",") + "}";
+      }
+      return "null";
+    }
+
+    function _computeBackupChecksumJs(decks, cards, history, unlockedPackIds) {
+      const canonical = _canonicalJsonForChecksumJs({
+        decks: Array.isArray(decks) ? decks : [],
+        cards: Array.isArray(cards) ? cards : [],
+        review_history: Array.isArray(history) ? history : [],
+        unlocked_pack_ids: Array.isArray(unlockedPackIds) ? unlockedPackIds : ["pack.free.starter_k12"],
+      });
+      const digestHex = _bytesToHexJs(_sha256BytesJs(_utf8BytesJs(canonical)));
+      return `bd81_${digestHex.slice(0, 32)}`;
+    }
+
     function exportBackupPayload() {
       const db = loadDb();
-      const checksum = _computeBackupChecksumJs(db.decks, db.cards, db.reviewHistory);
+      const snapshotDecks = JSON.parse(JSON.stringify(db.decks || []));
+      const snapshotCards = JSON.parse(JSON.stringify(db.cards || []));
+      const snapshotHist = JSON.parse(JSON.stringify(db.reviewHistory || []));
+      const snapshotPacks = (db.unlockedPackIds || ["pack.free.starter_k12"]).slice();
+      const checksum = _computeBackupChecksumJs(snapshotDecks, snapshotCards, snapshotHist, snapshotPacks);
       return {
         ok: true,
         standalone: true,
         schema_version: "8.0",
         exported_at: new Date().toISOString(),
         checksum,
-        decks: db.decks,
-        cards: db.cards,
-        review_history: db.reviewHistory || [],
-        unlocked_pack_ids: db.unlockedPackIds || ["pack.free.starter_k12"],
+        backup_checksum: checksum,
+        decks: snapshotDecks,
+        cards: snapshotCards,
+        review_history: snapshotHist,
+        unlocked_pack_ids: snapshotPacks,
+      };
+    }
+
+    function exportBackupJson() {
+      const db = loadDb();
+      const snapshotDecks = JSON.parse(JSON.stringify(db.decks || []));
+      const snapshotCards = JSON.parse(JSON.stringify(db.cards || []));
+      const snapshotHist = JSON.parse(JSON.stringify(db.reviewHistory || []));
+      const snapshotPacks = (db.unlockedPackIds || ["pack.free.starter_k12"]).slice();
+      const checksum = _computeBackupChecksumJs(snapshotDecks, snapshotCards, snapshotHist, snapshotPacks);
+      return {
+        ok: true,
+        standalone: true,
+        schema_version: "8.1",
+        exported_at: new Date().toISOString(),
+        backup_checksum: checksum,
+        decks: snapshotDecks,
+        cards: snapshotCards,
+        review_history: snapshotHist,
+        unlocked_pack_ids: snapshotPacks,
       };
     }
 
@@ -980,7 +1212,11 @@
           error: `백업 항목 수가 허용 한도(덱 ${MAX_IMPORT_DECKS_JS}개 / 카드 ${MAX_IMPORT_CARDS_JS}장)를 초과했습니다.`,
         };
       }
-      if (String(b.schema_version || "") === "8.0" && (b.checksum === undefined || b.checksum === null || !String(b.checksum).trim())) {
+      const schemaVer = String(
+        b.schema_version !== undefined && b.schema_version !== null ? b.schema_version : "8.1"
+      ).trim();
+      const isExplicitLegacySchema = schemaVer === "5.6" || schemaVer === "7.0" || schemaVer === "legacy";
+      if (schemaVer === "8.0" && (b.checksum === undefined || b.checksum === null || !String(b.checksum).trim())) {
         return {
           ok: false,
           standalone: true,
@@ -988,11 +1224,38 @@
           error: "v8.0 백업 파일에 무결성 체크섬이 누락되었습니다.",
         };
       }
-      if (b.checksum !== undefined && b.checksum !== null) {
-        const chk = String(b.checksum).trim();
-        if (chk.startsWith("bd80_")) {
-          const expectedChk = _computeBackupChecksumJs(b.decks, b.cards, b.review_history || []);
-          if (chk !== expectedChk) {
+      const rawChkCandidate = b.checksum !== undefined && b.checksum !== null ? b.checksum : b.backup_checksum;
+      if (
+        !isExplicitLegacySchema &&
+        (rawChkCandidate === undefined || rawChkCandidate === null || !String(rawChkCandidate).trim())
+      ) {
+        return {
+          ok: false,
+          standalone: true,
+          error_code: "BACKUP_CHECKSUM_MISMATCH",
+          error: "현재 스키마 백업 파일에 필수 무결성 체크섬이 누락되었습니다.",
+        };
+      }
+      if (rawChkCandidate !== undefined && rawChkCandidate !== null) {
+        const chk = String(rawChkCandidate).trim();
+        if (chk.startsWith("bd81_")) {
+          const expected81 = _computeBackupChecksumJs(
+            b.decks,
+            b.cards,
+            b.review_history || [],
+            b.unlocked_pack_ids || b.unlocked_packs || ["pack.free.starter_k12"]
+          );
+          if (chk !== expected81) {
+            return {
+              ok: false,
+              standalone: true,
+              error_code: "BACKUP_CHECKSUM_MISMATCH",
+              error: "백업 파일 전체 무결성(bd81 체크섬) 검증에 실패했습니다.",
+            };
+          }
+        } else if (chk.startsWith("bd80_") && schemaVer !== "8.1") {
+          const expected80 = _computeLegacyBackupChecksumV80Js(b.decks, b.cards, b.review_history || []);
+          if (chk !== expected80) {
             return {
               ok: false,
               standalone: true,
@@ -1000,7 +1263,7 @@
               error: "백업 파일 무결성(체크섬) 검증에 실패했습니다.",
             };
           }
-        } else if (!/^[0-9a-f]{64}$/i.test(chk)) {
+        } else if (!/^[0-9a-f]{64}$/i.test(chk) || schemaVer === "8.1") {
           return {
             ok: false,
             standalone: true,
@@ -1055,7 +1318,7 @@
         const rawState = String(incCard.state || "new");
         const safeState = ["new", "learning", "review", "relearning", "suspended"].includes(rawState) ? rawState : "new";
         if (existingCard) {
-          if (safeReps > Number(existingCard.reps || 0)) {
+          if (safeReps >= Number(existingCard.reps || 0)) {
             existingCard.reps = safeReps;
             existingCard.lapses = safeLapses;
             existingCard.stability = safeStability;
@@ -1095,6 +1358,26 @@
         }
       });
 
+      if (Array.isArray(b.review_history) && b.review_history.length > 0) {
+        const existingHist = Array.isArray(db.reviewHistory) ? db.reviewHistory : [];
+        const seenHist = new Set(existingHist.map((h) => `${h && h.card_id}:${h && (h.at || h.reviewed_at || "")}`));
+        b.review_history.slice(0, 20000).forEach((incH) => {
+          if (!incH || typeof incH !== "object") return;
+          const ts = String(incH.at || incH.reviewed_at || incH.timestamp || "").slice(0, 64);
+          const cid = Number(incH.card_id || 0);
+          const key = `${cid}:${ts}`;
+          if (!seenHist.has(key)) {
+            seenHist.add(key);
+            existingHist.push({
+              card_id: cid,
+              rating: Math.max(1, Math.min(4, Number(incH.rating || 3))),
+              at: ts || new Date().toISOString(),
+            });
+          }
+        });
+        db.reviewHistory = existingHist.slice(-20000);
+      }
+
       const rawPacks = Array.isArray(b.unlocked_pack_ids)
         ? b.unlocked_pack_ids
         : Array.isArray(b.unlocked_packs)
@@ -1117,6 +1400,453 @@
         new_cards: importedCards,
         updated_cards: updatedCards,
         total_cards: db.cards.length,
+      };
+    }
+
+    function importBackupJson(backupPayload) {
+      const res = importBackupPayload(backupPayload);
+      if (!res || !res.ok) {
+        throw new Error((res && res.error_code) || "BACKUP_IMPORT_FAILED");
+      }
+      return res;
+    }
+
+    const _DECK_SHARE_HMAC_KEY_JS = "braindeck-v13-zero-config-deck-share-integrity-key";
+    const MAX_SHARE_PAYLOAD_BYTES_JS = 128 * 1024;
+    const MAX_SHARE_TOKEN_CHARS_JS = 512 * 1024;
+
+    function _encodeBase64UrlBytesJs(bytes) {
+      if (typeof Buffer !== "undefined") {
+        return Buffer.from(bytes).toString("base64url");
+      }
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+      const stripEqRe = new RegExp("=+$", "g");
+      return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(stripEqRe, "");
+    }
+
+    function _decodeBase64UrlBytesJs(b64u) {
+      const s = String(b64u || "");
+      if (!/^[A-Za-z0-9_-]+$/.test(s)) {
+        throw new Error("INVALID_BASE64URL");
+      }
+      const clean = s.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = clean + "=".repeat((4 - (clean.length % 4)) % 4);
+      if (typeof Buffer !== "undefined") {
+        return new Uint8Array(Buffer.from(pad, "base64"));
+      }
+      const bin = atob(pad);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+
+    function _adler32Js(bytes) {
+      let a = 1;
+      let b = 0;
+      for (let i = 0; i < bytes.length; i += 1) {
+        a = (a + bytes[i]) % 65521;
+        b = (b + a) % 65521;
+      }
+      return ((b << 16) | a) >>> 0;
+    }
+
+    function _zlibCompressRfc1950Js(rawBytes) {
+      if (typeof require === "function") {
+        try {
+          const zlib = require("zlib");
+          const comp = zlib.deflateSync(Buffer.from(rawBytes), { level: 9 });
+          return new Uint8Array(comp.buffer, comp.byteOffset, comp.byteLength);
+        } catch (_ze) {
+          // Fall through to RFC 1950 stored-block encoder
+        }
+      }
+      const blockSize = 65535;
+      const numBlocks = Math.max(1, Math.ceil(rawBytes.length / blockSize));
+      const out = new Uint8Array(2 + numBlocks * 5 + rawBytes.length + 4);
+      out[0] = 0x78;
+      out[1] = 0x01;
+      let pos = 2;
+      for (let bIdx = 0; bIdx < numBlocks; bIdx += 1) {
+        const start = bIdx * blockSize;
+        const chunk = rawBytes.subarray(start, Math.min(rawBytes.length, start + blockSize));
+        const len = chunk.length;
+        const nlen = (~len) & 0xffff;
+        out[pos++] = bIdx === numBlocks - 1 ? 0x01 : 0x00;
+        out[pos++] = len & 0xff;
+        out[pos++] = (len >>> 8) & 0xff;
+        out[pos++] = nlen & 0xff;
+        out[pos++] = (nlen >>> 8) & 0xff;
+        out.set(chunk, pos);
+        pos += len;
+      }
+      const adler = _adler32Js(rawBytes);
+      const dv = new DataView(out.buffer);
+      dv.setUint32(pos, adler, false);
+      return out;
+    }
+
+    function _inflateDeflatePureBoundedJs(deflateBytes, maxOutBytes) {
+      let bitPos = 0;
+      const totalBits = deflateBytes.length * 8;
+      const readBits = (n) => {
+        if (bitPos + n > totalBits) throw new Error("TRUNCATED_DEFLATE");
+        let val = 0;
+        for (let i = 0; i < n; i += 1) {
+          const byteIdx = bitPos >>> 3;
+          const bitIdx = bitPos & 7;
+          val |= ((deflateBytes[byteIdx] >>> bitIdx) & 1) << i;
+          bitPos += 1;
+        }
+        return val;
+      };
+      const buildHuff = (lengths) => {
+        let maxBits = 0;
+        for (let i = 0; i < lengths.length; i += 1) if (lengths[i] > maxBits) maxBits = lengths[i];
+        if (maxBits === 0) return { maxBits: 1, map: new Map() };
+        const blCount = new Int32Array(maxBits + 1);
+        for (let i = 0; i < lengths.length; i += 1) if (lengths[i] > 0) blCount[lengths[i]] += 1;
+        const nextCode = new Int32Array(maxBits + 1);
+        let code = 0;
+        for (let bits = 1; bits <= maxBits; bits += 1) {
+          code = (code + blCount[bits - 1]) << 1;
+          nextCode[bits] = code;
+        }
+        const map = new Map();
+        for (let sym = 0; sym < lengths.length; sym += 1) {
+          const len = lengths[sym];
+          if (len > 0) {
+            const c = nextCode[len]++;
+            map.set((len << 16) | c, sym);
+          }
+        }
+        return { maxBits, map };
+      };
+      const decodeSym = (tree) => {
+        let code = 0;
+        for (let len = 1; len <= tree.maxBits; len += 1) {
+          code = (code << 1) | readBits(1);
+          const key = (len << 16) | code;
+          if (tree.map.has(key)) return tree.map.get(key);
+        }
+        throw new Error("INVALID_HUFFMAN_CODE");
+      };
+      const fixedLitLens = new Int32Array(288);
+      for (let i = 0; i <= 143; i += 1) fixedLitLens[i] = 8;
+      for (let i = 144; i <= 255; i += 1) fixedLitLens[i] = 9;
+      for (let i = 256; i <= 279; i += 1) fixedLitLens[i] = 7;
+      for (let i = 280; i <= 287; i += 1) fixedLitLens[i] = 8;
+      const fixedDistLens = new Int32Array(32);
+      fixedDistLens.fill(5);
+      const fixedLitTree = buildHuff(fixedLitLens);
+      const fixedDistTree = buildHuff(fixedDistLens);
+      const lenBase = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+      const lenExtra = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+      const distBase = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+      const distExtra = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+      const clOrder = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+
+      const out = [];
+      let isFinal = 0;
+      while (!isFinal) {
+        isFinal = readBits(1);
+        const btype = readBits(2);
+        if (btype === 0) {
+          bitPos = (bitPos + 7) & ~7;
+          const byteIdx = bitPos >>> 3;
+          if (byteIdx + 4 > deflateBytes.length) throw new Error("TRUNCATED_STORED_BLOCK");
+          const len = deflateBytes[byteIdx] | (deflateBytes[byteIdx + 1] << 8);
+          const nlen = deflateBytes[byteIdx + 2] | (deflateBytes[byteIdx + 3] << 8);
+          if (((len ^ 0xffff) & 0xffff) !== nlen) throw new Error("CORRUPTED_STORED_LEN");
+          const dataStart = byteIdx + 4;
+          if (dataStart + len > deflateBytes.length) throw new Error("TRUNCATED_STORED_DATA");
+          if (out.length + len > maxOutBytes) throw new Error("SHARE_PAYLOAD_TOO_LARGE");
+          for (let i = 0; i < len; i += 1) out.push(deflateBytes[dataStart + i]);
+          bitPos = (dataStart + len) * 8;
+        } else if (btype === 1 || btype === 2) {
+          let litTree = fixedLitTree;
+          let distTree = fixedDistTree;
+          if (btype === 2) {
+            const hlit = readBits(5) + 257;
+            const hdist = readBits(5) + 1;
+            const hclen = readBits(4) + 4;
+            const clLens = new Int32Array(19);
+            for (let i = 0; i < hclen; i += 1) clLens[clOrder[i]] = readBits(3);
+            const clTree = buildHuff(clLens);
+            const combined = new Int32Array(hlit + hdist);
+            let idx = 0;
+            while (idx < hlit + hdist) {
+              const s = decodeSym(clTree);
+              if (s < 16) {
+                combined[idx++] = s;
+              } else if (s === 16) {
+                if (idx === 0) throw new Error("BAD_CL_REPEAT");
+                const rep = readBits(2) + 3;
+                const prev = combined[idx - 1];
+                for (let r = 0; r < rep && idx < combined.length; r += 1) combined[idx++] = prev;
+              } else if (s === 17) {
+                const rep = readBits(3) + 3;
+                idx += rep;
+              } else {
+                const rep = readBits(7) + 11;
+                idx += rep;
+              }
+            }
+            litTree = buildHuff(combined.subarray(0, hlit));
+            distTree = buildHuff(combined.subarray(hlit));
+          }
+          for (;;) {
+            const sym = decodeSym(litTree);
+            if (sym < 256) {
+              if (out.length + 1 > maxOutBytes) throw new Error("SHARE_PAYLOAD_TOO_LARGE");
+              out.push(sym);
+            } else if (sym === 256) {
+              break;
+            } else {
+              const lIdx = sym - 257;
+              if (lIdx < 0 || lIdx >= lenBase.length) throw new Error("BAD_LEN_SYM");
+              const matchLen = lenBase[lIdx] + (lenExtra[lIdx] ? readBits(lenExtra[lIdx]) : 0);
+              const dSym = decodeSym(distTree);
+              if (dSym < 0 || dSym >= distBase.length) throw new Error("BAD_DIST_SYM");
+              const matchDist = distBase[dSym] + (distExtra[dSym] ? readBits(distExtra[dSym]) : 0);
+              if (matchDist > out.length) throw new Error("BAD_BACKREF_DIST");
+              if (out.length + matchLen > maxOutBytes) throw new Error("SHARE_PAYLOAD_TOO_LARGE");
+              for (let m = 0; m < matchLen; m += 1) {
+                out.push(out[out.length - matchDist]);
+              }
+            }
+          }
+        } else {
+          throw new Error("RESERVED_DEFLATE_BLOCK");
+        }
+      }
+      return new Uint8Array(out);
+    }
+
+    function _zlibDecompressRfc1950BoundedJs(compBytes, maxOutBytes) {
+      if (!compBytes || compBytes.length < 6) throw new Error("TRUNCATED_ZLIB_HEADER");
+      const cmf = compBytes[0];
+      const flg = compBytes[1];
+      if ((cmf & 0x0f) !== 8 || ((cmf << 8) | flg) % 31 !== 0 || (flg & 0x20) !== 0) {
+        throw new Error("INVALID_ZLIB_HEADER");
+      }
+      const dv = new DataView(compBytes.buffer, compBytes.byteOffset, compBytes.byteLength);
+      const expectedAdler = dv.getUint32(compBytes.byteLength - 4, false);
+      const rawDeflate = compBytes.subarray(2, compBytes.byteLength - 4);
+      let inflated = null;
+      if (typeof require === "function") {
+        const zlib = require("zlib");
+        const buf = zlib.inflateRawSync(Buffer.from(rawDeflate), { maxOutputLength: maxOutBytes + 1 });
+        if (buf.length > maxOutBytes) throw new Error("SHARE_PAYLOAD_TOO_LARGE");
+        inflated = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+      } else {
+        inflated = _inflateDeflatePureBoundedJs(rawDeflate, maxOutBytes);
+      }
+      if (_adler32Js(inflated) !== expectedAdler) {
+        throw new Error("ZLIB_ADLER32_MISMATCH");
+      }
+      return inflated;
+    }
+
+    function _computeDeckShareHmac16Js(b64Body, explicitKey) {
+      const keyStr = explicitKey && String(explicitKey).trim() ? String(explicitKey).trim() : _DECK_SHARE_HMAC_KEY_JS;
+      return _hmacSha256HexJs(_utf8BytesJs(keyStr), _utf8BytesJs(b64Body)).slice(0, 16);
+    }
+
+    function exportDeckShareToken(deckIdOrPayload) {
+      const db = loadDb();
+      const isObj = Boolean(deckIdOrPayload && typeof deckIdOrPayload === "object");
+      const rawDid = isObj ? deckIdOrPayload.deck_id ?? deckIdOrPayload.deckId : deckIdOrPayload;
+      const explicitKey = isObj ? deckIdOrPayload.integrity_key : undefined;
+      const targetDeck =
+        db.decks.find((d) => Number(d.deck_id) === Number(rawDid)) || db.decks[0];
+      if (!targetDeck) {
+        return { ok: false, standalone: true, error_code: "DECK_NOT_FOUND", error: "공유할 덱을 찾을 수 없습니다." };
+      }
+      const deckCards = db.cards
+        .filter((c) => c && Number(c.deck_id) === Number(targetDeck.deck_id))
+        .slice(0, 500)
+        .map((c) => ({
+          front_text: String(c.front_text || c.front || "").trim().slice(0, MAX_CARD_TEXT_LEN_JS),
+          back_text: String(c.back_text || c.back || "").trim().slice(0, MAX_CARD_TEXT_LEN_JS),
+        }))
+        .filter((c) => c.front_text && c.back_text);
+      if (deckCards.length === 0) {
+        return { ok: false, standalone: true, error_code: "EMPTY_DECK_SHARE", error: "공유할 카드가 없습니다." };
+      }
+      const canonicalObj = {
+        v: 1,
+        deck_name: String(targetDeck.name || "공유 단어장").trim().slice(0, 160),
+        category: String((isObj && deckIdOrPayload.category) || "general").trim().slice(0, 64),
+        cards: deckCards,
+      };
+      const rawBytes = _utf8BytesJs(JSON.stringify(canonicalObj));
+      if (rawBytes.byteLength > MAX_SHARE_PAYLOAD_BYTES_JS) {
+        return { ok: false, standalone: true, error_code: "SHARE_PAYLOAD_TOO_LARGE", error: "공유 덱 크기가 허용 상한(128KB)을 초과했습니다." };
+      }
+      const compressed = _zlibCompressRfc1950Js(rawBytes);
+      const b64Body = _encodeBase64UrlBytesJs(compressed);
+      const sig = _computeDeckShareHmac16Js(b64Body, explicitKey);
+      const token = `bdshare1:${b64Body}.${sig}`;
+      if (token.length > MAX_SHARE_TOKEN_CHARS_JS) {
+        return { ok: false, standalone: true, error_code: "SHARE_TOKEN_TOO_LARGE", error: "공유 토큰 길이가 허용 상한을 초과했습니다." };
+      }
+      return {
+        ok: true,
+        standalone: true,
+        deck_id: targetDeck.deck_id,
+        deck_name: targetDeck.name,
+        card_count: deckCards.length,
+        qr_compatible: token.length <= 2953,
+        token,
+        share_token: token,
+      };
+    }
+
+    function importDeckShareToken(tokenOrPayload) {
+      const isObj = Boolean(tokenOrPayload && typeof tokenOrPayload === "object");
+      const rawToken = String(
+        isObj ? tokenOrPayload.token || tokenOrPayload.share_token || "" : tokenOrPayload || ""
+      ).trim();
+      const explicitKey = isObj ? tokenOrPayload.integrity_key : undefined;
+      if (!rawToken.startsWith("bdshare1:") || rawToken.length > MAX_SHARE_TOKEN_CHARS_JS) {
+        return { ok: false, standalone: true, error_code: "INVALID_SHARE_TOKEN", error: "유효하지 않거나 허용 크기를 초과한 공유 토큰입니다." };
+      }
+      const bodyPart = rawToken.slice("bdshare1:".length);
+      const dotIdx = bodyPart.lastIndexOf(".");
+      if (dotIdx <= 0) {
+        return { ok: false, standalone: true, error_code: "INVALID_SHARE_TOKEN", error: "공유 토큰 서명 구분자가 누락되었습니다." };
+      }
+      const b64Body = bodyPart.slice(0, dotIdx);
+      const sig = bodyPart.slice(dotIdx + 1);
+      if (!b64Body || sig.length !== 16 || !/^[0-9a-f]{16}$/.test(sig)) {
+        return { ok: false, standalone: true, error_code: "INVALID_SHARE_SIGNATURE_FORMAT", error: "공유 토큰 무결성 서명 형식이 올바르지 않습니다." };
+      }
+      const expectedSig = _computeDeckShareHmac16Js(b64Body, explicitKey);
+      let diff = sig.length ^ expectedSig.length;
+      for (let i = 0; i < 16; i += 1) {
+        diff |= sig.charCodeAt(i) ^ expectedSig.charCodeAt(i);
+      }
+      if (diff !== 0) {
+        return { ok: false, standalone: true, error_code: "SHARE_SIGNATURE_MISMATCH", error: "공유 토큰 무결성 검증에 실패했습니다." };
+      }
+      let decodedJsonStr = "";
+      try {
+        const compBytes = _decodeBase64UrlBytesJs(b64Body);
+        const decompressed = _zlibDecompressRfc1950BoundedJs(compBytes, MAX_SHARE_PAYLOAD_BYTES_JS);
+        decodedJsonStr = _utf8DecodeJs(decompressed);
+      } catch (decErr) {
+        const code = String((decErr && decErr.message) || "SHARE_DECODE_FAILED");
+        return {
+          ok: false,
+          standalone: true,
+          error_code: code === "SHARE_PAYLOAD_TOO_LARGE" ? "SHARE_PAYLOAD_TOO_LARGE" : "SHARE_DECODE_FAILED",
+          error: "공유 토큰 압축 해제 또는 검증에 실패했습니다.",
+        };
+      }
+      let parsed = null;
+      try {
+        parsed = JSON.parse(decodedJsonStr);
+      } catch (_je) {
+        return { ok: false, standalone: true, error_code: "INVALID_SHARE_JSON", error: "공유 토큰 JSON 형식이 손상되었습니다." };
+      }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !Array.isArray(parsed.cards) || parsed.cards.length === 0 || parsed.cards.length > 1000) {
+        return { ok: false, standalone: true, error_code: "EMPTY_OR_EXCESSIVE_SHARE", error: "공유 카드 수량이 유효 범위를 벗어났습니다." };
+      }
+      const cleanName = `${String(parsed.deck_name || parsed.title || "공유 단어장").replace(/\0/g, "").trim().slice(0, 140)} (공유본)`;
+      const specs = parsed.cards
+        .map((c) => ({
+          front_text: String((c && (c.front_text || c.front)) || "").replace(/\0/g, "").trim().slice(0, MAX_CARD_TEXT_LEN_JS),
+          back_text: String((c && (c.back_text || c.back)) || "").replace(/\0/g, "").trim().slice(0, MAX_CARD_TEXT_LEN_JS),
+          note_type: String((c && c.note_type) || "basic") === "cloze" ? "cloze" : "basic",
+          tags: Array.isArray(c && c.tags) ? c.tags.map((t) => String(t || "").slice(0, 64)).filter(Boolean).slice(0, 16) : ["shared_deck"],
+        }))
+        .filter((s) => s.front_text && s.back_text);
+      if (specs.length === 0) {
+        return { ok: false, standalone: true, error_code: "EMPTY_SHARE_SPECS", error: "가져올 유효 카드가 없습니다." };
+      }
+      const saved = insertDeckWithSpecs(cleanName, String(parsed.description || "공유 토큰으로 추가된 덱").slice(0, 500), specs, "sequential");
+      return {
+        ok: true,
+        standalone: true,
+        deck_id: saved.deck_id,
+        deck_name: saved.deck_name,
+        category: String(parsed.category || "general"),
+        imported_cards: saved.saved_count,
+        card_count: saved.saved_count,
+      };
+    }
+
+    function getCommercialDashboard() {
+      const db = loadDb();
+      const hist = Array.isArray(db.reviewHistory) ? db.reviewHistory : [];
+      const countsByDay = new Map();
+      hist.forEach((h) => {
+        if (!h || typeof h !== "object") return;
+        const rawTs = h.at || h.reviewed_at || h.timestamp;
+        if (!rawTs) return;
+        const ms = Date.parse(String(rawTs));
+        if (!Number.isFinite(ms)) return;
+        const dayKey = new Date(ms).toISOString().slice(0, 10);
+        countsByDay.set(dayKey, (countsByDay.get(dayKey) || 0) + 1);
+      });
+      const heatmapDays = Array.from(countsByDay.entries())
+        .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+        .map(([dateKey, count]) => ({ date: dateKey, count }));
+      let streakDays = 0;
+      if (countsByDay.size > 0) {
+        const nowMs = Date.now();
+        const todayKey = new Date(nowMs).toISOString().slice(0, 10);
+        const yestKey = new Date(nowMs - 86400000).toISOString().slice(0, 10);
+        let cursorMs = countsByDay.has(todayKey) ? nowMs : countsByDay.has(yestKey) ? nowMs - 86400000 : null;
+        while (cursorMs !== null) {
+          const dKey = new Date(cursorMs).toISOString().slice(0, 10);
+          if (!countsByDay.has(dKey)) break;
+          streakDays += 1;
+          cursorMs -= 86400000;
+        }
+      }
+      return {
+        ok: true,
+        standalone: true,
+        total_cards: (db.cards || []).length,
+        review_count: hist.length,
+        streak_days: streakDays,
+        heatmap_days: heatmapDays,
+      };
+    }
+
+    function submitErrataReport(payload) {
+      const p = payload || {};
+      const cardId = Number(p.card_id !== undefined ? p.card_id : p.cardId || 0);
+      const issueType = String(p.issue_type || p.category || "typo").replace(/\0/g, "").trim().slice(0, 64) || "typo";
+      const description = String(p.description || p.note || p.reason || p.suggested_fix || "").replace(/\0/g, "").trim().slice(0, 1000);
+      if (!cardId && !description) {
+        return { ok: false, standalone: true, error_code: "EMPTY_ERRATA_REPORT", error: "신고할 카드 또는 오탈자 설명을 입력해 주세요." };
+      }
+      const db = loadDb();
+      const existing = Array.isArray(db.errataReports) ? db.errataReports : [];
+      const createdAt = new Date().toISOString();
+      const reportDigest = _bytesToHexJs(_sha256BytesJs(_utf8BytesJs(`${cardId}:${issueType}:${description}:${createdAt}:${existing.length}`))).slice(0, 10).toUpperCase();
+      const reportId = `ERRATA-${reportDigest}`;
+      const record = {
+        report_id: reportId,
+        card_id: cardId,
+        issue_type: issueType,
+        description,
+        created_at: createdAt,
+      };
+      db.errataReports = existing.concat([record]).slice(-500);
+      const savedOk = saveDb(db);
+      if (!savedOk) {
+        return { ok: false, standalone: true, error_code: "ERRATA_PERSIST_FAILED", error: "로컬 저장소에 오탈자 제보를 기록하지 못했습니다." };
+      }
+      return {
+        ok: true,
+        standalone: true,
+        persisted: true,
+        report_id: reportId,
+        stored_count: db.errataReports.length,
       };
     }
 
@@ -1201,6 +1931,7 @@
       hydrateFromIndexedDb,
       getCatalog,
       getStorePacks,
+      installStorePack,
       purchaseStorePack,
       purchaseStoreBundle,
       refundStorePack,
@@ -1225,7 +1956,13 @@
       decompressBacklog,
       decomposeLeechCard,
       exportBackupPayload,
+      exportBackupJson,
       importBackupPayload,
+      importBackupJson,
+      exportDeckShareToken,
+      importDeckShareToken,
+      getCommercialDashboard,
+      submitErrataReport,
       submitReview,
       undoLastReview,
       resetStudyProgress,

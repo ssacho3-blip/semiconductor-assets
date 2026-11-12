@@ -1085,7 +1085,26 @@
       };
     }
 
-    if (tagStr.includes("hanja") || front.includes("[한자") || hasCjk) {
+    if (tagStr.includes("dictation") || front.includes("받아쓰기") || front.includes("맞춤법")) {
+      return {
+        category_key: "vocab",
+        facet_key: "ko_dictation",
+        badge_label: "✏️ 맞춤법·받아쓰기",
+        short_label: "단어·어휘",
+      };
+    }
+
+    const isNonHanjaSubjectTagged =
+      tagStr.includes("hist") ||
+      tagStr.includes("khist") ||
+      tagStr.includes("kh_") ||
+      tagStr.includes("sci") ||
+      tagStr.includes("math") ||
+      tagStr.includes("law") ||
+      tagStr.includes("cert") ||
+      tagStr.includes("kor");
+
+    if (tagStr.includes("hanja") || front.includes("[한자") || (hasCjk && !isNonHanjaSubjectTagged)) {
       if (target.length <= 2 && /[\u4e00-\u9fff]/.test(target)) {
         return {
           category_key: "hanja",
@@ -1099,15 +1118,6 @@
         facet_key: "hanja_hun_eum",
         badge_label: "漢字 한자 훈음",
         short_label: "한자·성어",
-      };
-    }
-
-    if (tagStr.includes("dictation") || front.includes("받아쓰기") || front.includes("맞춤법")) {
-      return {
-        category_key: "vocab",
-        facet_key: "ko_dictation",
-        badge_label: "✏️ 맞춤법·받아쓰기",
-        short_label: "단어·어휘",
       };
     }
 

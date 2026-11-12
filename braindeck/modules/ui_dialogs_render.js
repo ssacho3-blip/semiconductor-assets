@@ -1940,12 +1940,82 @@
         const res = await apiPost("/api/v2/commercial/deck-share/export", {
           deck_id: Number(state.selectedDeckId) || 1,
         }).catch(() => null);
-        if (res && res.ok && res.token) {
+        const shareTok = res && (res.token || res.share_token);
+        if (res && res.ok && shareTok) {
           if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(res.token).catch(() => {});
+            navigator.clipboard.writeText(shareTok).catch(() => {});
           }
           showUxToast(`🔗 공유 토큰 생성 완료 (${res.card_count}장, 클립보드 복사됨)`, "emerald");
+        } else {
+          showUxToast("⚠️ 공유할 카드를 찾을 수 없습니다.", "amber");
         }
+      });
+    }
+
+    const btnImportDeckToken = el("btn-import-deck-token");
+    const shareImportModal = el("deck-share-import-modal");
+    const shareTokenInput = el("deck-share-token-input");
+    const btnShareCancel = el("btn-deck-share-import-cancel");
+    const btnShareSubmit = el("btn-deck-share-import-submit");
+    if (btnImportDeckToken && shareImportModal) {
+      btnImportDeckToken.addEventListener("click", () => {
+        if (shareTokenInput) shareTokenInput.value = "";
+        shareImportModal.style.display = "flex";
+      });
+    }
+    if (btnShareCancel && shareImportModal) {
+      btnShareCancel.addEventListener("click", () => {
+        shareImportModal.style.display = "none";
+      });
+    }
+    if (shareImportModal) {
+      shareImportModal.addEventListener("click", (ev) => {
+        if (ev.target === shareImportModal) shareImportModal.style.display = "none";
+      });
+    }
+    if (btnShareSubmit) {
+      btnShareSubmit.addEventListener("click", async () => {
+        const rawTok = String((shareTokenInput && shareTokenInput.value) || "").trim();
+        if (!rawTok) {
+          showUxToast("공유 토큰(bdshare1:...)을 입력해 주세요.", "amber");
+          return;
+        }
+        const impRes = await apiPost("/api/v2/commercial/deck-share/import", { token: rawTok }).catch(() => null);
+        if (impRes && impRes.ok) {
+          if (shareImportModal) shareImportModal.style.display = "none";
+          if (impRes.deck_id) state.selectedDeckId = String(impRes.deck_id);
+          await refreshDashboardAndQueue();
+          showUxToast(`📥 '${impRes.deck_name || "공유 단어장"}' (${impRes.imported_cards || impRes.card_count || 0}장) 가져오기 완료!`, "emerald");
+        } else {
+          showUxToast(`⛔ 공유 토큰 검증 실패: ${(impRes && impRes.error) || "유효하지 않은 토큰입니다."}`, "rose");
+        }
+      });
+    }
+
+    const linkExportPkg = el("link-export-apkg");
+    if (linkExportPkg) {
+      linkExportPkg.addEventListener("click", async (ev) => {
+        const isStandaloneStatic =
+          ctx && typeof ctx.resolveRuntimeBackendMode === "function" && ctx.resolveRuntimeBackendMode() === "STANDALONE_STATIC";
+        if (!isStandaloneStatic) return;
+        ev.preventDefault();
+        const pkg = await apiPost("/api/backup/export-json", {}).catch(() => null);
+        if (!pkg || !pkg.ok) {
+          showUxToast("⚠️ 오프라인 덱 패키지를 생성하지 못했습니다.", "rose");
+          return;
+        }
+        if (typeof Blob !== "undefined" && typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
+          const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: "application/json;charset=utf-8" });
+          const dlUrl = URL.createObjectURL(blob);
+          const tmpLink = document.createElement("a");
+          tmpLink.href = dlUrl;
+          tmpLink.download = `braindeck-offline-export-${new Date().toISOString().slice(0, 10)}.json`;
+          document.body.appendChild(tmpLink);
+          tmpLink.click();
+          document.body.removeChild(tmpLink);
+          setTimeout(() => URL.revokeObjectURL(dlUrl), 1500);
+        }
+        showUxToast("📦 오프라인 단독 모드: 전체 단어장·복습 이력 패키지를 기기에 저장했습니다.", "emerald");
       });
     }
 

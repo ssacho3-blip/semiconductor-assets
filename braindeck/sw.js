@@ -1,9 +1,8 @@
 const CACHE_NAME = "braindeck-shell-v1.1.0-b109";
+const CORPUS_CACHE_NAME = "braindeck-corpus-v8-55793ba0";
 const APP_SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./curriculum_corpus_v8.js",
-  "./curriculum_corpus_v8.json",
   "./modules/rust_wasm_core.js",
   "./modules/fsrs_core.js",
   "./modules/sync_crdt.js",
@@ -22,6 +21,11 @@ const APP_SHELL_ASSETS = [
   "./icon.svg",
   "./THIRD_PARTY_NOTICES.txt"
 ];
+// Heavy corpus bundles are cached on-demand in CORPUS_CACHE_NAME when requested via ensureCorpusBundleLoaded()
+const LAZY_CORPUS_ASSETS = [
+  "./curriculum_corpus_v8.json",
+  "./curriculum_corpus_v8.js"
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -39,7 +43,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys.map((key) => {
-            if (key !== CACHE_NAME) {
+            if (key !== CACHE_NAME && key !== CORPUS_CACHE_NAME) {
               return caches.delete(key);
             }
             return Promise.resolve();
@@ -56,6 +60,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
+  const isCorpusAsset =
+    url.pathname.endsWith("/curriculum_corpus_v8.json") ||
+    url.pathname.endsWith("/curriculum_corpus_v8.js");
+  const targetCache = isCorpusAsset ? CORPUS_CACHE_NAME : CACHE_NAME;
   event.respondWith(
     caches.match(req).then((exactCached) => {
       const hasVersionQuery = url.searchParams.has("v");
@@ -63,7 +71,7 @@ self.addEventListener("fetch", (event) => {
         .then((res) => {
           if (res && res.status === 200 && res.type === "basic") {
             const clone = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+            caches.open(targetCache).then((cache) => cache.put(req, clone));
           }
           return res;
         })

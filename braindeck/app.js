@@ -100,31 +100,10 @@
   const ONBOARDING_STORAGE_KEY = "braindeck_onboarding_v52";
 
   function switchTabPage(tabId) {
-    const resolved =
-      vm && typeof vm.resolveActivePageState === "function"
-        ? vm.resolveActivePageState(tabId, true)
-        : { activeTab: tabId || "study" };
+    const resolved = vm && typeof vm.resolveActivePageState === "function" ? vm.resolveActivePageState(tabId, true) : { activeTab: tabId || "study" };
     state.activeTab = resolved.activeTab;
-
-    document.querySelectorAll(".nav-tab-btn").forEach((btn) => {
-      const t = btn.getAttribute("data-tab");
-      if (t === state.activeTab) {
-        btn.classList.add("active");
-      } else {
-        btn.classList.remove("active");
-      }
-    });
-
-    ["study", "curriculum", "create", "store", "stats"].forEach((id) => {
-      const pageEl = el(`page-${id}`);
-      if (pageEl) {
-        if (id === state.activeTab) {
-          pageEl.classList.add("active");
-        } else {
-          pageEl.classList.remove("active");
-        }
-      }
-    });
+    document.querySelectorAll(".nav-tab-btn").forEach((btn) => btn.classList.toggle("active", btn.getAttribute("data-tab") === state.activeTab));
+    ["study", "curriculum", "create", "store", "stats"].forEach((id) => { const pEl = el(`page-${id}`); if (pEl) pEl.classList.toggle("active", id === state.activeTab); });
   }
 
   function showUxToast(message, tone = "emerald", actionLabel = "", onAction = null) {
@@ -265,15 +244,12 @@
         return standaloneEngine.getStorePacks(qs.get("category") || "all");
       }
     }
+    if (path.startsWith("/api/v2/commercial/dashboard")) {
+      if (typeof standaloneEngine.getCommercialDashboard === "function") return standaloneEngine.getCommercialDashboard();
+      return { ok: true, standalone: true, total_cards: 0, review_count: 0, streak_days: 0, heatmap_days: [] };
+    }
     if (path.startsWith("/api/bundle/offline-snapshot")) {
-      return {
-        ok: true,
-        standalone: true,
-        status: fallbackStandaloneGet("/api/status"),
-        due: fallbackStandaloneGet("/api/due"),
-        store: fallbackStandaloneGet("/api/store/packs"),
-        catalog: standaloneEngine.getCatalog(),
-      };
+      return { ok: true, standalone: true, status: fallbackStandaloneGet("/api/status"), due: fallbackStandaloneGet("/api/due"), store: fallbackStandaloneGet("/api/store/packs"), catalog: standaloneEngine.getCatalog() };
     }
     return null;
   }
@@ -466,14 +442,27 @@
         return standaloneEngine.exploreDeckCards(p);
       }
     }
+    if (path.startsWith("/api/v2/commercial/deck-share/export") && typeof standaloneEngine.exportDeckShareToken === "function") {
+      return standaloneEngine.exportDeckShareToken(p);
+    }
+    if (path.startsWith("/api/v2/commercial/deck-share/import") && typeof standaloneEngine.importDeckShareToken === "function") {
+      return standaloneEngine.importDeckShareToken(p);
+    }
+    if (path.startsWith("/api/v2/commercial/errata")) {
+      if (typeof standaloneEngine.submitErrataReport === "function") return standaloneEngine.submitErrataReport(p);
+      return { ok: false, standalone: true, error_code: "ERRATA_PERSIST_UNAVAILABLE" };
+    }
     if (path.startsWith("/api/custom-study")) {
       const cards = (state.rawDueCards && state.rawDueCards.length > 0) ? state.rawDueCards : (state.dueCards || []);
-      if (vm && typeof vm.buildCustomStudySession === "function") {
-        const sess = vm.buildCustomStudySession(cards, p);
-        return Object.assign({ ok: true, standalone: true }, sess);
-      }
+      if (vm && typeof vm.buildCustomStudySession === "function") return Object.assign({ ok: true, standalone: true }, vm.buildCustomStudySession(cards, p));
     }
     return { ok: false, standalone: true, error_code: "UNSUPPORTED_OFFLINE" };
+  }
+
+  async function _ensureCorpusForStandalonePath(path) {
+    if (vm && typeof vm.ensureCorpusBundleLoaded === "function" && (path.startsWith("/api/store/purchase") || path.startsWith("/api/catalog/"))) {
+      await vm.ensureCorpusBundleLoaded().catch(() => {});
+    }
   }
 
   async function apiGet(path) {
@@ -501,16 +490,15 @@
   }
 
   async function apiPost(path, payload) {
-    if (resolveRuntimeBackendMode() === "STANDALONE_STATIC") return fallbackStandalonePost(path, payload);
+    if (resolveRuntimeBackendMode() === "STANDALONE_STATIC") { await _ensureCorpusForStandalonePath(path); return fallbackStandalonePost(path, payload); }
     try {
       const hdrs = { "Content-Type": "application/json" };
       if (state.csrfToken) hdrs["X-BrainDeck-CSRF"] = state.csrfToken;
       const res = await fetch(path, { method: "POST", headers: hdrs, body: JSON.stringify(payload) });
-      if (!res.ok && (res.status === 404 || res.status === 405)) {
-        return fallbackStandalonePost(path, payload);
-      }
+      if (!res.ok && (res.status === 404 || res.status === 405)) { await _ensureCorpusForStandalonePath(path); return fallbackStandalonePost(path, payload); }
       return await res.json();
     } catch (_) {
+      await _ensureCorpusForStandalonePath(path);
       return fallbackStandalonePost(path, payload);
     }
   }
@@ -1851,77 +1839,47 @@
 
       const mime = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/png");
       const lowerName = (file.name || "").toLowerCase();
-      const isPlainTextDoc =
-        lowerName.endsWith(".txt") ||
-        lowerName.endsWith(".md") ||
-        lowerName.endsWith(".csv") ||
-        lowerName.endsWith(".tsv") ||
-        mime.startsWith("text/");
+      const isPlainTextDoc = lowerName.endsWith(".txt") || lowerName.endsWith(".md") || lowerName.endsWith(".csv") || lowerName.endsWith(".tsv") || mime.startsWith("text/");
+      const isPdfDoc = lowerName.endsWith(".pdf") || mime === "application/pdf";
       const buf = await file.arrayBuffer();
       let res = null;
-      const runOfflineDocFallback = () => {
+      const runOfflineDocFallback = async () => {
         const cleanTitle = deckName || file.name.replace(/\.[^.]+$/, "") || "문서 단어장";
-        if (isPlainTextDoc && standaloneEngine) {
-          const decodedText = new TextDecoder("utf-8").decode(buf).trim();
-          if (!decodedText) {
-            return {
-              ok: false,
-              status: "EMPTY_DOCUMENT",
-              error_code: "EMPTY_DOCUMENT",
-              message: "문서에서 추출된 텍스트가 없습니다.",
-              cards: [],
-            };
+        let extractedText = "";
+        let parsedPages = 1;
+        if (isPlainTextDoc) {
+          extractedText = new TextDecoder("utf-8").decode(buf).trim();
+        } else if (isPdfDoc && vm && typeof vm.extractTextFromPdfBuffer === "function") {
+          const pdfRes = await vm.extractTextFromPdfBuffer(buf).catch(() => null);
+          if (pdfRes && pdfRes.ok && pdfRes.text) {
+            extractedText = pdfRes.text;
+            parsedPages = Number(pdfRes.pages || 1);
+          } else {
+            return { ok: false, status: "SCANNED_PDF_REQUIRES_OCR", error_code: (pdfRes && pdfRes.error_code) || "SCANNED_OR_IMAGE_PDF_NEEDS_APP_OCR", message: "스캔본·이미지형 PDF는 안드로이드 온디바이스 ML Kit OCR 또는 텍스트(.txt/.md) 업로드를 이용해 주세요.", stats: { pages: parsedPages, ocr_pages: 0 }, cards: [] };
           }
-          const fallbackRes = standaloneEngine.buildSmartTextDeck({
-            deck_name: cleanTitle,
-            text: decodedText,
-            difficulty_level: docDiff,
-            auto_save: autoSave === "1",
-          });
+        }
+        if ((isPlainTextDoc || isPdfDoc) && standaloneEngine) {
+          if (!extractedText) return { ok: false, status: "EMPTY_DOCUMENT", error_code: "EMPTY_DOCUMENT", message: "문서에서 추출된 텍스트가 없습니다.", cards: [] };
+          const fallbackRes = standaloneEngine.buildSmartTextDeck({ deck_name: cleanTitle, text: extractedText, difficulty_level: docDiff, auto_save: autoSave === "1" });
           return {
-            ok: true,
-            status: "OK",
-            deck_id: autoSave === "1" ? fallbackRes.deck_id : null,
-            deck_name: cleanTitle,
-            category: "general",
-            ollama_cloud_model: "local_rule",
-            ollama_cloud_used: false,
-            provider: "standalone_local",
-            latency_ms: 8,
-            stats: { pages: 1, ocr_pages: 0, low_confidence_lines: 0, dropped_ungrounded: 0, duplicates: 0 },
-            cards: (fallbackRes.cards || []).map((c) => ({
-              ...c,
-              pattern: c.pattern || "definition",
-              source_page: 1,
-              source_excerpt: file.name,
-              tags: (c.tags || []).concat(["local_text_ingest"]),
-            })),
+            ok: true, status: "OK", deck_id: autoSave === "1" ? fallbackRes.deck_id : null, deck_name: cleanTitle, category: "general",
+            ollama_cloud_model: "local_rule", ollama_cloud_used: false, provider: "standalone_local", latency_ms: 8,
+            stats: { pages: parsedPages, ocr_pages: 0, low_confidence_lines: 0, dropped_ungrounded: 0, duplicates: 0 },
+            cards: (fallbackRes.cards || []).map((c) => ({ ...c, pattern: c.pattern || "definition", source_page: 1, source_excerpt: file.name, tags: (c.tags || []).concat(["local_text_ingest"]) })),
           };
         }
-        return {
-          ok: false,
-          status: "UNSUPPORTED_OFFLINE_OCR",
-          error_code: "OCR_REQUIRES_SERVER_OR_APP",
-          message:
-            "오프라인 정적 웹 환경에서는 이미지·PDF OCR 서버 분석을 사용할 수 없습니다. 텍스트(.txt/.md/.csv) 파일을 업로드하거나 로컬 서버·안드로이드 앱을 이용해 주세요.",
-          stats: { pages: 0, ocr_pages: 0, low_confidence_lines: 0, dropped_ungrounded: 0, duplicates: 0 },
-          cards: [],
-        };
+        return { ok: false, status: "UNSUPPORTED_OFFLINE_OCR", error_code: "OCR_REQUIRES_SERVER_OR_APP", message: "오프라인 웹 환경에서는 카메라 이미지 OCR 대신 텍스트형 PDF·.txt·.md·.csv 파일 또는 안드로이드 온디바이스 OCR을 이용해 주세요.", stats: { pages: 0, ocr_pages: 0 }, cards: [] };
       };
 
       if (resolveRuntimeBackendMode() === "STANDALONE_STATIC") {
-        res = runOfflineDocFallback();
+        res = await runOfflineDocFallback();
       } else {
         try {
-          const resp = await fetch(`/api/ai/ingest-document?${params.toString()}`, {
-            method: "POST",
-            headers: { "Content-Type": mime },
-            body: buf,
-          });
+          const resp = await fetch(`/api/ai/ingest-document?${params.toString()}`, { method: "POST", headers: { "Content-Type": mime }, body: buf });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           res = await resp.json();
         } catch (_err) {
-          res = runOfflineDocFallback();
+          res = await runOfflineDocFallback();
         }
       }
       const formatted = vm.formatIngestStatusBanner(res);
@@ -2249,17 +2207,17 @@
       el, vm, state, apiGet, apiPost, currentCard, enrichStandaloneCard, applyStudyFilter,
       renderCurrentCard, renderStudyPlanBanner, refreshDashboardAndQueue,
       renderDeckExplorerPanel, loadBrainPackStoreAndBind, loadCatalogAndBind, showUxToast, submitRating,
-      revealAnswer, applyEvidenceRatingGuard,
+      revealAnswer, applyEvidenceRatingGuard, resolveRuntimeBackendMode,
       getTrademarkCleanroomDisclaimers: vm && vm.getTrademarkCleanroomDisclaimers, loadThirdPartyNoticesRaw: standaloneEngine && standaloneEngine.loadThirdPartyNoticesRaw,
     });
     function syncStudyToolsSummaryBadge() { return reaPlannerCtrl.syncStudyToolsSummaryBadge(); }
     function switchCurriculumSegment(seg) { return reaPlannerCtrl.switchCurriculumSegment(seg); }
-    // BD-F06: Hydrate unified IndexedDB & Register PWA Service Worker
     if (standaloneEngine && typeof standaloneEngine.hydrateFromIndexedDb === "function") {
       standaloneEngine.hydrateFromIndexedDb(() => { loadBrainPackStoreAndBind(); loadCatalogAndBind(); refreshDashboardAndQueue(); });
     }
     if (typeof navigator !== "undefined" && "serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
     loadBrainPackStoreAndBind(); loadCatalogAndBind(); refreshDashboardAndQueue();
     syncOfflineVault(false); syncStudyToolsSummaryBadge();
+    if (vm && typeof vm.ensureCorpusBundleLoaded === "function") vm.ensureCorpusBundleLoaded().catch(() => {});
   });
 })();
