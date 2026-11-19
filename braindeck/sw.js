@@ -3,6 +3,7 @@ const CORPUS_CACHE_NAME = "braindeck-corpus-v8-55793ba0";
 const APP_SHELL_ASSETS = [
   "./",
   "./index.html",
+  "./styles.css",
   "./modules/rust_wasm_core.js",
   "./modules/fsrs_core.js",
   "./modules/sync_crdt.js",

@@ -7,1102 +7,68 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="BrainDeck" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; base-uri 'self';" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link rel="manifest" href="./manifest.json" />
   <title>BrainDeck (브레인덱) — 스마트 암기 & 브레인팩 스토어</title>
-  <style>
-    :root {
-      /* Quiet Precision design tokens */
-      --bd-canvas: #FAFAF8;
-      --bd-surface: #FFFFFF;
-      --bd-sunken: #F3F2EE;
-      --bd-line: #E7E5DF;
-      --bd-line-strong: #CFCCC3;
-      --bd-ink: #1A1A17;
-      --bd-ink-2: #55534C;
-      --bd-ink-3: #85827A;
-      --bd-accent: #1F4FD8;
-      --bd-on-accent: #FFFFFF;
-      --bd-accent-soft: #EAF0FE;
-      --bd-danger: #C2362B;
-      --bd-rate-again: #C2362B;
-      --bd-rate-hard: #9A5B00;
-      --bd-rate-good: #1F7A4D;
-      --bd-rate-easy: #1F4FD8;
-      --bd-scale: 1.0;
-      --bd-touch: 44px;
-      --bd-dock-offset: 12px;
-      /* Legacy aliases. --bg, --panel and --accent keep their literal values: the UI contract tests pin them. */
-      --bg: #f2f4f6;
-      --panel: #ffffff;
-      --surface: var(--bd-surface);
-      --surface-2: var(--bd-sunken);
-      --border: var(--bd-line);
-      --text: var(--bd-ink);
-      --muted: var(--bd-ink-2);
-      --accent: #1b64da;
-      --indigo: #1b64da;
-      --emerald: #00a862;
-      --amber: #d97706;
-      --rose: #e11d48;
-      --question-font-size: 21px;
-      --min-touch-target: 48px;
-      --card-radius: 22px;
-      --bd-surface-elevated: #f8fafc;
-      --bd-tint-blue: #eff6ff;
-      --bd-tint-rose: #fef2f2;
-      --bd-tint-green: #f0fdf4;
-      --bd-tint-amber: #fffbeb;
-    }
-    body[data-persona-tier="kids"] {
-      --bd-scale: 1.25;
-      --bd-touch: 56px;
-      --question-font-size: 1.55rem;
-      --min-touch-target: 58px;
-      --card-radius: 28px;
-      background: #f0f9ff;
-    }
-    body[data-persona-tier="kids"] #main-tab-nav,
-    body[data-persona-tier="kids"] #bd-collapsible-header-zone,
-    body[data-persona-tier="kids"] #btn-toggle-compact-header,
-    body[data-persona-tier="kids"] #card-fsrs-meta,
-    body[data-persona-tier="kids"] #btn-bury-card,
-    body[data-persona-tier="kids"] #btn-suspend-card,
-    body[data-persona-tier="kids"] #btn-decompose,
-    body[data-persona-tier="kids"] #btn-quiz-mode,
-    body[data-persona-tier="kids"] #rate-4 {
-      display: none !important;
-    }
-    body[data-persona-tier="kids"][data-kids-parent-menu="open"] #main-tab-nav {
-      display: flex !important;
-    }
-    body:not([data-persona-tier="kids"]) #btn-kids-parent-unlock {
-      display: none !important;
-    }
-    body[data-persona-tier="kids"] .card-arena {
-      --bd-arena-bg: #ffffff;
-      border: 2.5px solid #93c5fd;
-      box-shadow: 0 10px 25px rgba(59, 130, 246, 0.08);
-    }
-    body[data-persona-tier="teen"] {
-      --bd-scale: 1.10;
-      --bd-touch: 48px;
-      --question-font-size: 1.32rem;
-      --min-touch-target: 50px;
-      --card-radius: 22px;
-      background: var(--bd-canvas);
-    }
-    body[data-persona-tier="teen"] #card-fsrs-meta,
-    body[data-persona-tier="teen"] #btn-decompose {
-      display: none !important;
-    }
-    body[data-persona-tier="adult"] {
-      --question-font-size: 1.15rem;
-      --min-touch-target: 44px;
-      --card-radius: 14px;
-      background: var(--bd-canvas);
-    }
-    body[data-persona-tier="adult"] .app-shell {
-      max-width: 860px;
-    }
-    body[data-persona-tier="adult"] #bd-daily-stamp-strip {
-      display: none !important;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: max(16px, env(safe-area-inset-top)) 18px max(96px, env(safe-area-inset-bottom));
-    }
-    button, select, textarea, input {
-      font-family: inherit;
-    }
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      margin: -1px;
-      padding: 0;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-    /* Counters, progress read-outs and review intervals keep fixed-width digits so they do not jitter. */
-    #study-queue-counters,
-    #bd-daily-session-counter,
-    #bd-deck-progress-dashboard,
-    #card-inline-progress-box,
-    #card-meta,
-    #card-fsrs-meta,
-    #sprint-progress-badge,
-    .metric-val,
-    .rating-grid .interval {
-      font-variant-numeric: tabular-nums;
-    }
-    .app-shell {
-      max-width: 720px;
-      margin: 0 auto;
-    }
-    header {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      padding-bottom: 14px;
-      margin-bottom: 14px;
-    }
-    header button {
-      padding: 7px 11px;
-      font-size: 0.78rem;
-    }
-    .brand-title {
-      font-size: 1.3rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-      color: var(--text);
-    }
-    .badge-pill {
-      font-size: 0.76rem;
-      padding: 5px 11px;
-      border-radius: 999px;
-      background: #e8f3ff;
-      border: none;
-      color: var(--accent);
-      font-weight: 700;
-    }
-    button {
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: #f9fafb;
-      color: #333d4b;
-      padding: 10px 15px;
-      border-radius: 14px;
-      font-size: 0.88rem;
-      font-weight: 700;
-      transition: all 0.15s ease;
-    }
-    button:hover {
-      background: #e8f3ff;
-      color: var(--accent);
-      border-color: #c9e2ff;
-    }
-    .btn-primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #ffffff;
-    }
-    .btn-primary:hover {
-      background: #1b64da;
-      color: #ffffff;
-    }
-    /* Toss / Malhaeboca Style Clean White Tab Bar */
-    .tab-nav {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 6px;
-      background: #ffffff;
-      border: 1px solid var(--border);
-      padding: 6px;
-      border-radius: 20px;
-      margin-bottom: 18px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-    }
-    .nav-tab-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 3px;
-      padding: 9px 4px;
-      border-radius: 14px;
-      border: none;
-      background: transparent;
-      color: #8b95a1;
-      font-size: 0.78rem;
-      font-weight: 700;
-    }
-    .nav-tab-btn .nav-icon {
-      font-size: 1.15rem;
-    }
-    .nav-tab-btn.active {
-      background: #e8f3ff;
-      color: var(--accent);
-      box-shadow: none;
-    }
-    @media (max-width: 768px) {
-      .tab-nav {
-        position: fixed;
-        bottom: max(10px, env(safe-area-inset-bottom));
-        left: 12px;
-        right: 12px;
-        margin-bottom: 0;
-        z-index: 100;
-        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
-      }
-      /* Lift the sticky answer dock above the fixed bottom tab bar; kids mode hides that bar. */
-      body {
-        --bd-dock-offset: calc(max(10px, env(safe-area-inset-bottom)) + 76px);
-      }
-      body[data-persona-tier="kids"]:not([data-kids-parent-menu="open"]) {
-        --bd-dock-offset: max(12px, env(safe-area-inset-bottom));
-      }
-    }
-    .tab-page {
-      display: none;
-      animation: fadeIn 0.16s ease-out;
-    }
-    .tab-page.active {
-      display: block;
-    }
-    /* UX-05: OLED True-Black Dark Mode Semantic Tokens & Inline Surface Overrides */
-    html[data-bd-theme="oled-dark"] {
-      --bg: #05070d;
-      --panel: #0b0f19;
-      --bd-canvas: #05070d;
-      --bd-surface: #0b0f19;
-      --bd-surface-elevated: #111827;
-      --bd-sunken: #0f172a;
-      --bd-line: #1e293b;
-      --bd-line-strong: #334155;
-      --bd-ink: #f8fafc;
-      --bd-ink-2: #cbd5e1;
-      --bd-ink-3: #94a3b8;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --border: #1e293b;
-      --bd-tint-blue: #0f1f38;
-      --bd-tint-rose: #2a1219;
-      --bd-tint-green: #0d261b;
-      --bd-tint-amber: #291e0b;
-    }
-    html[data-bd-theme="oled-dark"] body,
-    html[data-bd-theme="oled-dark"] .tab-nav,
-    html[data-bd-theme="oled-dark"] .panel,
-    html[data-bd-theme="oled-dark"] .card-arena,
-    html[data-bd-theme="oled-dark"] .metric-card,
-    html[data-bd-theme="oled-dark"] .onboarding-card,
-    html[data-bd-theme="oled-dark"] [style*="background:#ffffff"],
-    html[data-bd-theme="oled-dark"] [style*="background: #ffffff"],
-    html[data-bd-theme="oled-dark"] [style*="background:#f8fafc"],
-    html[data-bd-theme="oled-dark"] [style*="background: #f8fafc"],
-    html[data-bd-theme="oled-dark"] [style*="background:#f9fafb"],
-    html[data-bd-theme="oled-dark"] [style*="background:#f1f5f9"],
-    html[data-bd-theme="oled-dark"] [style*="background:#eff6ff"],
-    html[data-bd-theme="oled-dark"] [style*="background:#e8f3ff"],
-    html[data-bd-theme="oled-dark"] [style*="background:#eef2ff"],
-    html[data-bd-theme="oled-dark"] [style*="background:#ecfdf5"],
-    html[data-bd-theme="oled-dark"] [style*="background:#fef2f2"],
-    html[data-bd-theme="oled-dark"] [style*="background:#fffbeb"],
-    html[data-bd-theme="oled-dark"] [style*="background:#f0fdf4"] {
-      background: var(--panel, #0b0f19) !important;
-      color: var(--text, #f8fafc) !important;
-      border-color: var(--border, #1e293b) !important;
-    }
-    html[data-bd-theme="oled-dark"] input,
-    html[data-bd-theme="oled-dark"] select,
-    html[data-bd-theme="oled-dark"] textarea,
-    html[data-bd-theme="oled-dark"] button:not(.btn-primary) {
-      background: #111827 !important;
-      color: var(--text, #f8fafc) !important;
-      border-color: var(--border, #1e293b) !important;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .panel {
-      background: var(--panel);
-      border: none;
-      border-radius: 24px;
-      padding: 22px;
-      margin-bottom: 16px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    }
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-      gap: 10px;
-    }
-    .panel-title {
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: var(--text);
-    }
-    select, textarea, input[type="text"] {
-      width: 100%;
-      background: #f9fafb;
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 14px;
-      padding: 12px 14px;
-      font-size: 0.94rem;
-      font-weight: 500;
-    }
-    .card-arena {
-      --bd-arena-bg: #f9fafb;
-      background: var(--bd-arena-bg);
-      border: 1px solid #e5e8eb;
-      border-radius: var(--card-radius);
-      padding: 28px 24px;
-      min-height: 250px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      margin-bottom: 14px;
-    }
-    .card-question {
-      /* The persona token still wins when it asks for a smaller size than the single-screen cap. */
-      font-size: min(var(--question-font-size), calc(1.22rem * var(--bd-scale)));
-      line-height: 1.38;
-      font-weight: 800;
-      color: var(--text);
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      margin: 6px 0;
-    }
-    .card-answer {
-      margin-top: 6px;
-      padding: 8px 12px;
-      border-radius: 12px;
-      background: #e8faf0;
-      border-top: none;
-      font-size: calc(1.02rem * var(--bd-scale));
-      line-height: 1.45;
-      color: #008a50;
-      font-weight: 700;
-      white-space: pre-wrap;
-      display: none;
-    }
-    .ai-box {
-      margin-top: 10px;
-      padding: 13px 15px;
-      border-radius: 14px;
-      background: #e8f3ff;
-      border: none;
-      color: #1b64da;
-      font-size: 0.88rem;
-      line-height: 1.5;
-      font-weight: 600;
-      display: none;
-      white-space: pre-wrap;
-    }
-    /* Thumb-zone answer dock: four equal columns pinned to the bottom of the study arena. */
-    .rating-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
-      margin-top: 14px;
-      position: sticky;
-      bottom: var(--bd-dock-offset);
-      z-index: 25;
-      background: rgba(255, 255, 255, 0.96);
-      -webkit-backdrop-filter: blur(8px);
-      backdrop-filter: blur(8px);
-      padding: 10px;
-      border: 1px solid var(--bd-line);
-      border-radius: 12px;
-    }
-    /* Three columns when the "easy" button is hidden (kids persona via CSS, junior tier via inline style). */
-    body[data-persona-tier="kids"] .rating-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-    .rating-grid:has(> .rate-btn[style*="display: none"]) {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-    .rate-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-width: 0;
-      min-height: max(var(--min-touch-target), var(--bd-touch));
-      padding: 8px 6px;
-      border-radius: 10px;
-      border: 1.5px solid var(--rate-color, var(--bd-line-strong));
-      background: var(--bd-surface);
-      color: var(--rate-color, var(--bd-ink));
-      font-size: calc(0.92rem * var(--bd-scale));
-      font-weight: 800;
-      line-height: 1.25;
-      text-align: center;
-      word-break: keep-all;
-    }
-    @media (max-width: 480px) {
-      .rating-grid {
-        gap: 6px;
-      }
-      .rate-btn {
-        padding: 6px 2px;
-        font-size: calc(0.78rem * var(--bd-scale));
-      }
-    }
-    .rate-btn:hover {
-      background: var(--bd-sunken);
-      border-color: var(--rate-color, var(--bd-line-strong));
-      color: var(--rate-color, var(--bd-ink));
-    }
-    .rate-sub {
-      font-size: calc(0.74rem * var(--bd-scale));
-      font-weight: 600;
-      opacity: 0.85;
-      margin-top: 2px;
-    }
-    .rate-again { --rate-color: var(--bd-rate-again); }
-    .rate-hard { --rate-color: var(--bd-rate-hard); }
-    .rate-good { --rate-color: var(--bd-rate-good); }
-    .rate-easy { --rate-color: var(--bd-rate-easy); }
-    .recommended-glow {
-      box-shadow: 0 0 0 3px rgba(31, 79, 216, 0.28);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--rate-color, var(--bd-accent)) 28%, transparent);
-    }
-    /* Study Theater: only the compact top bar, the card arena and the answer dock stay on screen. */
-    :is(body.focus-study-mode, body.bd-study-theater-active) {
-      --bd-dock-offset: max(12px, env(safe-area-inset-bottom));
-      padding-bottom: max(24px, env(safe-area-inset-bottom));
-    }
-    :is(body.focus-study-mode, body.bd-study-theater-active) #main-tab-nav,
-    :is(body.focus-study-mode, body.bd-study-theater-active)[data-kids-parent-menu="open"] #main-tab-nav,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #bd-kids-quick-start-bar,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #bd-collapsible-header-zone,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #deck-card-explorer-panel,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #study-tools-drawer,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #summary-sheet-panel,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #learner-policy-summary,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #btn-open-mode-setup,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #btn-reset-study,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #btn-toggle-compact-header,
-    :is(body.focus-study-mode, body.bd-study-theater-active) #btn-toggle-study-tools {
-      display: none !important;
-    }
-    :is(body.focus-study-mode, body.bd-study-theater-active) header {
-      padding-bottom: 4px;
-      margin-bottom: 8px;
-    }
-    /* ==========================================================================
-       Zero-Scroll Study Viewport (100dvh)
-       One flex chain owns the height: body > .app-shell > #page-study > .panel > #card-arena.
-       Chrome rows are flex:none, the card arena takes whatever is left, and only the card body
-       (#card-arena > div:first-child) scrolls. The reveal toolbar and the answer dock never move.
-       The lock is scoped with :has(#page-study.active), so the other tabs keep their page scroll.
-       ========================================================================== */
-    html:has(#page-study.active) {
-      height: 100vh;
-      height: 100dvh;
-      overflow: hidden;
-      overscroll-behavior: none;
-    }
-    body:has(#page-study.active) {
-      height: 100vh;
-      height: 100dvh;
-      min-height: 0;
-      overflow: hidden;
-      padding: max(8px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
-    }
-    body:has(#page-study.active) .app-shell {
-      height: 100%;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    body:has(#page-study.active) header {
-      flex: none;
-      flex-wrap: nowrap;
-      margin-bottom: 6px;
-      padding: 2px 0;
-    }
-    body:has(#page-study.active) .brand-title {
-      flex: 1 1 auto;
-      min-width: 0;
-      flex-wrap: nowrap;
-      white-space: nowrap;
-      overflow: hidden;
-      font-size: 1.12rem;
-      gap: 6px;
-    }
-    body:has(#page-study.active) .brand-title > span {
-      flex: 0 1 auto;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    body:has(#page-study.active) #learner-policy-summary {
-      flex: 1 1 0;
-    }
-    body:has(#page-study.active) header > div:last-child {
-      flex: none;
-    }
-    body:has(#page-study.active) header button {
-      white-space: nowrap;
-    }
-    /* Toasts float over the header instead of pushing the card down, let clicks through, and slide away on their own. */
-    body:has(#page-study.active) #ux-toast-banner {
-      position: fixed;
-      z-index: 150;
-      top: max(8px, env(safe-area-inset-top));
-      left: 50%;
-      width: min(692px, calc(100vw - 24px));
-      max-height: 32vh;
-      overflow: hidden;
-      margin: 0;
-      padding: 8px 12px;
-      transform: translateX(-50%);
-      font-size: 0.82rem;
-      line-height: 1.4;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
-      pointer-events: none;
-      animation: bd-toast-leave 0.35s ease-in 6s forwards;
-    }
-    body:has(#page-study.active) #ux-toast-banner button {
-      pointer-events: auto;
-    }
-    @keyframes bd-toast-leave {
-      to { opacity: 0; transform: translate(-50%, calc(-100% - 32px)); }
-    }
-    body:has(#page-study.active) .tab-nav {
-      flex: none;
-      margin-bottom: 8px;
-      padding: 4px;
-    }
-    body:has(#page-study.active) .nav-tab-btn {
-      padding: 6px 4px;
-    }
-    @media (min-width: 769px) {
-      body:has(#page-study.active) .nav-tab-btn {
-        flex-direction: row;
-        gap: 6px;
-      }
-    }
-    @media (max-width: 768px) {
-      /* The bottom tab bar joins the flex chain, so nothing has to guess its height. */
-      body:has(#page-study.active) .tab-nav {
-        position: static;
-        order: 99;
-        margin: 8px 0 0;
-      }
-    }
-    body:has(#page-study.active) #page-study {
-      flex: 1 1 auto;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    #page-study.active > .panel {
-      --bd-dock-offset: 0px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      padding: 12px 16px;
-    }
-    body:has(#page-study.active) #page-study.active > .panel {
-      flex: 1 1 auto;
-      min-height: 0;
-      margin-bottom: 0;
-      /* The panel itself never scrolls; only opened drawers and the card body (#card-arena > div:first-child) scroll internally. */
-      overflow: hidden;
-    }
-    #page-study.active > .panel > * {
-      flex: none;
-      margin-top: 0;
-      margin-bottom: 0;
-    }
-    /* Horizontal chip rails: one line each, swipe or wheel sideways, never wrap downwards. */
-    .bd-rail {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: nowrap;
-      min-width: 0;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scrollbar-width: none;
-    }
-    .bd-rail::-webkit-scrollbar {
-      display: none;
-    }
-    .bd-rail > * {
-      flex: none;
-      white-space: nowrap;
-    }
-    #bd-kids-quick-start-bar {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scrollbar-width: none;
-    }
-    #bd-kids-quick-start-bar::-webkit-scrollbar {
-      display: none;
-    }
-    #bd-kids-quick-start-bar > .bd-rail {
-      display: contents;
-    }
-    #bd-kids-quick-start-bar select {
-      max-width: 170px;
-      flex: none;
-    }
-    #bd-kids-quick-start-bar > * ,
-    #bd-kids-quick-start-bar .bd-rail > * {
-      flex: none;
-      white-space: nowrap;
-    }
-    #page-study .panel-header {
-      display: flex;
-      flex-wrap: nowrap;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 6px;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scrollbar-width: none;
-    }
-    #page-study .panel-header::-webkit-scrollbar {
-      display: none;
-    }
-    #deck-select {
-      flex: 0 1 220px;
-      min-width: 110px;
-      padding: 5px 10px;
-      font-size: 0.8rem;
-    }
-    #study-queue-counters {
-      display: contents;
-    }
-    #study-queue-counters > span,
-    #study-queue-counters > button {
-      flex: none;
-      padding: 4px 8px;
-      border-radius: 999px;
-      white-space: nowrap;
-      font-size: 0.74rem;
-      font-weight: 800;
-    }
-    /* Opened panels are capped so they can never push the card off the screen. */
-    #bd-collapsible-header-zone,
-    #study-tools-drawer,
-    #deck-card-explorer-panel,
-    #summary-sheet-panel {
-      max-height: 26vh;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-    }
-    #deck-card-explorer-panel > div:first-child,
-    #summary-sheet-panel > div:first-child {
-      position: sticky;
-      top: 0;
-      z-index: 1;
-      margin-top: -6px;
-      padding: 6px 0;
-      background: #ffffff;
-    }
-    #page-study .ai-box {
-      margin-top: 4px;
-      padding: 5px 9px;
-    }
-    #page-study.active > .panel > #card-arena {
-      flex: 1 1 0;
-      min-height: 0;
-    }
-    #card-arena {
-      padding: 8px 12px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      overflow: hidden;
-    }
-    #card-arena > div:first-child {
-      flex: 1 1 auto;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      overflow-y: auto;
-    }
-    body:has(#page-study.active) #card-inline-progress-box {
-      padding: 3px 8px;
-      margin-bottom: 4px;
-    }
-    #card-inline-progress-box > div:first-child > span {
-      white-space: nowrap;
-    }
-    #card-inline-deck-pct {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .bd-card-meta-row {
-      display: flex;
-      flex-wrap: nowrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.74rem;
-      color: var(--muted);
-      flex: none;
-    }
-    .bd-card-meta-row > div {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex: none;
-    }
-    .bd-card-meta-row > div:first-child {
-      flex: 1 1 0;
-      min-width: 0;
-      overflow: hidden;
-    }
-    .bd-card-meta-row > div:first-child > * {
-      flex: none;
-      white-space: nowrap;
-    }
-    .bd-card-meta-row > div:first-child > #card-meta {
-      flex: 1 1 0;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #bd-card-coaching-banner {
-      flex: none;
-      margin-bottom: 0 !important;
-      padding: 3px 8px !important;
-      font-size: 0.73rem !important;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #page-study .card-question {
-      flex: none;
-      margin: 2px 0;
-      font-size: clamp(0.95rem, 2.1vh, 1.16rem);
-      line-height: 1.3;
-    }
-    #page-study .card-answer {
-      flex: none;
-      margin: 0;
-      padding: 5px 10px;
-      font-size: 0.9rem;
-      line-height: 1.3;
-    }
-    #page-study #card-extra-explanation {
-      flex: none;
-      margin: 0;
-      padding: 4px 8px;
-      font-size: 0.74rem;
-      line-height: 1.3;
-    }
-    #card-svg-diagram {
-      flex: none;
-      margin: 2px 0 !important;
-    }
-    #card-svg-diagram svg {
-      display: block;
-      width: auto;
-      max-width: 100%;
-      max-height: min(68px, 10vh);
-      margin: 0 auto;
-    }
-    /* 4-choice quiz: always 2 x 2, so four options cost two rows instead of four. */
-    #interactive-quiz-box {
-      flex: none;
-      margin-top: 2px !important;
-      padding: 6px 8px !important;
-    }
-    .bd-quiz-head {
-      display: flex;
-      flex-wrap: nowrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 4px;
-      font-size: 0.74rem;
-    }
-    .bd-quiz-head > div:first-child {
-      flex: 1 1 0;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .bd-quiz-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 5px;
-    }
-    .bd-quiz-grid > button {
-      min-height: 36px;
-      padding: 6px 8px;
-      font-size: calc(0.8rem * var(--bd-scale));
-      line-height: 1.25;
-      text-align: left;
-    }
-    #interactive-quiz-box.bd-quiz-revealed .bd-quiz-head {
-      display: none !important;
-    }
-    #interactive-quiz-box.bd-quiz-revealed .bd-quiz-grid > button {
-      min-height: 28px;
-      padding: 3px 7px;
-      font-size: 0.74rem;
-    }
-    /* Answer toolbar: one row. Secondary tools slide sideways under the pinned reveal button. */
-    .bd-card-toolbar {
-      flex: none;
-      margin-top: 4px;
-    }
-    .bd-card-toolbar > button {
-      padding: 5px 9px;
-      font-size: 0.76rem;
-    }
-    #solve-mode-badge {
-      order: -2;
-    }
-    #btn-hint {
-      order: -1;
-    }
-    #btn-reveal {
-      position: sticky;
-      right: 0;
-      max-width: 64%;
-      min-height: 34px;
-      margin-left: auto;
-      padding: 5px 14px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      font-size: 0.82rem;
-      box-shadow: -10px 0 8px -2px var(--bd-arena-bg);
-    }
-    #hint-box,
-    #eval-box {
-      max-height: 44px;
-      overflow: hidden;
-      font-size: 0.75rem;
-      line-height: 1.25;
-      padding: 4px 10px !important;
-      margin-top: 2px !important;
-    }
-    #rating-guard-banner {
-      padding: 3px 8px !important;
-      font-size: 0.72rem !important;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #typing-solve-zone > button {
-      padding: 6px 10px;
-    }
-    #recall-input {
-      padding: 6px 10px;
-    }
-    #page-study .rating-grid {
-      gap: 5px;
-      padding: 4px;
-    }
-    #page-study .rate-btn {
-      padding: 3px 5px;
-      min-height: 38px;
-    }
-    @media (max-width: 480px) {
-      body:has(#page-study.active) {
-        padding-left: 10px;
-        padding-right: 10px;
-      }
-      body:has(#page-study.active) .brand-title {
-        font-size: 1rem;
-      }
-      /* The profile button and the profile rail already name the tier, so the header keeps one line. */
-      body:has(#page-study.active) #age-tier-banner,
-      body:has(#page-study.active) #learner-policy-summary {
-        display: none;
-      }
-      body:has(#page-study.active) header button {
-        padding: 6px 8px;
-        font-size: 0.72rem;
-      }
-      body:has(#page-study.active) #btn-open-mode-setup {
-        max-width: 8.5em;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      #page-study.active > .panel {
-        padding: 10px 12px;
-      }
-      /* Phones: both quick-start rails merge into one swipeable line, with the profile and the two start buttons first. */
-      #bd-kids-quick-start-bar {
-        flex-direction: row;
-        align-items: center;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        scrollbar-width: none;
-      }
-      #bd-kids-quick-start-bar::-webkit-scrollbar {
-        display: none;
-      }
-      #bd-kids-quick-start-bar > .bd-rail {
-        display: contents;
-      }
-      #bd-kids-quick-start-bar #bd-family-profile-select {
-        order: -2;
-        max-width: 7em;
-      }
-      #bd-quick-eng-level,
-      #btn-quick-start-english,
-      #bd-quick-hanja-level,
-      #btn-quick-start-hanja {
-        order: -1;
-      }
-      #card-arena {
-        padding: 10px 12px;
-      }
-      .card-question {
-        font-size: min(var(--question-font-size), calc(1.08rem * var(--bd-scale)));
-      }
-      #study-queue-counters > span,
-      #study-queue-counters > button {
-        padding: 4px 8px;
-        font-size: 0.72rem;
-      }
-    }
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .metric-card {
-      background: #ffffff;
-      border: none;
-      border-radius: 20px;
-      padding: 18px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-    }
-    .metric-label {
-      font-size: 0.8rem;
-      color: var(--muted);
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .metric-val {
-      font-size: 1.45rem;
-      font-weight: 800;
-      color: var(--text);
-    }
-    .curve-svg {
-      width: 100%;
-      height: 120px;
-      background: #f9fafb;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      margin-top: 10px;
-    }
-    /* Toss-Style Full-Screen Initial Mode Setup Overlay */
-    .onboarding-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(242, 244, 246, 0.96);
-      backdrop-filter: blur(16px);
-      z-index: 200;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .onboarding-card {
-      width: 100%;
-      max-width: 440px;
-      background: #ffffff;
-      border: none;
-      border-radius: 28px;
-      padding: 32px 24px;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08);
-      text-align: center;
-    }
-    .onboarding-mode-btn {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 18px;
-      margin-top: 12px;
-      border-radius: 20px;
-      background: #f9fafb;
-      border: 1px solid #e5e8eb;
-      text-align: left;
-    }
-    .onboarding-mode-btn:hover {
-      border-color: var(--accent);
-      background: #e8f3ff;
-    }
-  </style>
+  <link rel="stylesheet" href="./styles.css?v=10.1.0-b109" />
 </head>
 <body>
   <div id="aria-live-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <!-- Initial Mode & LearnerProfile v2 Setup Modal (Frame 1: 3 Questions) -->
   <div id="onboarding-modal" class="onboarding-overlay">
-    <div class="onboarding-card" style="max-width:460px;">
-      <div style="font-size:0.85rem;font-weight:800;color:var(--accent);letter-spacing:0.06em;margin-bottom:4px;">BRAINDECK PROFILE</div>
-      <div style="font-size:1.25rem;font-weight:800;margin-bottom:4px;">내 학습 프로필 설정 (1회 설정 · 전역 자동 적용)</div>
-      <div style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
+    <div class="onboarding-card bd-s-001">
+      <div class="bd-s-002">BRAINDECK PROFILE</div>
+      <div class="bd-s-003">내 학습 프로필 설정 (1회 설정 · 전역 자동 적용)</div>
+      <div class="bd-s-004">
         한 번만 골라두면 모든 탭의 풀이 방식·난이도·섞기 옵션이 자동으로 맞춰집니다.
       </div>
 
-      <div style="font-size:0.78rem;font-weight:800;color:var(--accent);margin-bottom:6px;">1. 학습 연령 · 목표 프리셋 (원탭 선택)</div>
+      <div class="bd-s-005">1. 학습 연령 · 목표 프리셋 (원탭 선택)</div>
       <button type="button" class="onboarding-mode-btn" data-onboarding-tier="junior">
-        <span class="badge-pill" style="background:#ecfdf5;color:#047857;">JR</span>
+        <span class="badge-pill bd-s-006">JR</span>
         <div>
-          <div style="font-size:0.95rem;font-weight:800;color:var(--text);">주니어 모드 (초등·기초)</div>
-          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">큰 글씨 · 4지선다 퀴즈 · Lv.1 기초 · 쉬운 3버튼</div>
+          <div class="bd-s-007">주니어 모드 (초등·기초)</div>
+          <div class="bd-s-008">큰 글씨 · 4지선다 퀴즈 · Lv.1 기초 · 쉬운 3버튼</div>
         </div>
       </button>
       <button type="button" class="onboarding-mode-btn" data-onboarding-tier="teen">
-        <span class="badge-pill" style="background:#e8f3ff;color:#1b64da;">K12</span>
+        <span class="badge-pill bd-s-009">K12</span>
         <div>
-          <div style="font-size:0.95rem;font-weight:800;color:var(--text);">중고등 모드 (내신·수능)</div>
-          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">자동 진화(선다→서술) · 통합 난이도(Lv.1~3) · 교차 섞기</div>
+          <div class="bd-s-007">중고등 모드 (내신·수능)</div>
+          <div class="bd-s-008">자동 진화(선다→서술) · 통합 난이도(Lv.1~3) · 교차 섞기</div>
         </div>
       </button>
       <button type="button" class="onboarding-mode-btn" data-onboarding-tier="adult">
-        <span class="badge-pill" style="background:#eef2ff;color:#3730a3;">PRO</span>
+        <span class="badge-pill bd-s-010">PRO</span>
         <div>
-          <div style="font-size:0.95rem;font-weight:800;color:var(--text);">성인 모드 (자격증·어학·전공)</div>
-          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">자동 진화(선다→서술) · 심화·역방향 인출 · 정밀 FSRS</div>
+          <div class="bd-s-007">성인 모드 (자격증·어학·전공)</div>
+          <div class="bd-s-008">자동 진화(선다→서술) · 심화·역방향 인출 · 정밀 FSRS</div>
         </div>
       </button>
 
-      <details style="margin-top:10px;padding:10px 12px;border-radius:14px;background:#f9fafb;border:1px solid var(--border);">
-        <summary style="font-size:0.82rem;font-weight:700;cursor:pointer;color:var(--muted);">세부 풀이 방식 · 난이도 직접 조정 (선택)</summary>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
-          <label style="font-size:0.78rem;font-weight:700;color:var(--muted);">
+      <details class="bd-s-011">
+        <summary class="bd-s-012">세부 풀이 방식 · 난이도 직접 조정 (선택)</summary>
+        <div class="bd-s-013">
+          <label class="bd-s-014">
             2. 카드 풀이 방식 (1카드 1모드)
-            <select id="profile-solve-mode-select" style="margin-top:4px;">
+            <select id="profile-solve-mode-select" class="bd-s-015">
               <option value="adaptive">자동 진화 (새 카드=4지선다 → 복습 카드=직접 타이핑)</option>
               <option value="choice">4지선다 객관식만</option>
               <option value="typing">직접 타이핑(서술형)만</option>
               <option value="flip">클래식 카드 뒤집기만</option>
             </select>
           </label>
-          <label style="font-size:0.78rem;font-weight:700;color:var(--muted);">
+          <label class="bd-s-014">
             3. 기본 카드 생성 난이도
-            <select id="profile-difficulty-select" style="margin-top:4px;">
+            <select id="profile-difficulty-select" class="bd-s-015">
               <option value="mixed">통합 (Lv.1 기초 + Lv.2 빈칸 + Lv.3 심화)</option>
               <option value="lv1">Lv.1 기초·핵심 개념</option>
               <option value="lv2">Lv.2 실전 문맥 빈칸</option>
               <option value="lv3">Lv.3 심화·역방향 인출</option>
             </select>
           </label>
-          <button id="btn-save-learner-profile" type="button" class="btn-primary" style="margin-top:4px;width:100%;">
+          <button id="btn-save-learner-profile" type="button" class="btn-primary bd-s-016">
             세부 프로필 저장 및 시작
           </button>
         </div>
@@ -1115,43 +81,43 @@
       <div class="brand-title">
         BrainDeck (브레인덱)
         <span id="age-tier-banner" class="badge-pill">중고등</span>
-        <span id="learner-policy-summary" style="font-size:0.74rem;font-weight:600;color:var(--muted);"></span>
+        <span id="learner-policy-summary" class="bd-s-017"></span>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="bd-s-018">
         <button id="btn-open-mode-setup" type="button">
           프로필 설정
         </button>
         <button id="btn-undo-review" type="button" title="방금 평가 되돌리기 (Z)">
           취소
         </button>
-        <button id="btn-reset-study" type="button" style="background:#fff0f0;color:#be123c;border-color:#fecdd3;" title="현재 덱 학습 진도 및 복습 상태 처음부터 초기화">
+        <button id="btn-reset-study" type="button" title="현재 덱 학습 진도 및 복습 상태 처음부터 초기화" class="bd-s-019">
           초기화
         </button>
       </div>
     </header>
 
-    <div id="ux-toast-banner" class="ai-box" role="status" style="margin:0 0 14px 0;display:none;align-items:center;justify-content:space-between;gap:10px;font-weight:600;"></div>
+    <div id="ux-toast-banner" class="ai-box bd-s-020" role="status"></div>
 
     <!-- 5-Tab Multi-Page Navigation -->
     <nav id="main-tab-nav" class="tab-nav" aria-label="주요 메뉴">
       <button type="button" class="nav-tab-btn active" data-tab="study">
-        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">STUDY</span>
+        <span class="nav-icon bd-s-021">STUDY</span>
         <span>학습</span>
       </button>
       <button type="button" class="nav-tab-btn" data-tab="curriculum">
-        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">EXAM</span>
+        <span class="nav-icon bd-s-021">EXAM</span>
         <span>시험·급수</span>
       </button>
       <button type="button" class="nav-tab-btn" data-tab="create">
-        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">CREATE</span>
+        <span class="nav-icon bd-s-021">CREATE</span>
         <span>만들기</span>
       </button>
       <button type="button" class="nav-tab-btn" data-tab="store">
-        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">STORE</span>
+        <span class="nav-icon bd-s-021">STORE</span>
         <span>스토어</span>
       </button>
       <button type="button" class="nav-tab-btn" data-tab="stats">
-        <span class="nav-icon" style="font-size:0.78rem;font-weight:800;">STATS</span>
+        <span class="nav-icon bd-s-021">STATS</span>
         <span>내 정보</span>
       </button>
     </nav>
@@ -1160,58 +126,58 @@
     <main id="page-study" class="tab-page active">
       <section class="panel">
         <!-- Unified Single-Screen Focus Bar (English & Hanja Level Selectors + Family Profile + Daily Goal + User Manual) -->
-        <div id="bd-kids-quick-start-bar" style="border-radius:16px;background:linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%);border:1.5px solid #93c5fd;">
+        <div id="bd-kids-quick-start-bar" class="bd-s-022">
           <div class="bd-rail">
-            <select id="bd-family-profile-select" style="width:auto;padding:5px 10px;font-size:0.78rem;font-weight:800;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="연령·목적별 맞춤 UI 및 기억 엔진 전환">
+            <select id="bd-family-profile-select" title="연령·목적별 맞춤 UI 및 기억 엔진 전환" class="bd-s-023">
               <option value="kid1" selected>👦 초등 키즈 · 첫째 (놀이·3버튼)</option>
               <option value="kid2">👧 초등 키즈 · 둘째 (놀이·3버튼)</option>
               <option value="teen">🧑‍🎓 중고등 내신·수능 (오답·스프린트)</option>
               <option value="adult">👨 성인·프로 워크스페이스 (정밀지표·전체도구)</option>
             </select>
-            <select id="bd-daily-goal-select" style="width:auto;padding:5px 9px;font-size:0.76rem;font-weight:800;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="오늘의 목표 문제 수">
+            <select id="bd-daily-goal-select" title="오늘의 목표 문제 수" class="bd-s-024">
               <option value="10">하루 10문제</option>
               <option value="15" selected>하루 15문제</option>
               <option value="20">하루 20문제</option>
               <option value="30">하루 30문제</option>
             </select>
-            <span id="bd-daily-session-counter" style="font-size:0.8rem;font-weight:800;color:#0f172a;">🎯 오늘의 목표 0 / 15문제</span>
-            <span id="bd-daily-stamp-strip" style="font-size:0.78rem;letter-spacing:1px;">⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪</span>
-            <span id="bd-persona-mode-badge" class="badge-pill" style="background:#dbeafe;color:#1e40af;font-size:0.73rem;font-weight:800;">🎈 초등 키즈 놀이학습 (큰 글씨 · 3버튼 · 4지선다)</span>
-            <span id="bd-rust-engine-badge" class="badge-pill" style="background:#1e293b;color:#f8fafc;font-size:0.72rem;font-weight:800;">🦀 Rust/WASM Core</span>
+            <span id="bd-daily-session-counter" class="bd-s-025">🎯 오늘의 목표 0 / 15문제</span>
+            <span id="bd-daily-stamp-strip" class="bd-s-026">⚪⚪⚪⚪⚪⚪⚪⚪⚪⚪</span>
+            <span id="bd-persona-mode-badge" class="badge-pill bd-s-027">🎈 초등 키즈 놀이학습 (큰 글씨 · 3버튼 · 4지선다)</span>
+            <span id="bd-rust-engine-badge" class="badge-pill bd-s-028">🦀 Rust/WASM Core</span>
           </div>
           <div class="bd-rail">
-            <select id="bd-quick-eng-level" style="width:auto;padding:5px 8px;font-size:0.76rem;border-radius:999px;background:#ffffff;border:1px solid #93c5fd;" title="영어 단계 선택">
+            <select id="bd-quick-eng-level" title="영어 단계 선택" class="bd-s-029">
               <option value="moe-eng:elem-3-4" selected>🇬🇧 초3·4 필수(240)</option>
               <option value="moe-eng:elementary">🇬🇧 초5·6 완성(400)</option>
               <option value="moe-eng:middle">🇬🇧 중등 필수(500)</option>
               <option value="moe-eng:high">🇬🇧 고등 내신(500)</option>
               <option value="exam-eng:csat-civil">🇬🇧 수능·공무원(450)</option>
             </select>
-            <button type="button" id="btn-quick-start-english" class="btn-primary" style="padding:6px 12px;font-size:0.8rem;border-radius:999px;background:#1b64da;border-color:#1b64da;">
+            <button type="button" id="btn-quick-start-english" class="btn-primary bd-s-030">
               영어 시작
             </button>
-            <select id="bd-quick-hanja-level" style="width:auto;padding:5px 8px;font-size:0.76rem;border-radius:999px;background:#ffffff;border:1px solid #86efac;" title="한자 급수 선택">
+            <select id="bd-quick-hanja-level" title="한자 급수 선택" class="bd-s-031">
               <option value="hanja-grade:8geup" selected>🀄 8급 기초(100)</option>
               <option value="hanja-grade:7geup">🀄 7급 초등(150)</option>
               <option value="hanja-grade:6to4geup">🀄 6~4급 중급(400)</option>
               <option value="moe-hanja-1800:middle">🀄 중등 한자(450)</option>
             </select>
-            <button type="button" id="btn-quick-start-hanja" class="btn-primary" style="padding:6px 12px;font-size:0.8rem;border-radius:999px;background:#047857;border-color:#047857;">
+            <button type="button" id="btn-quick-start-hanja" class="btn-primary bd-s-032">
               한자 시작
             </button>
-            <button type="button" id="btn-quick-speak-now" style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#ffffff;color:#1d4ed8;border:1px solid #93c5fd;" title="현재 영단어 발음 듣기 (단축키 R)">
+            <button type="button" id="btn-quick-speak-now" title="현재 영단어 발음 듣기 (단축키 R)" class="bd-s-033">
               🔊 발음 듣기
             </button>
-            <button type="button" id="btn-toggle-auto-tts" aria-pressed="false" style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#ffffff;color:#1d4ed8;border:1px solid #93c5fd;">
+            <button type="button" id="btn-toggle-auto-tts" aria-pressed="false" class="bd-s-033">
               🔇 자동발음 OFF
             </button>
-            <button type="button" id="btn-quick-today-wrong" disabled style="padding:6px 10px;font-size:0.76rem;border-radius:999px;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;">
+            <button type="button" id="btn-quick-today-wrong" disabled class="bd-s-034">
               📝 오늘 오답 (0)
             </button>
-            <button type="button" id="btn-open-user-manual" style="padding:6px 11px;font-size:0.76rem;font-weight:800;border-radius:999px;background:#0f172a;color:#ffffff;border:1px solid #0f172a;" title="아이·학부모 눈높이 사용설명서 열기 (단축키 ?)">
+            <button type="button" id="btn-open-user-manual" title="아이·학부모 눈높이 사용설명서 열기 (단축키 ?)" class="bd-s-035">
               📖 사용설명서
             </button>
-            <button type="button" id="btn-kids-parent-unlock" aria-expanded="false" style="padding:6px 11px;font-size:0.76rem;font-weight:800;border-radius:999px;background:#ffffff;color:#334155;border:1px solid #cbd5e1;" title="키즈 모드에서 부모님 전체 메뉴(5탭) 열기/닫기">
+            <button type="button" id="btn-kids-parent-unlock" aria-expanded="false" title="키즈 모드에서 부모님 전체 메뉴(5탭) 열기/닫기" class="bd-s-036">
               👨‍👩‍👧 전체메뉴
             </button>
           </div>
@@ -1220,11 +186,11 @@
           <select id="deck-select"></select>
           <!-- 3-Color Queue Counter Pills + Progressive Disclosure Study Tools Toggle (Contract C1 + BD-P0-02 Compact Header Toggle) -->
           <div id="study-queue-counters">
-            <span id="count-new" style="background:#e8f3ff;color:#1b64da;">새 카드 0</span>
-            <span id="count-learn" style="background:#fff0f0;color:#be123c;">학습·오답 0</span>
-            <span id="count-review" style="background:#e8faf0;color:#008a50;">복습 0</span>
-            <span id="active-study-filter-summary" class="badge-pill" style="display:none;background:#eef2ff;color:#1d4ed8;"></span>
-            <button type="button" id="btn-focus-study-mode" aria-pressed="false" style="background:#eef2ff;color:#1d4ed8;border-color:#c7d2fe;" title="하단 탭과 상단 대시보드를 모두 숨기고 플래시카드에만 몰입하는 집중 모드">
+            <span id="count-new" class="bd-s-009">새 카드 0</span>
+            <span id="count-learn" class="bd-s-037">학습·오답 0</span>
+            <span id="count-review" class="bd-s-038">복습 0</span>
+            <span id="active-study-filter-summary" class="badge-pill bd-s-039"></span>
+            <button type="button" id="btn-focus-study-mode" aria-pressed="false" title="하단 탭과 상단 대시보드를 모두 숨기고 플래시카드에만 몰입하는 집중 모드" class="bd-s-040">
               🎯 집중모드
             </button>
             <button type="button" id="btn-toggle-compact-header" aria-expanded="false" aria-controls="bd-collapsible-header-zone" title="상단 학습계획 및 대시보드 접기/펼치기 (카드 집중 뷰)">
@@ -1236,121 +202,121 @@
           </div>
         </div>
 
-        <div id="bd-collapsible-header-zone" style="display:none;">
+        <div id="bd-collapsible-header-zone" class="bd-s-041">
         <!-- Always-Visible D-Day Study Planner & Daily Quota Controller (v5.9 Upgrade) -->
-        <div id="bd-planner-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:10px 12px;border-radius:16px;background:#eef2ff;border:1px solid #c7d2fe;">
-          <span style="font-size:0.78rem;font-weight:800;color:#1d4ed8;">D-Day 학습계획 · 일일 할당량:</span>
-          <select id="bd-plan-days" style="width:auto;padding:5px 8px;font-size:0.76rem;" title="시험·완주 목표 기간 (D-Day)">
+        <div id="bd-planner-bar" class="bd-s-042">
+          <span class="bd-s-043">D-Day 학습계획 · 일일 할당량:</span>
+          <select id="bd-plan-days" title="시험·완주 목표 기간 (D-Day)" class="bd-s-044">
             <option value="7">D-7 (단기 집중)</option>
             <option value="14">D-14 (2주 내신)</option>
             <option value="30" selected>D-30 (1개월 표준)</option>
             <option value="60">D-60 (2개월 완주)</option>
             <option value="90">D-90 (3개월 여유)</option>
           </select>
-          <select id="bd-plan-daily-new" style="width:auto;padding:5px 8px;font-size:0.76rem;" title="하루 새 카드 학습 할당량">
+          <select id="bd-plan-daily-new" title="하루 새 카드 학습 할당량" class="bd-s-044">
             <option value="auto" selected>권장량 자동배분</option>
             <option value="20">하루 20장씩</option>
             <option value="30">하루 30장씩</option>
             <option value="40">하루 40장씩</option>
             <option value="50">하루 50장씩</option>
           </select>
-          <select id="bd-plan-minutes" style="width:auto;padding:5px 8px;font-size:0.76rem;" title="하루 가용 학습 시간 예산">
+          <select id="bd-plan-minutes" title="하루 가용 학습 시간 예산" class="bd-s-044">
             <option value="15">하루 15분</option>
             <option value="30" selected>하루 30분 (추천)</option>
             <option value="45">하루 45분</option>
             <option value="60">하루 60분</option>
           </select>
-          <button type="button" id="btn-compute-study-plan" style="padding:5px 10px;font-size:0.76rem;background:#ffffff;color:#1d4ed8;border-color:#93c5fd;">
+          <button type="button" id="btn-compute-study-plan" class="bd-s-045">
             계획 산출
           </button>
-          <button type="button" id="btn-apply-study-plan" class="btn-primary" style="padding:5px 12px;font-size:0.76rem;">
+          <button type="button" id="btn-apply-study-plan" class="btn-primary bd-s-046">
             이 계획으로 매일 학습 적용
           </button>
-          <select id="bd-custom-study-preset" style="width:auto;padding:5px 8px;font-size:0.76rem;margin-left:auto;" title="맞춤 보충 학습 (Custom Study)">
+          <select id="bd-custom-study-preset" title="맞춤 보충 학습 (Custom Study)" class="bd-s-047">
             <option value="increase_new_quota">오늘 새 카드 10장 더 학습</option>
             <option value="forgotten_recent">최근 오답·망각 복습</option>
             <option value="review_ahead">시험 대비 3일 선행 복습</option>
             <option value="preview_new">새 카드 무오염 미리보기</option>
             <option value="cram_flagged_or_leech">플래그·거머리 취약 특훈</option>
           </select>
-          <button type="button" id="btn-run-custom-study" style="padding:5px 11px;font-size:0.76rem;background:#ffffff;color:#1d4ed8;border-color:#93c5fd;">
+          <button type="button" id="btn-run-custom-study" class="bd-s-048">
             맞춤학습 시작
           </button>
         </div>
-        <div id="bd-study-plan-banner" class="ai-box" style="display:block;margin-top:0;margin-bottom:10px;background:#f8fafc;border:1px solid #c7d2fe;color:#1e293b;font-size:0.82rem;">
+        <div id="bd-study-plan-banner" class="ai-box bd-s-049">
           덱을 선택하면 전체 카드 수와 목표일(D-Day)에 맞춰 오늘 학습할 할당량이 자동으로 계획·배분됩니다.
         </div>
 
         <!-- IMPL-V61: 0.5-Second Multi-Dimensional Progress & Mastery Dashboard (Today % + 1,000-Card Coverage % + 4-Tier Maturity Bar + Lv1~Lv4 Stage Filter) -->
-        <div id="bd-deck-progress-dashboard" style="padding:12px 14px;border-radius:16px;background:#ffffff;border:1px solid #cbd5e1;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+        <div id="bd-deck-progress-dashboard" class="bd-s-050">
           <!-- Row 1: Today's Daily Goal Progress Bar -->
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;font-size:0.8rem;">
+          <div class="bd-s-051">
             <div>
-              <span id="bd-today-progress-label" style="font-weight:800;color:#2563eb;font-variant-numeric:tabular-nums;">오늘 목표 진척률: 0 / 30장 완료 (0.0%)</span>
+              <span id="bd-today-progress-label" class="bd-s-052">오늘 목표 진척률: 0 / 30장 완료 (0.0%)</span>
             </div>
-            <div id="bd-today-eta-label" style="font-size:0.75rem;font-weight:700;color:#475569;font-variant-numeric:tabular-nums;">
+            <div id="bd-today-eta-label" class="bd-s-053">
               남은 시간 약 7분
             </div>
           </div>
-          <div role="progressbar" aria-label="오늘 목표 진척률" style="height:8px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-bottom:10px;">
-            <div id="bd-today-progress-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#2563eb 0%,#10b981 100%);transition:width 0.3s ease;"></div>
+          <div role="progressbar" aria-label="오늘 목표 진척률" class="bd-s-054">
+            <div id="bd-today-progress-fill" class="bd-s-055"></div>
           </div>
 
           <!-- Row 2: 1,000-Card Whole-Deck Coverage % & FSRS Mastery % + 4-Tier Stacked Bar -->
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;font-size:0.79rem;">
+          <div class="bd-s-056">
             <div>
-              <span id="bd-deck-coverage-label" style="font-weight:800;color:#047857;font-variant-numeric:tabular-nums;">전체 덱 진도율 (1회 이상 학습): 0.0% (0 / 1,020장)</span>
-              <span style="color:#94a3b8;margin:0 4px;">|</span>
-              <span id="bd-deck-mastery-label" style="font-weight:800;color:#4f46e5;font-variant-numeric:tabular-nums;">FSRS 가중 숙련도: 0.0% · 장기마스터 0.0%</span>
+              <span id="bd-deck-coverage-label" class="bd-s-057">전체 덱 진도율 (1회 이상 학습): 0.0% (0 / 1,020장)</span>
+              <span class="bd-s-058">|</span>
+              <span id="bd-deck-mastery-label" class="bd-s-059">FSRS 가중 숙련도: 0.0% · 장기마스터 0.0%</span>
             </div>
-            <div id="bd-deck-milestone-label" style="font-size:0.74rem;font-weight:700;color:#0f766e;">
+            <div id="bd-deck-milestone-label" class="bd-s-060">
               첫 10% 돌파까지 102장
             </div>
           </div>
-          <div role="progressbar" aria-label="전체 덱 기억 성숙도 분포" style="display:flex;height:9px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-bottom:9px;">
-            <div id="bd-bar-mature" title="장기마스터 (S≥21일)" style="height:100%;width:0%;background:#10b981;transition:width 0.3s ease;"></div>
-            <div id="bd-bar-young" title="단기암기 (1~20일)" style="height:100%;width:0%;background:#3b82f6;transition:width 0.3s ease;"></div>
-            <div id="bd-bar-learning" title="학습·오답 (당일~1일)" style="height:100%;width:0%;background:#f59e0b;transition:width 0.3s ease;"></div>
-            <div id="bd-bar-unseen" title="미학습 (새 카드)" style="height:100%;width:100%;background:#e2e8f0;transition:width 0.3s ease;"></div>
+          <div role="progressbar" aria-label="전체 덱 기억 성숙도 분포" class="bd-s-061">
+            <div id="bd-bar-mature" title="장기마스터 (S≥21일)" class="bd-s-062"></div>
+            <div id="bd-bar-young" title="단기암기 (1~20일)" class="bd-s-063"></div>
+            <div id="bd-bar-learning" title="학습·오답 (당일~1일)" class="bd-s-064"></div>
+            <div id="bd-bar-unseen" title="미학습 (새 카드)" class="bd-s-065"></div>
           </div>
 
           <!-- 4-Tier Bucket Summary Pills + Deck Card Explorer Trigger -->
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:0.74rem;">
-            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-              <button type="button" class="bd-bucket-chip" data-bucket="unseen" style="padding:3px 9px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:0.73rem;font-weight:700;">
-                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#94a3b8;margin-right:4px;"></span>미학습 <span id="bd-cnt-unseen">0</span>장
+          <div class="bd-s-066">
+            <div class="bd-s-067">
+              <button type="button" class="bd-bucket-chip bd-s-068" data-bucket="unseen">
+                <span class="bd-s-069"></span>미학습 <span id="bd-cnt-unseen">0</span>장
               </button>
-              <button type="button" class="bd-bucket-chip" data-bucket="learning" style="padding:3px 9px;border-radius:999px;background:#fffbeb;color:#b45309;border:1px solid #fde68a;font-size:0.73rem;font-weight:700;">
-                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-right:4px;"></span>학습·오답 <span id="bd-cnt-learning">0</span>장
+              <button type="button" class="bd-bucket-chip bd-s-070" data-bucket="learning">
+                <span class="bd-s-071"></span>학습·오답 <span id="bd-cnt-learning">0</span>장
               </button>
-              <button type="button" class="bd-bucket-chip" data-bucket="young" style="padding:3px 9px;border-radius:999px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:0.73rem;font-weight:700;">
-                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#3b82f6;margin-right:4px;"></span>단기암기 <span id="bd-cnt-young">0</span>장
+              <button type="button" class="bd-bucket-chip bd-s-072" data-bucket="young">
+                <span class="bd-s-073"></span>단기암기 <span id="bd-cnt-young">0</span>장
               </button>
-              <button type="button" class="bd-bucket-chip" data-bucket="mature" style="padding:3px 9px;border-radius:999px;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-size:0.73rem;font-weight:700;">
-                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;margin-right:4px;"></span>장기마스터 <span id="bd-cnt-mature">0</span>장
+              <button type="button" class="bd-bucket-chip bd-s-074" data-bucket="mature">
+                <span class="bd-s-075"></span>장기마스터 <span id="bd-cnt-mature">0</span>장
               </button>
             </div>
-            <button type="button" id="btn-open-deck-explorer" style="padding:4px 11px;border-radius:999px;background:#eef2ff;color:#3730a3;border:1px solid #a5b4fc;font-size:0.74rem;font-weight:800;">
+            <button type="button" id="btn-open-deck-explorer" class="bd-s-076">
               전체 카드 진도표·검색
             </button>
           </div>
 
           <!-- Row 3: Stage (Lv.1 ~ Lv.4) Progress & Step-by-Step Filter -->
-          <div id="bd-stage-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-top:7px;border-top:1px dashed #e2e8f0;font-size:0.74rem;">
-            <span style="font-weight:800;color:#334155;">단계별 정복:</span>
-            <button type="button" class="bd-stage-btn btn-primary" id="btn-stage-all" data-stage="all" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
+          <div id="bd-stage-filter-bar" class="bd-s-077">
+            <span class="bd-s-078">단계별 정복:</span>
+            <button type="button" class="bd-stage-btn btn-primary bd-s-079" id="btn-stage-all" data-stage="all">
               전체 단계
             </button>
-            <button type="button" class="bd-stage-btn" id="btn-stage-lv1" data-stage="lv1" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
+            <button type="button" class="bd-stage-btn bd-s-079" id="btn-stage-lv1" data-stage="lv1">
               Lv.1 기초 (0%)
             </button>
-            <button type="button" class="bd-stage-btn" id="btn-stage-lv2" data-stage="lv2" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
+            <button type="button" class="bd-stage-btn bd-s-079" id="btn-stage-lv2" data-stage="lv2">
               Lv.2 핵심 (0%)
             </button>
-            <button type="button" class="bd-stage-btn" id="btn-stage-lv3" data-stage="lv3" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
+            <button type="button" class="bd-stage-btn bd-s-079" id="btn-stage-lv3" data-stage="lv3">
               Lv.3 심화 (0%)
             </button>
-            <button type="button" class="bd-stage-btn" id="btn-stage-lv4" data-stage="lv4" style="padding:4px 10px;font-size:0.73rem;border-radius:999px;">
+            <button type="button" class="bd-stage-btn bd-s-079" id="btn-stage-lv4" data-stage="lv4">
               Lv.4 최고급 (0%)
             </button>
           </div>
@@ -1358,23 +324,23 @@
         </div>
 
         <!-- IMPL-V61 AC-5: Deck Card Explorer & Instant Search Drawer -->
-        <div id="deck-card-explorer-panel" style="display:none;padding:12px;border-radius:18px;background:#ffffff;border:2px solid #818cf8;box-shadow:0 8px 24px rgba(15,23,42,0.08);">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-            <div style="font-weight:800;color:#312e81;font-size:0.9rem;">
+        <div id="deck-card-explorer-panel" class="bd-s-080">
+          <div class="bd-s-081">
+            <div class="bd-s-082">
               덱 전체 카드 진도표 · 키워드 검색 (<span id="explorer-total-label">0장</span>)
             </div>
-            <button type="button" id="btn-close-deck-explorer" style="padding:4px 10px;font-size:0.76rem;">닫기</button>
+            <button type="button" id="btn-close-deck-explorer" class="bd-s-083">닫기</button>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-            <input type="text" id="explorer-search-input" placeholder="단어, 뜻, 예문, 개념어를 검색하세요..." style="flex:1;min-width:180px;padding:7px 11px;font-size:0.8rem;" />
-            <select id="explorer-bucket-select" style="width:auto;padding:6px 10px;font-size:0.78rem;">
+          <div class="bd-s-084">
+            <input type="text" id="explorer-search-input" placeholder="단어, 뜻, 예문, 개념어를 검색하세요..." class="bd-s-085" />
+            <select id="explorer-bucket-select" class="bd-s-086">
               <option value="all">전체 상태</option>
               <option value="unseen">미학습만</option>
               <option value="learning">학습·오답만</option>
               <option value="young">단기암기만</option>
               <option value="mature">장기마스터만</option>
             </select>
-            <select id="explorer-stage-select" style="width:auto;padding:6px 10px;font-size:0.78rem;">
+            <select id="explorer-stage-select" class="bd-s-086">
               <option value="all">전체 난이도</option>
               <option value="lv1">Lv.1 기초</option>
               <option value="lv2">Lv.2 핵심</option>
@@ -1382,95 +348,95 @@
               <option value="lv4">Lv.4 최고급</option>
             </select>
           </div>
-          <div id="explorer-card-rows" style="display:flex;flex-direction:column;gap:6px;"></div>
+          <div id="explorer-card-rows" class="bd-s-087"></div>
         </div>
 
         <!-- Contract C1: Collapsible Study Tools & Filter Drawer (Default closed for Zen focus, Zero Feature Loss) -->
-        <div id="study-tools-drawer" style="display:none;padding:12px;border-radius:16px;background:#f8fafc;border:1px solid var(--border);">
+        <div id="study-tools-drawer" class="bd-s-088">
           <!-- Study Filter Chips (All / Wrong-Unknown Only / Marked Only + Smart Interleaved Shuffle Toggle) -->
-          <div id="study-filter-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
-            <button type="button" class="study-filter-btn btn-primary" data-filter="all" style="padding:7px 13px;font-size:0.8rem;">
+          <div id="study-filter-bar" class="bd-s-089">
+            <button type="button" class="study-filter-btn btn-primary bd-s-090" data-filter="all">
               전체 학습
             </button>
-            <button type="button" class="study-filter-btn" id="btn-filter-wrong" data-filter="wrong_only" style="padding:7px 13px;font-size:0.8rem;">
+            <button type="button" class="study-filter-btn bd-s-090" id="btn-filter-wrong" data-filter="wrong_only">
               오답·모르는 것만 (0)
             </button>
-            <button type="button" class="study-filter-btn" id="btn-filter-leech" data-filter="leech_only" style="padding:7px 13px;font-size:0.8rem;">
+            <button type="button" class="study-filter-btn bd-s-090" id="btn-filter-leech" data-filter="leech_only">
               거머리 취약만 (0)
             </button>
-            <button type="button" class="study-filter-btn" id="btn-filter-marked" data-filter="marked_only" style="padding:7px 13px;font-size:0.8rem;">
+            <button type="button" class="study-filter-btn bd-s-090" id="btn-filter-marked" data-filter="marked_only">
               중요 표시 카드만 (0)
             </button>
-            <button type="button" id="btn-toggle-shuffle" class="btn-primary" style="padding:7px 13px;font-size:0.8rem;margin-left:auto;" title="단원·유형 쏠림 없이 지능형 랜덤 섞기">
+            <button type="button" id="btn-toggle-shuffle" class="btn-primary bd-s-091" title="단원·유형 쏠림 없이 지능형 랜덤 섞기">
               스마트 랜덤 섞기: ON
             </button>
           </div>
 
           <!-- Gate T43: Question-Type Organization & Filter Bar (유형별 모아풀기 · 4지선다 동종 보기 격리) -->
-          <div id="study-type-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;padding:7px 10px;border-radius:13px;background:#f1f5f9;border:1px solid #e2e8f0;">
-            <span style="font-size:0.76rem;font-weight:800;color:#334155;margin-right:2px;">문제 유형별 정리:</span>
-            <button type="button" class="study-qtype-btn btn-primary" id="btn-qtype-all" data-qtype="all" style="padding:5px 11px;font-size:0.76rem;">
+          <div id="study-type-filter-bar" class="bd-s-092">
+            <span class="bd-s-093">문제 유형별 정리:</span>
+            <button type="button" class="study-qtype-btn btn-primary bd-s-094" id="btn-qtype-all" data-qtype="all">
               전체 유형
             </button>
-            <button type="button" class="study-qtype-btn" id="btn-qtype-vocab" data-qtype="vocab" style="padding:5px 11px;font-size:0.76rem;">
+            <button type="button" class="study-qtype-btn bd-s-094" id="btn-qtype-vocab" data-qtype="vocab">
               단어·어휘만
             </button>
-            <button type="button" class="study-qtype-btn" id="btn-qtype-grammar" data-qtype="grammar" style="padding:5px 11px;font-size:0.76rem;">
+            <button type="button" class="study-qtype-btn bd-s-094" id="btn-qtype-grammar" data-qtype="grammar">
               문법·구문만
             </button>
-            <button type="button" class="study-qtype-btn" id="btn-qtype-hanja" data-qtype="hanja" style="padding:5px 11px;font-size:0.76rem;">
+            <button type="button" class="study-qtype-btn bd-s-094" id="btn-qtype-hanja" data-qtype="hanja">
               한자·성어만
             </button>
-            <button type="button" class="study-qtype-btn" id="btn-qtype-history_sci" data-qtype="history_sci" style="padding:5px 11px;font-size:0.76rem;">
+            <button type="button" class="study-qtype-btn bd-s-094" id="btn-qtype-history_sci" data-qtype="history_sci">
               역사·과학·전공
             </button>
           </div>
 
           <!-- v5.6 Study Utilities: Electronic Red-Cellophane Sheet, 2-Col Printable Exam, Commute Audio Loop, Non-Destructive Cram -->
-          <div id="v56-rea-utility-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 10px;border-radius:14px;background:#ffffff;border:1px solid var(--border);">
-            <button type="button" id="btn-open-summary-sheet" style="padding:6px 11px;font-size:0.78rem;background:#fff0f0;color:#be123c;border-color:#fecdd3;">
+          <div id="v56-rea-utility-bar" class="bd-s-095">
+            <button type="button" id="btn-open-summary-sheet" class="bd-s-096">
               전자 셀로판지 요약시트
             </button>
-            <button type="button" id="btn-print-exam-sheet" style="padding:6px 11px;font-size:0.78rem;">
+            <button type="button" id="btn-print-exam-sheet" class="bd-s-097">
               2단 쪽지시험지 인쇄/PDF
             </button>
-            <button type="button" id="btn-commute-audio-loop" style="padding:6px 11px;font-size:0.78rem;">
+            <button type="button" id="btn-commute-audio-loop" class="bd-s-097">
               통학 오디오 루프
             </button>
-            <button type="button" id="btn-toggle-cram-sandbox" style="padding:6px 11px;font-size:0.78rem;" title="켜면 벼락치기 다회독 시 장기기억 스케줄을 오염시키지 않습니다">
+            <button type="button" id="btn-toggle-cram-sandbox" title="켜면 벼락치기 다회독 시 장기기억 스케줄을 오염시키지 않습니다" class="bd-s-097">
               무오염 벼락치기(CRAM): OFF
             </button>
-            <button id="btn-reset-card-arena" type="button" style="padding:6px 11px;font-size:0.76rem;color:#be123c;border-color:#fecdd3;background:#fff0f0;margin-left:auto;" title="현재 덱 처음부터 초기화">덱 진도 초기화</button>
+            <button id="btn-reset-card-arena" type="button" title="현재 덱 처음부터 초기화" class="bd-s-098">덱 진도 초기화</button>
           </div>
         </div>
 
         <!-- Electronic Red-Cellophane Summary Sheet Panel (v5.6 RN-1) -->
-        <div id="summary-sheet-panel" style="display:none;padding:12px;border-radius:18px;background:#ffffff;border:2px solid #fecdd3;">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-            <div style="font-weight:800;color:#be123c;font-size:0.92rem;">시험 5분 전 전자 빨간 셀로판지 요약시트 (정답 탭하여 확인)</div>
-            <div style="display:flex;gap:6px;">
-              <button type="button" id="btn-summary-toggle-all" style="padding:5px 10px;font-size:0.76rem;">정답 전체 보기/가리기</button>
-              <button type="button" id="btn-summary-close" style="padding:5px 10px;font-size:0.76rem;">닫기</button>
+        <div id="summary-sheet-panel" class="bd-s-099">
+          <div class="bd-s-081">
+            <div class="bd-s-100">시험 5분 전 전자 빨간 셀로판지 요약시트 (정답 탭하여 확인)</div>
+            <div class="bd-s-101">
+              <button type="button" id="btn-summary-toggle-all" class="bd-s-102">정답 전체 보기/가리기</button>
+              <button type="button" id="btn-summary-close" class="bd-s-102">닫기</button>
             </div>
           </div>
-          <div id="summary-sheet-rows" style="display:flex;flex-direction:column;gap:8px;"></div>
+          <div id="summary-sheet-rows" class="bd-s-103"></div>
         </div>
 
-        <div id="leech-banner" class="ai-box" style="border-color:var(--rose);color:var(--rose);"></div>
+        <div id="leech-banner" class="ai-box bd-s-104"></div>
 
         <div class="card-arena" id="card-arena">
           <div>
             <!-- Rust/WASM Hanja Radical/Stroke & English Phonics Live Coaching Banner -->
-            <div id="bd-card-coaching-banner" style="display:none;margin-bottom:6px;padding:5px 10px;border-radius:10px;background:#f0fdf4;border:1px solid #86efac;color:#065f46;font-size:0.76rem;font-weight:700;"></div>
+            <div id="bd-card-coaching-banner" class="bd-s-105"></div>
 
             <!-- Daily 15-Card Session Completion Celebration Modal -->
-            <div id="bd-session-complete-modal" role="dialog" aria-modal="true" aria-label="오늘의 학습 목표 완주" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
-              <div style="max-width:420px;width:100%;background:#ffffff;border-radius:24px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,0.25);text-align:center;">
-                <div style="font-size:2.4rem;margin-bottom:8px;">🏅🎉</div>
-                <h3 style="margin:0 0 8px 0;font-size:1.25rem;color:#0f172a;">오늘의 학습 목표 완주 성공!</h3>
-                <p id="bd-session-complete-summary" style="margin:0 0 16px 0;font-size:0.88rem;color:#334155;font-weight:700;"></p>
-                <div style="display:flex;flex-direction:column;gap:8px;">
-                  <button type="button" id="btn-session-retry-wrong" class="btn-primary" style="background:#d97706;border-color:#d97706;">🔥 오늘 틀린·모르는 문제만 다시 풀기</button>
+            <div id="bd-session-complete-modal" role="dialog" aria-modal="true" aria-label="오늘의 학습 목표 완주" class="bd-s-106">
+              <div class="bd-s-107">
+                <div class="bd-s-108">🏅🎉</div>
+                <h3 class="bd-s-109">오늘의 학습 목표 완주 성공!</h3>
+                <p id="bd-session-complete-summary" class="bd-s-110"></p>
+                <div class="bd-s-103">
+                  <button type="button" id="btn-session-retry-wrong" class="btn-primary bd-s-111">🔥 오늘 틀린·모르는 문제만 다시 풀기</button>
                   <button type="button" id="btn-session-more-10" class="btn-primary">➕ 오늘 목표 10문제 더 풀기</button>
                   <button type="button" id="btn-session-finish-close">✅ 오늘 공부 기분 좋게 끝내기</button>
                 </div>
@@ -1478,46 +444,46 @@
             </div>
 
             <!-- Interactive 3-Tab User Manual Modal (아이용 / 부모님용 / 단축키·FAQ) -->
-            <div id="bd-user-manual-modal" role="dialog" aria-modal="true" aria-labelledby="bd-user-manual-title" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.6);align-items:center;justify-content:center;padding:16px;">
-              <div style="max-width:620px;width:100%;max-height:86vh;display:flex;flex-direction:column;background:#ffffff;border-radius:24px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,0.3);">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">
-                  <h3 id="bd-user-manual-title" style="margin:0;font-size:1.15rem;color:#0f172a;">📖 BrainDeck 영어·한자 집중 학습 사용설명서</h3>
-                  <button type="button" id="btn-close-user-manual" style="padding:5px 12px;font-size:0.8rem;border-radius:999px;">✕ 닫기 (Esc)</button>
+            <div id="bd-user-manual-modal" role="dialog" aria-modal="true" aria-labelledby="bd-user-manual-title" class="bd-s-112">
+              <div class="bd-s-113">
+                <div class="bd-s-114">
+                  <h3 id="bd-user-manual-title" class="bd-s-115">📖 BrainDeck 영어·한자 집중 학습 사용설명서</h3>
+                  <button type="button" id="btn-close-user-manual" class="bd-s-116">✕ 닫기 (Esc)</button>
                 </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-                  <button type="button" id="btn-manual-tab-kids" class="btn-primary" style="padding:7px 14px;font-size:0.82rem;border-radius:999px;">👦 아이용 3초 시작 가이드</button>
-                  <button type="button" id="btn-manual-tab-parents" style="padding:7px 14px;font-size:0.82rem;border-radius:999px;">👨‍👩‍👧 부모님 관리 · FAQ</button>
-                  <button type="button" id="btn-manual-tab-shortcuts" style="padding:7px 14px;font-size:0.82rem;border-radius:999px;">⌨️ 키보드 단축키 표</button>
+                <div class="bd-s-117">
+                  <button type="button" id="btn-manual-tab-kids" class="btn-primary bd-s-118">👦 아이용 3초 시작 가이드</button>
+                  <button type="button" id="btn-manual-tab-parents" class="bd-s-118">👨‍👩‍👧 부모님 관리 · FAQ</button>
+                  <button type="button" id="btn-manual-tab-shortcuts" class="bd-s-118">⌨️ 키보드 단축키 표</button>
                 </div>
-                <div id="bd-user-manual-body" style="overflow-y:auto;padding-right:4px;flex:1;"></div>
+                <div id="bd-user-manual-body" class="bd-s-119"></div>
               </div>
             </div>
 
             <!-- In-Card Live Progress Bar & Percentage Header (Always Visible Inside Flashcard Arena) -->
-            <div id="card-inline-progress-box" style="margin-bottom:6px;padding:5px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:0.72rem;font-weight:800;margin-bottom:4px;">
-                <span id="card-inline-today-pct" style="color:var(--accent);">오늘 진척률: 0.0% (0/30장 완료)</span>
-                <span id="card-inline-deck-pct" style="color:#047857;">전체 덱 진도율: 0.0% (0/1,020장) · 숙련도 0.0%</span>
+            <div id="card-inline-progress-box" class="bd-s-120">
+              <div class="bd-s-121">
+                <span id="card-inline-today-pct" class="bd-s-122">오늘 진척률: 0.0% (0/30장 완료)</span>
+                <span id="card-inline-deck-pct" class="bd-s-123">전체 덱 진도율: 0.0% (0/1,020장) · 숙련도 0.0%</span>
               </div>
-              <div style="width:100%;height:5px;border-radius:999px;background:#e2e8f0;overflow:hidden;position:relative;">
-                <div id="card-inline-today-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#3182f6,#10b981);transition:width 0.25s ease;"></div>
+              <div class="bd-s-124">
+                <div id="card-inline-today-fill" class="bd-s-125"></div>
               </div>
             </div>
 
             <div class="bd-card-meta-row">
               <div>
-                <span id="card-qtype-badge" class="badge-pill" style="font-size:0.74rem;background:#eef2ff;color:#1d4ed8;">단어 뜻·어휘</span>
-                <span id="sprint-progress-badge" class="badge-pill" style="font-size:0.72rem;background:#ecfdf5;color:#047857;">스프린트 1</span>
+                <span id="card-qtype-badge" class="badge-pill bd-s-126">단어 뜻·어휘</span>
+                <span id="sprint-progress-badge" class="badge-pill bd-s-127">스프린트 1</span>
                 <span id="card-meta">준비 중...</span>
               </div>
               <div>
-                <span id="card-fsrs-meta" style="display:none;"></span>
-                <button id="btn-play-tts" type="button" style="padding:4px 9px;font-size:0.74rem;color:#1d4ed8;border-color:#bfdbfe;" title="표제어 발음 듣기 (Web Speech TTS)">🔊 발음 듣기</button>
-                <button id="btn-mark-card" type="button" style="padding:4px 9px;font-size:0.74rem;" title="중요 표시">☆ 중요</button>
-                <details id="card-more-actions-menu" style="position:relative;display:inline-block;">
-                  <summary id="btn-card-more-actions" style="list-style:none;cursor:pointer;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#f8fafc;font-size:0.74rem;font-weight:800;color:var(--text);" title="플래그 · 숨김 · 정지 · 편집 · 삭제 · 오류제보 · 다크모드">⋯ 카드 관리</summary>
-                  <div style="position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:230px;padding:10px;border-radius:14px;background:#ffffff;border:1px solid var(--border);box-shadow:0 12px 28px rgba(15,23,42,0.14);display:flex;flex-direction:column;gap:6px;">
-                    <select id="select-card-flag" style="width:100%;padding:5px 8px;font-size:0.74rem;border-radius:10px;" title="7색 플래그 지정 (단축키 F)">
+                <span id="card-fsrs-meta" class="bd-s-041"></span>
+                <button id="btn-play-tts" type="button" title="표제어 발음 듣기 (Web Speech TTS)" class="bd-s-128">🔊 발음 듣기</button>
+                <button id="btn-mark-card" type="button" title="중요 표시" class="bd-s-129">☆ 중요</button>
+                <details id="card-more-actions-menu" class="bd-s-130">
+                  <summary id="btn-card-more-actions" title="플래그 · 숨김 · 정지 · 편집 · 삭제 · 오류제보 · 다크모드" class="bd-s-131">⋯ 카드 관리</summary>
+                  <div class="bd-s-132">
+                    <select id="select-card-flag" title="7색 플래그 지정 (단축키 F)" class="bd-s-133">
                       <option value="0">플래그 없음</option>
                       <option value="1">[Red] 집중 요주의</option>
                       <option value="2">[Orange] 시험 전 재확인</option>
@@ -1527,68 +493,68 @@
                       <option value="6">[Teal] 발음 체크</option>
                       <option value="7">[Purple] 심화 변별</option>
                     </select>
-                    <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                      <button id="btn-bury-card" type="button" style="flex:1;padding:5px 8px;font-size:0.74rem;" title="오늘 하루 숨기기 (단축키 -)">숨김</button>
-                      <button id="btn-suspend-card" type="button" style="flex:1;padding:5px 8px;font-size:0.74rem;" title="카드 일시 정지 (단축키 @)">정지</button>
-                      <button id="btn-edit-current-card" type="button" style="flex:1;padding:5px 8px;font-size:0.74rem;" title="카드 앞·뒷면 수정 (FSRS 이력 보존)">편집</button>
-                      <button id="btn-delete-current-card" type="button" style="flex:1;padding:5px 8px;font-size:0.74rem;color:#be123c;border-color:#fecdd3;" title="카드 삭제">삭제</button>
+                    <div class="bd-s-134">
+                      <button id="btn-bury-card" type="button" title="오늘 하루 숨기기 (단축키 -)" class="bd-s-135">숨김</button>
+                      <button id="btn-suspend-card" type="button" title="카드 일시 정지 (단축키 @)" class="bd-s-135">정지</button>
+                      <button id="btn-edit-current-card" type="button" title="카드 앞·뒷면 수정 (FSRS 이력 보존)" class="bd-s-135">편집</button>
+                      <button id="btn-delete-current-card" type="button" title="카드 삭제" class="bd-s-136">삭제</button>
                     </div>
-                    <div style="display:flex;gap:5px;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--border);">
-                      <button id="btn-report-errata" type="button" title="오타·해설 개선 1클릭 제보" style="flex:1;font-size:0.74rem;padding:5px 8px;">🚨 오류제보</button>
-                      <button id="btn-oled-theme-toggle" type="button" title="OLED True-Black 다크모드 전환" style="flex:1;font-size:0.74rem;padding:5px 8px;">🌙 다크모드</button>
+                    <div class="bd-s-137">
+                      <button id="btn-report-errata" type="button" title="오타·해설 개선 1클릭 제보" class="bd-s-138">🚨 오류제보</button>
+                      <button id="btn-oled-theme-toggle" type="button" title="OLED True-Black 다크모드 전환" class="bd-s-138">🌙 다크모드</button>
                     </div>
                   </div>
                 </details>
               </div>
             </div>
             <div class="card-question" id="card-question">오늘 카드를 모두 끝냈어요!</div>
-            <div id="card-svg-diagram" role="region" aria-label="개념 시각 다이어그램" style="display:none;margin:6px 0;"></div>
+            <div id="card-svg-diagram" role="region" aria-label="개념 시각 다이어그램" class="bd-s-139"></div>
             <div class="card-answer" id="card-answer"></div>
-            <div id="card-extra-explanation" class="ai-box" style="display:none;background:#ffffff;color:#4e5968;border:1px solid #e5e8eb;"></div>
+            <div id="card-extra-explanation" class="ai-box bd-s-140"></div>
             <!-- v13.0 Contract C11: Hanja & Spelling Handwriting Scratchpad Canvas -->
-            <div id="bd-scratchpad-drawer" style="display:none;margin-top:10px;padding:12px;border-radius:14px;background:#fffbeb;border:1.5px solid #f59e0b;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:0.78rem;font-weight:800;color:#b45309;flex-wrap:wrap;gap:6px;">
+            <div id="bd-scratchpad-drawer" class="bd-s-141">
+              <div class="bd-s-142">
                 <span>✍️ 한자 획순 · 스펠링 손글씨 연습장 (마우스/터치/펜슬)</span>
-                <div style="display:flex;gap:6px;">
-                  <button type="button" id="btn-scratchpad-grade" class="btn-primary" style="padding:3px 9px;font-size:0.73rem;">필순·자형 채점</button>
-                  <button type="button" id="btn-scratchpad-clear" style="padding:3px 9px;font-size:0.73rem;">지우기</button>
-                  <button type="button" id="btn-scratchpad-close" style="padding:3px 9px;font-size:0.73rem;">닫기</button>
+                <div class="bd-s-101">
+                  <button type="button" id="btn-scratchpad-grade" class="btn-primary bd-s-143">필순·자형 채점</button>
+                  <button type="button" id="btn-scratchpad-clear" class="bd-s-143">지우기</button>
+                  <button type="button" id="btn-scratchpad-close" class="bd-s-143">닫기</button>
                 </div>
               </div>
-              <canvas id="bd-scratchpad-canvas" width="320" height="140" style="width:100%;height:140px;background:#ffffff;border-radius:10px;border:1px dashed #fbbf24;touch-action:none;cursor:crosshair;"></canvas>
-              <div id="bd-scratchpad-feedback" style="margin-top:6px;font-size:0.76rem;font-weight:700;color:#92400e;"></div>
+              <canvas id="bd-scratchpad-canvas" width="320" height="140" class="bd-s-144"></canvas>
+              <div id="bd-scratchpad-feedback" class="bd-s-145"></div>
             </div>
 
             <!-- v13.2 Contract C8 & C9: Active Production Arena (Dictation, Chunk Ordering, Speech Shadowing & Dual-Memory FSRS) -->
-            <div id="bd-active-production-drawer" style="display:none;margin-top:10px;padding:12px;border-radius:14px;background:#f0fdf4;border:1.5px solid #34d399;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-                <span id="bd-prod-mode-title" style="font-size:0.8rem;font-weight:800;color:#065f46;">🎧 능동 인출 훈련 (이중 기억 FSRS 연동)</span>
-                <div style="display:flex;gap:5px;flex-wrap:wrap;">
-                  <button type="button" id="btn-prod-dictation" style="padding:3px 8px;font-size:0.73rem;">🎧 받아쓰기</button>
-                  <button type="button" id="btn-prod-chunk-order" style="padding:3px 8px;font-size:0.73rem;">🧩 어순배열</button>
-                  <button type="button" id="btn-prod-shadowing" style="padding:3px 8px;font-size:0.73rem;">🎙️ 섀도잉</button>
-                  <button type="button" id="btn-prod-close" style="padding:3px 8px;font-size:0.73rem;">닫기</button>
+            <div id="bd-active-production-drawer" class="bd-s-146">
+              <div class="bd-s-147">
+                <span id="bd-prod-mode-title" class="bd-s-148">🎧 능동 인출 훈련 (이중 기억 FSRS 연동)</span>
+                <div class="bd-s-134">
+                  <button type="button" id="btn-prod-dictation" class="bd-s-149">🎧 받아쓰기</button>
+                  <button type="button" id="btn-prod-chunk-order" class="bd-s-149">🧩 어순배열</button>
+                  <button type="button" id="btn-prod-shadowing" class="bd-s-149">🎙️ 섀도잉</button>
+                  <button type="button" id="btn-prod-close" class="bd-s-149">닫기</button>
                 </div>
               </div>
-              <div id="bd-prod-prompt-box" style="font-size:0.82rem;font-weight:700;color:#064e3b;margin-bottom:8px;"></div>
-              <div id="bd-prod-chunks-zone" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
-              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                <input type="text" id="bd-prod-input" placeholder="듣거나 조합한 문장·단어를 입력하세요..." style="flex:1;min-width:160px;background:#ffffff;" />
-                <button type="button" id="btn-prod-mic" style="display:none;padding:7px 10px;font-size:0.76rem;">🎙️ 음성인식</button>
-                <button type="button" id="btn-prod-grade" class="btn-primary" style="padding:7px 12px;font-size:0.76rem;">능동 채점</button>
+              <div id="bd-prod-prompt-box" class="bd-s-150"></div>
+              <div id="bd-prod-chunks-zone" class="bd-s-151"></div>
+              <div class="bd-s-152">
+                <input type="text" id="bd-prod-input" placeholder="듣거나 조합한 문장·단어를 입력하세요..." class="bd-s-153" />
+                <button type="button" id="btn-prod-mic" class="bd-s-154">🎙️ 음성인식</button>
+                <button type="button" id="btn-prod-grade" class="btn-primary bd-s-155">능동 채점</button>
               </div>
-              <div id="bd-prod-feedback" style="margin-top:6px;font-size:0.78rem;font-weight:700;color:#047857;"></div>
+              <div id="bd-prod-feedback" class="bd-s-156"></div>
             </div>
             <div id="interactive-quiz-box" class="ai-box"></div>
 
             <!-- Post-Session Wrong/Unknown Retry Box -->
-            <div id="post-session-retry-box" style="display:none;margin-top:8px;padding:12px;border-radius:16px;background:#fff0f0;text-align:center;">
-              <div id="post-session-summary" style="font-size:0.9rem;font-weight:700;color:#be123c;margin-bottom:10px;"></div>
-              <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-                <button id="btn-retry-wrong-now" type="button" class="btn-primary" style="background:#be123c;border-color:#be123c;">
+            <div id="post-session-retry-box" class="bd-s-157">
+              <div id="post-session-summary" class="bd-s-158"></div>
+              <div class="bd-s-159">
+                <button id="btn-retry-wrong-now" type="button" class="btn-primary bd-s-160">
                   틀린·모르는 문제만 다시 복습하기
                 </button>
-                <button id="btn-reset-post-session" type="button" style="background:#ffffff;color:#be123c;border-color:#fecdd3;">
+                <button id="btn-reset-post-session" type="button" class="bd-s-161">
                   전체 카드 처음부터 다시 학습 (초기화)
                 </button>
               </div>
@@ -1596,13 +562,13 @@
           </div>
 
           <div class="bd-rail bd-card-toolbar">
-            <span id="solve-mode-badge" class="badge-pill" style="font-size:0.74rem;">4지선다 모드</span>
-            <button id="btn-tts" type="button" style="display:none;" aria-hidden="true">발음</button>
+            <span id="solve-mode-badge" class="badge-pill bd-s-162">4지선다 모드</span>
+            <button id="btn-tts" type="button" aria-hidden="true" class="bd-s-041">발음</button>
             <button id="btn-quiz-mode" type="button" title="현재 카드 풀이 방식 전환">풀이방식 전환</button>
             <button id="btn-toggle-active-production" type="button" title="받아쓰기 · 어순배열 · 발음 섀도잉 능동 인출 훈련 열기">🎧 능동훈련</button>
             <button id="btn-toggle-scratchpad" type="button" title="한자·영단어 손글씨 연습장 열기">✍️ 필기장</button>
             <button id="btn-hint" type="button">힌트</button>
-            <button id="btn-decompose" type="button" title="어려운 카드를 쉽게 쪼개기" style="display:none;">쪼개기</button>
+            <button id="btn-decompose" type="button" title="어려운 카드를 쉽게 쪼개기" class="bd-s-041">쪼개기</button>
             <button id="btn-reveal" class="btn-primary" type="button">
               정답 보기
             </button>
@@ -1612,22 +578,22 @@
         <div id="hint-box" class="ai-box"></div>
 
         <!-- Typing Answer Input + 3-Tier Understanding Grader (Shown only in typing mode under 1-Card 1-Mode) -->
-        <div id="typing-solve-zone" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-          <button id="btn-dont-know" type="button" style="white-space:nowrap;background:#fff0f0;color:#be123c;border-color:#fecdd3;">
+        <div id="typing-solve-zone" class="bd-s-152">
+          <button id="btn-dont-know" type="button" class="bd-s-163">
             모름
           </button>
-          <input type="text" id="recall-input" placeholder="답을 직접 입력해 기억을 인출해 보세요..." style="flex:1 1 120px;min-width:0;" />
-          <button id="btn-eval" type="button" class="btn-primary" style="white-space:nowrap;">채점 확인</button>
-          <button id="btn-override-correct" type="button" style="display:none;white-space:nowrap;background:#ecfdf5;color:#047857;border-color:#6ee7b7;" title="오타·유의어로 부분점수가 나왔을 때 정답으로 인정하고 바로 넘어갑니다">
+          <input type="text" id="recall-input" placeholder="답을 직접 입력해 기억을 인출해 보세요..." class="bd-s-164" />
+          <button id="btn-eval" type="button" class="btn-primary bd-s-165">채점 확인</button>
+          <button id="btn-override-correct" type="button" title="오타·유의어로 부분점수가 나왔을 때 정답으로 인정하고 바로 넘어갑니다" class="bd-s-166">
             내 답이 맞아요
           </button>
         </div>
         <div id="eval-box" class="ai-box"></div>
 
         <!-- Metacognitive Rating Calibration Banner (Frame 3: EvidenceRatingGuard) -->
-        <div id="rating-guard-banner" style="display:none;padding:5px 10px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);font-size:0.76rem;font-weight:700;color:var(--muted);"></div>
+        <div id="rating-guard-banner" class="bd-s-167"></div>
 
-        <div class="rating-grid" id="rating-grid-box" style="display:none;">
+        <div class="rating-grid bd-s-041" id="rating-grid-box">
           <button class="rate-btn rate-again" id="rate-1" data-rating="1">
             <span id="rate-title-1">다시</span>
             <span class="rate-sub interval" id="preview-1">&lt;1분</span>
@@ -1650,19 +616,19 @@
 
     <!-- PAGE 2: CURRICULUM (학교 시험범위 & 급수 — Contract C3: 3-Segment Simplification) -->
     <section id="page-curriculum" class="tab-page">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-        <div id="curriculum-seg-bar" role="tablist" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1;min-width:260px;">
-          <button type="button" role="tab" aria-selected="true" class="curr-seg-btn btn-primary" data-curr-seg="textbook" style="padding:10px;font-size:0.83rem;">
+      <div class="bd-s-168">
+        <div id="curriculum-seg-bar" role="tablist" class="bd-s-169">
+          <button type="button" role="tab" aria-selected="true" class="curr-seg-btn btn-primary bd-s-170" data-curr-seg="textbook">
             교과서 단원
           </button>
-          <button type="button" role="tab" aria-selected="false" class="curr-seg-btn" data-curr-seg="collection" style="padding:10px;font-size:0.83rem;">
+          <button type="button" role="tab" aria-selected="false" class="curr-seg-btn bd-s-170" data-curr-seg="collection">
             교육부·급수
           </button>
-          <button type="button" role="tab" aria-selected="false" class="curr-seg-btn" id="btn-curr-seg-combined" data-curr-seg="combined" style="padding:10px;font-size:0.83rem;">
+          <button type="button" role="tab" aria-selected="false" class="curr-seg-btn bd-s-170" id="btn-curr-seg-combined" data-curr-seg="combined">
             🎯 시험범위 조합
           </button>
         </div>
-        <select id="curriculum-difficulty-select" style="width:auto;min-width:210px;" title="생성할 카드의 학습 깊이를 선택하세요">
+        <select id="curriculum-difficulty-select" title="생성할 카드의 학습 깊이를 선택하세요" class="bd-s-171">
           <option value="mixed">난이도: 통합 (Lv.1~3 골고루)</option>
           <option value="lv1">Lv.1 기초·핵심 개념</option>
           <option value="lv2">Lv.2 실전 문맥 빈칸</option>
@@ -1674,15 +640,15 @@
       <div class="panel curr-seg-panel" id="curr-seg-textbook">
         <div class="panel-header">
           <div class="panel-title">학교 교과서 시험범위 덱</div>
-          <button id="btn-toggle-all-units" type="button" style="padding:5px 10px;font-size:0.76rem;">전체 선택</button>
+          <button id="btn-toggle-all-units" type="button" class="bd-s-102">전체 선택</button>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="bd-s-172">
           <select id="catalog-textbook-select"></select>
-          <div id="catalog-units-box" style="display:flex;flex-wrap:wrap;gap:6px;padding:12px;background:#f9fafb;border-radius:14px;border:1px solid var(--border);"></div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input type="text" id="exam-page-start" placeholder="시작 쪽 (선택)" style="width:120px;" />
-            <input type="text" id="exam-page-end" placeholder="끝 쪽 (선택)" style="width:120px;" />
-            <button id="btn-add-exam-to-combo" type="button" style="margin-left:auto;">
+          <div id="catalog-units-box" class="bd-s-173"></div>
+          <div class="bd-s-174">
+            <input type="text" id="exam-page-start" placeholder="시작 쪽 (선택)" class="bd-s-175" />
+            <input type="text" id="exam-page-end" placeholder="끝 쪽 (선택)" class="bd-s-175" />
+            <button id="btn-add-exam-to-combo" type="button" class="bd-s-176">
               + 통합 시험범위에 추가
             </button>
             <button id="btn-gen-exam-scope" class="btn-primary" type="button">
@@ -1692,37 +658,37 @@
         </div>
       </div>
 
-      <div class="panel curr-seg-panel" id="curr-seg-collection" style="display:none;">
+      <div class="panel curr-seg-panel bd-s-041" id="curr-seg-collection">
         <div class="panel-header">
           <div class="panel-title">교육부 9대 필수 · 급수 한자 · 한국사 · 자격증</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <select id="catalog-collection-select" style="flex:1;min-width:200px;"></select>
-          <button id="btn-add-col-to-combo" type="button" style="white-space:nowrap;">
+        <div class="bd-s-177">
+          <select id="catalog-collection-select" class="bd-s-178"></select>
+          <button id="btn-add-col-to-combo" type="button" class="bd-s-165">
             + 통합 시험범위에 추가
           </button>
-          <button id="btn-gen-collection" class="btn-primary" type="button" style="white-space:nowrap;">
+          <button id="btn-gen-collection" class="btn-primary bd-s-165" type="button">
             단일 덱 바로 시작
           </button>
         </div>
-        <div id="catalog-status-msg" style="font-size:0.84rem;color:var(--emerald);margin-top:10px;"></div>
+        <div id="catalog-status-msg" class="bd-s-179"></div>
       </div>
 
       <!-- Multi-Scope Combined Exam Deck Builder (지능형 다중 조합 랜덤 인터리빙 덱) -->
-      <div class="panel curr-seg-panel" id="curr-seg-combined" style="display:none;border:2px solid #c9e2ff;background:#f4f9ff;">
-        <div class="panel-header" style="flex-wrap:wrap;">
+      <div class="panel curr-seg-panel bd-s-180" id="curr-seg-combined">
+        <div class="panel-header bd-s-181">
           <div class="panel-title">내 시험 출제범위 다중 조합 & 지능형 랜덤 덱</div>
-          <button id="btn-preset-midterm-combo" type="button" style="padding:5px 10px;font-size:0.76rem;background:#ffffff;">
+          <button id="btn-preset-midterm-combo" type="button" class="bd-s-182">
             중간고사 다중 범위 예시 담기
           </button>
         </div>
-        <div style="font-size:0.82rem;color:#4e5968;margin-bottom:10px;">
+        <div class="bd-s-183">
           여러 교과서 단원이나 급수 팩을 <strong>[+ 통합 시험범위에 추가]</strong>로 담은 뒤 생성하면, 같은 단원이 연속으로 몰리지 않도록 <strong>스마트 인터리빙 랜덤 알고리즘</strong>으로 섞인 통합 시험대비 덱이 만들어집니다.
         </div>
-        <div id="combined-scope-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <input type="text" id="combined-deck-name" placeholder="통합 시험덱 이름 (예: 1학기 중간고사 전범위 랜덤 총정리)" style="flex:1;min-width:200px;background:#ffffff;" />
-          <button id="btn-clear-combined-scopes" type="button" style="padding:9px 12px;font-size:0.8rem;background:#ffffff;">
+        <div id="combined-scope-list" class="bd-s-184"></div>
+        <div class="bd-s-174">
+          <input type="text" id="combined-deck-name" placeholder="통합 시험덱 이름 (예: 1학기 중간고사 전범위 랜덤 총정리)" class="bd-s-185" />
+          <button id="btn-clear-combined-scopes" type="button" class="bd-s-186">
             비우기
           </button>
           <button id="btn-gen-combined-exam-deck" class="btn-primary" type="button">
@@ -1734,107 +700,107 @@
 
     <!-- PAGE 3: CREATE (사진·PDF·텍스트 카드 만들기 — Frame 5: 3-Segment Switcher) -->
     <section id="page-create" class="tab-page">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
-        <button type="button" class="create-seg-btn btn-primary" data-create-seg="doc" style="padding:10px;font-size:0.84rem;">
+      <div class="bd-s-187">
+        <button type="button" class="create-seg-btn btn-primary bd-s-188" data-create-seg="doc">
           사진 · PDF
         </button>
-        <button type="button" class="create-seg-btn" data-create-seg="manual" style="padding:10px;font-size:0.84rem;">
+        <button type="button" class="create-seg-btn bd-s-188" data-create-seg="manual">
           직접 입력
         </button>
-        <button type="button" class="create-seg-btn" data-create-seg="ai" style="padding:10px;font-size:0.84rem;">
+        <button type="button" class="create-seg-btn bd-s-188" data-create-seg="ai">
           노트 · 텍스트
         </button>
       </div>
 
       <div class="panel create-seg-panel" id="create-seg-doc">
-        <div class="panel-header" style="flex-wrap:wrap;gap:8px;">
+        <div class="panel-header bd-s-189">
           <div class="panel-title">사진 · PDF로 카드 만들기</div>
-          <span class="badge-pill" style="background:#eef2ff;color:#1d4ed8;">✨ 스마트 자동 생성</span>
+          <span class="badge-pill bd-s-190">✨ 스마트 자동 생성</span>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
-          <input type="text" id="doc-deck-name" placeholder="단어장 이름 (비워두면 자동 지정)" style="flex:1;min-width:180px;" />
-          <select id="doc-ollama-model-select" style="width:auto;min-width:190px;" title="문서에서 핵심 개념을 정교한 카드로 자동 구조화합니다">
+        <div class="bd-s-191">
+          <input type="text" id="doc-deck-name" placeholder="단어장 이름 (비워두면 자동 지정)" class="bd-s-192" />
+          <select id="doc-ollama-model-select" title="문서에서 핵심 개념을 정교한 카드로 자동 구조화합니다" class="bd-s-193">
             <option value="glm-5.3-flash">✨ 스마트 자동 생성 (추천)</option>
             <option value="local_rule">⚡ 오프라인 빠른 생성</option>
           </select>
-          <select id="doc-difficulty-select" style="width:auto;min-width:150px;">
+          <select id="doc-difficulty-select" class="bd-s-194">
             <option value="standard">난이도: 표준</option>
             <option value="lv1">Lv.1 기초·핵심</option>
             <option value="lv2">Lv.2 실전 빈칸</option>
             <option value="lv3">Lv.3 심화·역방향</option>
             <option value="mixed">통합 (Lv.1~3)</option>
           </select>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--muted);cursor:pointer;" title="체크 해제 시 추출된 카드를 미리보기로 편집·제외한 뒤 일괄 저장합니다">
+          <label title="체크 해제 시 추출된 카드를 미리보기로 편집·제외한 뒤 일괄 저장합니다" class="bd-s-195">
             <input type="checkbox" id="doc-auto-save" />
             즉시 저장 (해제 시 미리보기·편집)
           </label>
         </div>
 
-        <div id="doc-dropzone" style="border:2px dashed #c9e2ff;border-radius:18px;padding:28px 16px;text-align:center;background:#f9fafb;cursor:pointer;">
-          <div style="font-size:0.82rem;font-weight:800;color:var(--muted);margin-bottom:6px;">PDF / IMAGE UPLOAD</div>
-          <div style="font-size:0.96rem;font-weight:700;color:var(--accent);">
+        <div id="doc-dropzone" class="bd-s-196">
+          <div class="bd-s-197">PDF / IMAGE UPLOAD</div>
+          <div class="bd-s-198">
             교재 사진이나 PDF 파일을 선택하세요
           </div>
-          <input type="file" id="doc-file-input" accept="application/pdf,image/jpeg,image/png,image/heic,image/webp,text/plain,text/markdown,text/csv,.txt,.md,.csv,.tsv" style="display:none;" />
+          <input type="file" id="doc-file-input" accept="application/pdf,image/jpeg,image/png,image/heic,image/webp,text/plain,text/markdown,text/csv,.txt,.md,.csv,.tsv" class="bd-s-041" />
         </div>
 
-        <div id="doc-ingest-banner" class="ai-box" style="margin-top:10px;"></div>
+        <div id="doc-ingest-banner" class="ai-box bd-s-199"></div>
 
-        <div id="doc-preview-container" style="display:none;margin-top:12px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span id="doc-preview-title" style="font-size:0.86rem;font-weight:700;color:var(--emerald);"></span>
+        <div id="doc-preview-container" class="bd-s-200">
+          <div class="bd-s-201">
+            <span id="doc-preview-title" class="bd-s-202"></span>
             <button id="btn-save-doc-deck" class="btn-primary" type="button">
               덱 저장하기
             </button>
           </div>
-          <div id="doc-preview-list" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+          <div id="doc-preview-list" class="bd-s-203"></div>
         </div>
       </div>
 
-      <div class="panel create-seg-panel" id="create-seg-manual" style="display:none;">
-        <div class="panel-header" style="flex-wrap:wrap;gap:6px;">
+      <div class="panel create-seg-panel bd-s-041" id="create-seg-manual">
+        <div class="panel-header bd-s-204">
           <div class="panel-title">카드 직접 추가 (기본형 · {{c1::빈칸}} Cloze · 이미지 가리기)</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button id="btn-insert-cloze" type="button" style="padding:5px 10px;font-size:0.76rem;">+ {{c1::빈칸}} 넣기</button>
-            <button id="btn-toggle-io-builder" type="button" style="padding:5px 10px;font-size:0.76rem;">🖼️ 이미지 가리기 영역 그리기</button>
+          <div class="bd-s-205">
+            <button id="btn-insert-cloze" type="button" class="bd-s-102">+ {{c1::빈칸}} 넣기</button>
+            <button id="btn-toggle-io-builder" type="button" class="bd-s-102">🖼️ 이미지 가리기 영역 그리기</button>
           </div>
         </div>
-        <div id="bd-io-builder-drawer" style="display:none;margin-bottom:10px;padding:12px;border-radius:14px;background:#f8fafc;border:1px solid #cbd5e1;">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:0.78rem;font-weight:800;color:#1e293b;">
+        <div id="bd-io-builder-drawer" class="bd-s-206">
+          <div class="bd-s-207">
             <span>🖼️ 마우스·터치 드래그로 이미지 가리기 박스({{io1::x,y,w,h::라벨}}) 자동 생성</span>
-            <button type="button" id="btn-io-clear-boxes" style="padding:3px 8px;font-size:0.72rem;">영역 초기화</button>
+            <button type="button" id="btn-io-clear-boxes" class="bd-s-208">영역 초기화</button>
           </div>
-          <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
-            <input type="text" id="bd-io-label-input" placeholder="가릴 부위 정답 라벨 (예: 대동맥궁, 좌심실)" style="flex:1;min-width:160px;background:#ffffff;padding:6px 10px;font-size:0.8rem;" />
+          <div class="bd-s-209">
+            <input type="text" id="bd-io-label-input" placeholder="가릴 부위 정답 라벨 (예: 대동맥궁, 좌심실)" class="bd-s-210" />
           </div>
-          <canvas id="bd-io-builder-canvas" width="320" height="140" style="width:100%;height:140px;background:#0f172a;border-radius:10px;border:1px solid #38bdf8;touch-action:none;cursor:crosshair;"></canvas>
+          <canvas id="bd-io-builder-canvas" width="320" height="140" class="bd-s-211"></canvas>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="bd-s-103">
           <input type="text" id="direct-card-front" placeholder="질문 또는 빈칸 문장 (예: 광합성은 {{c1::엽록체}}에서 일어난다)" />
           <input type="text" id="direct-card-back" placeholder="정답 또는 해설" />
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span id="direct-card-status" style="font-size:0.82rem;color:var(--emerald);"></span>
+          <div class="bd-s-212">
+            <span id="direct-card-status" class="bd-s-213"></span>
             <button id="btn-add-direct-card" class="btn-primary" type="button">+ 카드 추가하기</button>
           </div>
         </div>
       </div>
 
-      <div class="panel create-seg-panel" id="create-seg-ai" style="display:none;">
-        <div class="panel-header" style="flex-wrap:wrap;">
+      <div class="panel create-seg-panel bd-s-041" id="create-seg-ai">
+        <div class="panel-header bd-s-181">
           <div class="panel-title">텍스트 붙여넣기</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <select id="ai-ollama-model-select" style="width:auto;">
+          <div class="bd-s-205">
+            <select id="ai-ollama-model-select" class="bd-s-214">
               <option value="glm-5.3-flash">✨ 스마트 자동 생성 (추천)</option>
               <option value="local_rule">⚡ 오프라인 빠른 생성</option>
             </select>
-            <select id="ai-difficulty-select" style="width:auto;">
+            <select id="ai-difficulty-select" class="bd-s-214">
               <option value="standard">난이도: 표준</option>
               <option value="lv1">Lv.1 기초·핵심</option>
               <option value="lv2">Lv.2 실전 빈칸</option>
               <option value="lv3">Lv.3 심화·역방향</option>
               <option value="mixed">통합 (Lv.1~3)</option>
             </select>
-            <select id="ai-domain-mode" style="width:auto;">
+            <select id="ai-domain-mode" class="bd-s-214">
               <option value="auto">자동 감지</option>
               <option value="english">영어 회화·단어</option>
               <option value="semiconductor_ai">전공·자격증</option>
@@ -1842,8 +808,8 @@
           </div>
         </div>
         <textarea id="ai-raw-text" rows="4" placeholder="단어: 뜻 또는 문장을 붙여넣으세요..."></textarea>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
-          <span id="ai-gen-status" style="font-size:0.82rem;color:var(--emerald);"></span>
+        <div class="bd-s-215">
+          <span id="ai-gen-status" class="bd-s-213"></span>
           <button id="btn-generate-cards" class="btn-primary" type="button">
             카드 만들기
           </button>
@@ -1859,23 +825,23 @@
           <span id="store-summary-badge" class="badge-pill">로딩 중...</span>
         </div>
 
-        <div id="store-category-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-          <button type="button" class="store-cat-btn btn-primary" data-cat="all" style="padding:6px 11px;font-size:0.78rem;">전체</button>
-          <button type="button" class="store-cat-btn" data-cat="moe_curriculum" style="padding:6px 11px;font-size:0.78rem;">교육부 필수(9종)</button>
-          <button type="button" class="store-cat-btn" data-cat="starter_free" style="padding:6px 11px;font-size:0.78rem;">무료</button>
-          <button type="button" class="store-cat-btn" data-cat="k12_textbook" style="padding:6px 11px;font-size:0.78rem;">교과서</button>
-          <button type="button" class="store-cat-btn" data-cat="hanja_history" style="padding:6px 11px;font-size:0.78rem;">한자·역사</button>
-          <button type="button" class="store-cat-btn" data-cat="language_exam" style="padding:6px 11px;font-size:0.78rem;">어학</button>
-          <button type="button" class="store-cat-btn" data-cat="pro_cert" style="padding:6px 11px;font-size:0.78rem;">자격증</button>
+        <div id="store-category-tabs" class="bd-s-216">
+          <button type="button" class="store-cat-btn btn-primary bd-s-097" data-cat="all">전체</button>
+          <button type="button" class="store-cat-btn bd-s-097" data-cat="moe_curriculum">교육부 필수(9종)</button>
+          <button type="button" class="store-cat-btn bd-s-097" data-cat="starter_free">무료</button>
+          <button type="button" class="store-cat-btn bd-s-097" data-cat="k12_textbook">교과서</button>
+          <button type="button" class="store-cat-btn bd-s-097" data-cat="hanja_history">한자·역사</button>
+          <button type="button" class="store-cat-btn bd-s-097" data-cat="language_exam">어학</button>
+          <button type="button" class="store-cat-btn bd-s-097" data-cat="pro_cert">자격증</button>
         </div>
 
-        <button id="btn-buy-bundle-3" type="button" class="btn-primary" style="width:100%;margin-bottom:12px;padding:11px;font-size:0.84rem;">
+        <button id="btn-buy-bundle-3" type="button" class="btn-primary bd-s-217">
           3팩 골라담기 15% 할인 장착
         </button>
 
-        <div id="store-status-msg" style="font-size:0.82rem;color:var(--emerald);margin-bottom:8px;"></div>
-        <div id="store-pack-list" style="display:flex;flex-direction:column;gap:10px;"></div>
-        <div id="store-trademark-disclaimer-box" style="margin-top:14px;padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid var(--border);font-size:0.74rem;color:var(--muted);line-height:1.5;white-space:pre-line;">⚖️ 비제휴 및 호환성 안내: 본 스토어의 교과서 출판사명 및 검정 시험명은 학생의 학습 진도 호환과 시험 대비 범위를 안내하기 위한 설명적 표기이며, 해당 출판사·주관사와 제휴되거나 공식 보증받지 않은 비공식 독립 콘텐츠입니다.</div>
+        <div id="store-status-msg" class="bd-s-218"></div>
+        <div id="store-pack-list" class="bd-s-172"></div>
+        <div id="store-trademark-disclaimer-box" class="bd-s-219">⚖️ 비제휴 및 호환성 안내: 본 스토어의 교과서 출판사명 및 검정 시험명은 학생의 학습 진도 호환과 시험 대비 범위를 안내하기 위한 설명적 표기이며, 해당 출판사·주관사와 제휴되거나 공식 보증받지 않은 비공식 독립 콘텐츠입니다.</div>
       </div>
     </section>
 
@@ -1892,7 +858,7 @@
         </div>
         <div class="metric-card">
           <div class="metric-label">기억 유지율</div>
-          <div class="metric-val" id="stat-retention" style="color:var(--emerald);">90.0%</div>
+          <div class="metric-val bd-s-220" id="stat-retention">90.0%</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">기억 지속일 / 오답</div>
@@ -1905,7 +871,7 @@
           <div class="panel-title">학습 모드 변경</div>
           <span id="offline-vault-badge" class="badge-pill">오프라인 보호중</span>
         </div>
-        <div id="age-tier-switcher" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <div id="age-tier-switcher" class="bd-s-221">
           <button type="button" class="age-tier-btn" data-age-tier="junior">주니어</button>
           <button type="button" class="age-tier-btn btn-primary" data-age-tier="teen">중고등</button>
           <button type="button" class="age-tier-btn" data-age-tier="adult">성인</button>
@@ -1918,16 +884,16 @@
           <line x1="0" y1="30" x2="480" y2="30" stroke="rgba(52,211,153,0.35)" stroke-dasharray="4 4" stroke-width="1" />
           <polyline id="curve-polyline" fill="none" stroke="#38bdf8" stroke-width="2.5" points="" />
         </svg>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+        <div class="bd-s-222">
           <button id="btn-decompress" type="button">밀린 복습 나누기</button>
           <button id="btn-sync-offline-vault" type="button">기기에 오프라인 저장</button>
           <button id="btn-export-backup-json" type="button">.braindeck.json 백업 내보내기</button>
           <button id="btn-import-backup-json" type="button">.braindeck.json 백업 복원</button>
-          <input type="file" id="backup-json-file-input" accept="application/json,.json" style="display:none;" />
-          <a id="link-export-apkg" href="/api/export.apkg" style="text-decoration:none;">
+          <input type="file" id="backup-json-file-input" accept="application/json,.json" class="bd-s-041" />
+          <a id="link-export-apkg" href="/api/export.apkg" class="bd-s-223">
             <button id="btn-export-apkg" type="button">.apkg 내보내기</button>
           </a>
-          <a id="link-download-apk" href="https://github.com/ssacho3-blip/semiconductor-assets/releases/download/braindeck-v1.1/BrainDeck-v1.1.apk" style="text-decoration:none;">
+          <a id="link-download-apk" href="https://github.com/ssacho3-blip/semiconductor-assets/releases/download/braindeck-v1.1/BrainDeck-v1.1.apk" class="bd-s-223">
             <button id="btn-download-apk" type="button" class="btn-primary">안드로이드 앱 설치파일 (v1.1 Build 108)</button>
           </a>
           <button id="btn-share-deck-token" type="button">🔗 단어장 공유 토큰 복사</button>
@@ -1941,68 +907,68 @@
           <div class="panel-title">🎯 문항반응이론(2PL IRT) 시험 예상 점수 · 합격률 예측</div>
           <span id="bd-irt-status-badge" class="badge-pill">실시간 분석</span>
         </div>
-        <div id="bd-irt-summary-text" style="font-size:0.86rem;font-weight:700;color:var(--text);margin-bottom:8px;">
+        <div id="bd-irt-summary-text" class="bd-s-224">
           학습 기록이 쌓이면 예상 TOEIC 점수(95% 신뢰구간)와 급수한자·수능 합격 확률을 자동 계산합니다.
         </div>
-        <div id="bd-forgetting-alert-banner" style="font-size:0.8rem;color:var(--amber);font-weight:700;margin-bottom:8px;"></div>
-        <div style="font-size:0.78rem;font-weight:800;color:var(--muted);margin-bottom:6px;">🔥 365일 연간 복습 잔디 히트맵 & 스트릭 프리즈 보호</div>
-        <div id="bd-heatmap-365-grid" style="display:grid;grid-template-columns:repeat(53,1fr);gap:2px;padding:8px;border-radius:10px;background:#0f172a;overflow-x:auto;"></div>
-        <div id="bd-trademark-disclaimer-box" style="margin-top:10px;font-size:0.72rem;color:var(--muted);line-height:1.45;white-space:pre-line;">
+        <div id="bd-forgetting-alert-banner" class="bd-s-225"></div>
+        <div class="bd-s-226">🔥 365일 연간 복습 잔디 히트맵 & 스트릭 프리즈 보호</div>
+        <div id="bd-heatmap-365-grid" class="bd-s-227"></div>
+        <div id="bd-trademark-disclaimer-box" class="bd-s-228">
           ⚖️ 클린룸(Clean-Room) 및 상표권 고지: TOEIC®은 ETS의 등록상표이며, 수능·교과서 분류 표기는 한국교육과정평가원(KICE)·교육부 공개 성취기준을 참고한 학습 분류입니다. BrainDeck은 타사 상표권자와 제휴되지 않은 독립 소프트웨어이며 모든 예문과 해설은 100% 자체 창작 자산입니다.
         </div>
-        <div style="margin-top:10px;">
-          <button id="btn-open-oss-licenses" type="button" style="padding:7px 13px;font-size:0.78rem;">⚖️ 오픈소스 및 데이터 라이선스 고지</button>
+        <div class="bd-s-199">
+          <button id="btn-open-oss-licenses" type="button" class="bd-s-229">⚖️ 오픈소스 및 데이터 라이선스 고지</button>
         </div>
       </div>
     </section>
 
-    <div id="oss-license-modal" role="dialog" aria-modal="true" aria-label="오픈소스 및 데이터 라이선스 고지" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
-      <div style="max-width:640px;width:100%;max-height:84vh;display:flex;flex-direction:column;background:#ffffff;border-radius:24px;padding:22px;box-shadow:0 20px 48px rgba(15,23,42,0.22);">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">
-          <h3 style="margin:0;font-size:1.05rem;color:#0f172a;">⚖️ 오픈소스 · 데이터 라이선스 및 비제휴 상표권 고지</h3>
-          <button type="button" id="btn-close-oss-licenses" style="padding:5px 12px;font-size:0.8rem;border-radius:999px;">✕ 닫기</button>
+    <div id="oss-license-modal" role="dialog" aria-modal="true" aria-label="오픈소스 및 데이터 라이선스 고지" class="bd-s-106">
+      <div class="bd-s-230">
+        <div class="bd-s-114">
+          <h3 class="bd-s-231">⚖️ 오픈소스 · 데이터 라이선스 및 비제휴 상표권 고지</h3>
+          <button type="button" id="btn-close-oss-licenses" class="bd-s-116">✕ 닫기</button>
         </div>
-        <pre id="oss-license-modal-body" style="margin:0;padding:14px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;font-size:0.75rem;line-height:1.55;color:#1e293b;white-space:pre-wrap;overflow-y:auto;flex:1;"></pre>
+        <pre id="oss-license-modal-body" class="bd-s-232"></pre>
       </div>
     </div>
 
     <!-- UX-03: Non-Blocking Inline Card Edit & Delete Modals -->
-    <div id="card-edit-modal" role="dialog" aria-modal="true" aria-label="카드 내용 수정" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
-      <div style="max-width:520px;width:100%;display:flex;flex-direction:column;gap:12px;background:#ffffff;border-radius:20px;padding:20px;box-shadow:0 20px 48px rgba(15,23,42,0.22);">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <h3 style="margin:0;font-size:1rem;">✏️ 카드 앞면·뒷면 편집 (FSRS 이력 보존)</h3>
-          <button type="button" id="btn-card-edit-insert-cloze" style="padding:4px 10px;font-size:0.76rem;border-radius:999px;">+ {{c1::빈칸}} 삽입</button>
+    <div id="card-edit-modal" role="dialog" aria-modal="true" aria-label="카드 내용 수정" class="bd-s-233">
+      <div class="bd-s-234">
+        <div class="bd-s-212">
+          <h3 class="bd-s-235">✏️ 카드 앞면·뒷면 편집 (FSRS 이력 보존)</h3>
+          <button type="button" id="btn-card-edit-insert-cloze" class="bd-s-236">+ {{c1::빈칸}} 삽입</button>
         </div>
-        <label style="font-size:0.8rem;font-weight:700;color:var(--muted);">앞면 (질문 · Cloze 문장)</label>
-        <textarea id="card-edit-front-input" rows="3" style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);font-size:0.9rem;resize:vertical;"></textarea>
-        <label style="font-size:0.8rem;font-weight:700;color:var(--muted);">뒷면 (정답 · 핵심 해설)</label>
-        <textarea id="card-edit-back-input" rows="3" style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);font-size:0.9rem;resize:vertical;"></textarea>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
-          <button type="button" id="btn-card-edit-cancel" style="padding:8px 14px;border-radius:10px;">취소</button>
-          <button type="button" id="btn-card-edit-save" class="btn-primary" style="padding:8px 16px;border-radius:10px;">저장하기</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="card-delete-confirm-modal" role="dialog" aria-modal="true" aria-label="카드 삭제 확인" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
-      <div style="max-width:400px;width:100%;display:flex;flex-direction:column;gap:12px;background:#ffffff;border-radius:20px;padding:20px;box-shadow:0 20px 48px rgba(15,23,42,0.22);">
-        <h3 style="margin:0;font-size:1rem;">🗑️ 카드 영구 삭제 확인</h3>
-        <div id="card-delete-confirm-text" style="font-size:0.86rem;color:var(--muted);">이 카드를 삭제하시겠습니까? (기존 복습 이력 통계는 보존됩니다.)</div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
-          <button type="button" id="btn-card-delete-cancel" style="padding:8px 14px;border-radius:10px;">취소</button>
-          <button type="button" id="btn-card-delete-confirm" style="padding:8px 16px;border-radius:10px;background:#e11d48;color:#ffffff;border-color:#e11d48;">영구 삭제</button>
+        <label class="bd-s-237">앞면 (질문 · Cloze 문장)</label>
+        <textarea id="card-edit-front-input" rows="3" class="bd-s-238"></textarea>
+        <label class="bd-s-237">뒷면 (정답 · 핵심 해설)</label>
+        <textarea id="card-edit-back-input" rows="3" class="bd-s-238"></textarea>
+        <div class="bd-s-239">
+          <button type="button" id="btn-card-edit-cancel" class="bd-s-240">취소</button>
+          <button type="button" id="btn-card-edit-save" class="btn-primary bd-s-241">저장하기</button>
         </div>
       </div>
     </div>
 
-    <div id="deck-share-import-modal" role="dialog" aria-modal="true" aria-label="공유 토큰으로 단어장 받기" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,0.55);align-items:center;justify-content:center;padding:16px;">
-      <div style="max-width:480px;width:100%;display:flex;flex-direction:column;gap:12px;background:var(--panel);border-radius:20px;padding:20px;box-shadow:0 20px 48px rgba(15,23,42,0.22);">
-        <h3 style="margin:0;font-size:1rem;">📥 공유 토큰으로 단어장 받기 (오프라인 지원)</h3>
-        <div style="font-size:0.82rem;color:var(--muted);">전달받은 bdshare1: 공유 토큰을 붙여넣으면 서버 없이도 내 단어장으로 추가됩니다.</div>
-        <textarea id="deck-share-token-input" rows="4" placeholder="bdshare1:..." style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);font-size:0.84rem;resize:vertical;"></textarea>
-        <div style="display:flex;justify-content:flex-end;gap:8px;">
-          <button type="button" id="btn-deck-share-import-cancel" style="padding:8px 14px;border-radius:10px;">취소</button>
-          <button type="button" id="btn-deck-share-import-submit" class="btn-primary" style="padding:8px 16px;border-radius:10px;">단어장 추가</button>
+    <div id="card-delete-confirm-modal" role="dialog" aria-modal="true" aria-label="카드 삭제 확인" class="bd-s-233">
+      <div class="bd-s-242">
+        <h3 class="bd-s-235">🗑️ 카드 영구 삭제 확인</h3>
+        <div id="card-delete-confirm-text" class="bd-s-243">이 카드를 삭제하시겠습니까? (기존 복습 이력 통계는 보존됩니다.)</div>
+        <div class="bd-s-239">
+          <button type="button" id="btn-card-delete-cancel" class="bd-s-240">취소</button>
+          <button type="button" id="btn-card-delete-confirm" class="bd-s-244">영구 삭제</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="deck-share-import-modal" role="dialog" aria-modal="true" aria-label="공유 토큰으로 단어장 받기" class="bd-s-233">
+      <div class="bd-s-245">
+        <h3 class="bd-s-235">📥 공유 토큰으로 단어장 받기 (오프라인 지원)</h3>
+        <div class="bd-s-246">전달받은 bdshare1: 공유 토큰을 붙여넣으면 서버 없이도 내 단어장으로 추가됩니다.</div>
+        <textarea id="deck-share-token-input" rows="4" placeholder="bdshare1:..." class="bd-s-247"></textarea>
+        <div class="bd-s-248">
+          <button type="button" id="btn-deck-share-import-cancel" class="bd-s-240">취소</button>
+          <button type="button" id="btn-deck-share-import-submit" class="btn-primary bd-s-241">단어장 추가</button>
         </div>
       </div>
     </div>

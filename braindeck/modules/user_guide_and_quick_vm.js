@@ -204,16 +204,16 @@
       const rows = USER_MANUAL_SECTIONS.shortcuts
         .map(
           (r) =>
-            `<tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:8px 10px;font-weight:800;color:#1d4ed8;white-space:nowrap;"><code>${r.key}</code></td><td style="padding:8px 10px;color:#334155;">${r.action}</td></tr>`
+            `<tr class="bd-manual-row"><td class="bd-manual-key"><code>${r.key}</code></td><td class="bd-manual-action">${r.action}</td></tr>`
         )
         .join("");
-      return `<div style="font-size:0.84rem;"><p style="margin:0 0 10px 0;color:#475569;font-weight:700;">키보드 하나로 모든 학습과 복습을 빠르게 조작할 수 있습니다.</p><table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:12px;overflow:hidden;"><thead><tr style="background:#e2e8f0;text-align:left;"><th style="padding:8px 10px;">단축키</th><th style="padding:8px 10px;">동작 설명</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div class="bd-manual-wrap"><p class="bd-manual-intro">키보드 하나로 모든 학습과 복습을 빠르게 조작할 수 있습니다.</p><table class="bd-manual-table"><thead><tr class="bd-manual-thead-row"><th class="bd-manual-th">단축키</th><th class="bd-manual-th">동작 설명</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     const sections = USER_MANUAL_SECTIONS[tabKey] || USER_MANUAL_SECTIONS.kids;
     return sections
       .map((sec) => {
-        const items = sec.bullets.map((b) => `<li style="margin-bottom:6px;line-height:1.5;">${b}</li>`).join("");
-        return `<div style="margin-bottom:14px;padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;"><h4 style="margin:0 0 8px 0;font-size:0.92rem;color:#0f172a;">${sec.title}</h4><ul style="margin:0;padding-left:18px;font-size:0.83rem;color:#334155;">${items}</ul></div>`;
+        const items = sec.bullets.map((b) => `<li class="bd-manual-item">${b}</li>`).join("");
+        return `<div class="bd-manual-card"><h4 class="bd-manual-card-title">${sec.title}</h4><ul class="bd-manual-list">${items}</ul></div>`;
       })
       .join("");
   }

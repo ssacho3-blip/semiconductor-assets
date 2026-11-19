@@ -11,6 +11,15 @@
   const PROFILE_STORAGE_KEY = "braindeck_learner_profile_v55";
   let runtimeBackendMode = null; // "SERVER_API" | "STANDALONE_STATIC"
   let kidsFocusCtrl = null;
+  function readInlineDisplay(node) {
+    return node.style ? node.style.display : "";
+  }
+  function isHiddenDisplay(node) {
+    if (!node) return true;
+    const inlineDisp = readInlineDisplay(node);
+    if (inlineDisp) return inlineDisp === "none";
+    return typeof getComputedStyle === "function" ? getComputedStyle(node).display === "none" : false;
+  }
 
   const _APP_MODULE_PATHS = {
     BrainDeckUiDialogsRender: "./modules/ui_dialogs_render.js",
@@ -494,7 +503,11 @@
     try {
       const hdrs = { "Content-Type": "application/json" };
       if (state.csrfToken) hdrs["X-BrainDeck-CSRF"] = state.csrfToken;
-      const res = await fetch(path, { method: "POST", headers: hdrs, body: JSON.stringify(payload) });
+      const fetchOpts = { method: "POST", headers: hdrs, body: JSON.stringify(payload) };
+      if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+        fetchOpts.signal = AbortSignal.timeout(3000);
+      }
+      const res = await fetch(path, fetchOpts);
       if (!res.ok && (res.status === 404 || res.status === 405)) { await _ensureCorpusForStandalonePath(path); return fallbackStandalonePost(path, payload); }
       return await res.json();
     } catch (_) {
@@ -699,7 +712,7 @@
 
   async function renderDeckExplorerPanel() {
     const panel = el("deck-card-explorer-panel");
-    if (!panel || panel.style.display === "none") return;
+    if (isHiddenDisplay(panel)) return;
     return _getAppModule("BrainDeckUiDialogsRender").renderDeckExplorerPanelDom({
       el,
       state,
@@ -1082,7 +1095,7 @@
     const qBox = el("interactive-quiz-box");
     if (qBox) qBox.classList.add("bd-quiz-revealed");
     const svgBox = el("card-svg-diagram");
-    if (svgBox && svgBox.childElementCount > 0 && (!qBox || qBox.style.display === "none")) {
+    if (svgBox && svgBox.childElementCount > 0 && isHiddenDisplay(qBox)) {
       svgBox.style.display = "block";
     }
     const extraEl = el("card-extra-explanation");

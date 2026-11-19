@@ -13,10 +13,155 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
+  function readInlineDisplay(node) {
+    return node.style ? node.style.display : "";
+  }
+
+  function isHiddenDisplay(node) {
+    if (!node) return true;
+    const inlineDisp = readInlineDisplay(node);
+    if (inlineDisp) return inlineDisp === "none";
+    return typeof getComputedStyle === "function" ? getComputedStyle(node).display === "none" : false;
+  }
+
+  const _SCRATCHPAD_GUIDE_PRIMITIVES = [
+    ["가로획(一)", 44.0, 4.0],
+    ["세로획(丨)", 4.0, 44.0],
+    ["삐침(丿)", -14.0, 38.0],
+    ["파임(丶)", 34.0, 32.0],
+    ["꺾임(乙)", 36.0, 28.0],
+  ];
+
+  function normalizeGuideChar(character) {
+    const rawCh = String(character || "學").trim();
+    return rawCh ? rawCh.slice(0, 1) : "學";
+  }
+
+  function buildSingleGuideVector(codepoint, sIdx) {
+    const seedVal = (codepoint * 31 + sIdx * 17) % 97;
+    const prim = _SCRATCHPAD_GUIDE_PRIMITIVES[(codepoint + sIdx) % _SCRATCHPAD_GUIDE_PRIMITIVES.length];
+    const x0 = Math.round((34.0 + (sIdx % 3) * 42.0 + (seedVal % 9)) * 10) / 10;
+    const y0 = Math.round((34.0 + (Math.floor(sIdx / 3) % 4) * 32.0 + ((seedVal >> 2) % 9)) * 10) / 10;
+    const x1 = Math.round(Math.max(20.0, Math.min(180.0, x0 + prim[1])) * 10) / 10;
+    const y1 = Math.round(Math.max(20.0, Math.min(180.0, y0 + prim[2])) * 10) / 10;
+    return [[x0, y0], [x1, y1]];
+  }
+
+  function buildScratchpadStrokeGuideJs(character, strokeCount = 8) {
+    const ch = normalizeGuideChar(character);
+    const expected = Math.max(1, Math.min(36, Math.trunc(Number(strokeCount) || 8)));
+    const codepoint = ch.codePointAt(0) || 0x5b78;
+    const guideVectors = [];
+    for (let sIdx = 0; sIdx < expected; sIdx += 1) {
+      guideVectors.push(buildSingleGuideVector(codepoint, sIdx));
+    }
+    return {
+      character: ch,
+      expected_strokes: expected,
+      guide_vectors: guideVectors,
+    };
+  }
+
+  function resolveDevicePixelRatio() {
+    return typeof window !== "undefined" ? window.devicePixelRatio : 1;
+  }
+
+  function computeScratchpadPixelDims(rectWidth, rectHeight, rawDpr) {
+    const dpr = Math.max(1, Number(rawDpr) || 1);
+    const cssW = Math.max(200, Math.round(rectWidth || 320));
+    const cssH = Math.max(120, Math.round(rectHeight || 140));
+    return [Math.round(cssW * dpr), Math.round(cssH * dpr)];
+  }
+
+  function applyCanvasBackingDims(canvas, dims) {
+    if (canvas.width !== dims[0]) canvas.width = dims[0];
+    if (canvas.height !== dims[1]) canvas.height = dims[1];
+  }
+
+  function isValidScratchpadPoint(pt) {
+    if (!Array.isArray(pt) || pt.length < 2) return false;
+    return Number.isFinite(Number(pt[0])) && Number.isFinite(Number(pt[1]));
+  }
+
+  function hasInvalidScratchpadStrokes(rawStrokes) {
+    return rawStrokes.some((s) => !Array.isArray(s) || !s.every(isValidScratchpadPoint));
+  }
+
+  function computeStrokeVectorDelta(stroke) {
+    const p0 = stroke[0];
+    const p1 = stroke[stroke.length - 1];
+    return [Number(p1[0]) - Number(p0[0]), Number(p1[1]) - Number(p0[1])];
+  }
+
+  function normalizeCosineScore(cosSim) {
+    if (cosSim < -0.25) return { score: 0.0, reversed: true };
+    if (cosSim <= 0.0) return { score: 0.0, reversed: false };
+    return { score: Math.min(1.0, cosSim), reversed: false };
+  }
+
+  function scoreStrokeAgainstGuide(uStroke, guideVec) {
+    if (!Array.isArray(guideVec) || guideVec.length < 2) return { score: 0.0, reversed: false };
+    const [ux, uy] = computeStrokeVectorDelta(uStroke);
+    const uNorm = Math.hypot(ux, uy);
+    if (uNorm < 1e-3) return { score: 0.0, reversed: false };
+    const [gx, gy] = computeStrokeVectorDelta(guideVec);
+    const cosSim = (gx * ux + gy * uy) / (Math.max(1e-3, Math.hypot(gx, gy)) * uNorm);
+    return normalizeCosineScore(cosSim);
+  }
+
+  function computeReversePenalty(actual, reversedCount) {
+    if (reversedCount <= 0) return 0.0;
+    return actual > 1 && reversedCount > Math.floor(actual / 2) ? 0.25 : 0.15;
+  }
+
+  function readGuideSpecFields(guideSpec) {
+    const safeSpec = guideSpec || {};
+    return {
+      expected: Math.max(1, Number(safeSpec.expected_strokes || 1)),
+      guideVectors: Array.isArray(safeSpec.guide_vectors) ? safeSpec.guide_vectors : [],
+    };
+  }
+
+  function resolveScratchpadVerdict(totalPct, dirPct, reversedCount) {
+    if (reversedCount !== 0 || dirPct < 50.0 || totalPct < 70.0) return "RETRY";
+    return "PASS";
+  }
+
+  function buildScratchpadResult(expected, actual, dirPct, reversedCount, totalPct, verdict) {
+    return {
+      stroke_count_exact: actual === expected,
+      actual_strokes: actual,
+      expected_strokes: expected,
+      direction_similarity_pct: dirPct,
+      reversed_stroke_count: reversedCount,
+      score_pct: totalPct,
+      verdict,
+    };
+  }
+
+  function evaluateScratchpadStrokesJs(guideSpec, userStrokes) {
+    const { expected, guideVectors } = readGuideSpecFields(guideSpec);
+    const rawStrokes = Array.isArray(userStrokes) ? userStrokes : [];
+    if (hasInvalidScratchpadStrokes(rawStrokes)) return buildScratchpadResult(expected, 0, 0.0, 0, 0.0, "RETRY");
+    const validStrokes = rawStrokes.filter((s) => s.length >= 2);
+    const actual = validStrokes.length;
+    if (actual === 0) return buildScratchpadResult(expected, 0, 0.0, 0, 0.0, "EMPTY");
+
+    const countScore = Math.max(0.0, 1.0 - Math.abs(actual - expected) / Math.max(expected, 4));
+    const densityScore = Math.min(1.0, validStrokes.filter((s) => s.length >= 3).length / actual);
+    const perStroke = validStrokes.map((s, idx) => scoreStrokeAgainstGuide(s, guideVectors[idx]));
+    const reversedCount = perStroke.filter((r) => r.reversed).length;
+    const directionScore = perStroke.reduce((acc, r) => acc + r.score, 0.0) / actual;
+    const rawTotal = Math.max(0.0, (0.40 * countScore + 0.45 * directionScore + 0.15 * densityScore) - computeReversePenalty(actual, reversedCount));
+    const totalPct = Math.round(rawTotal * 1000) / 10;
+    const dirPct = Math.round(directionScore * 1000) / 10;
+    return buildScratchpadResult(expected, actual, dirPct, reversedCount, totalPct, resolveScratchpadVerdict(totalPct, dirPct, reversedCount));
+  }
+
   async function renderDeckExplorerPanelDom(ctx) {
     const { el, state, apiPost, enrichStandaloneCard, renderCurrentCard, showUxToast } = ctx;
     const panel = el("deck-card-explorer-panel");
-    if (!panel || panel.style.display === "none") return;
+    if (isHiddenDisplay(panel)) return;
     const qInput = el("explorer-search-input");
     const bSel = el("explorer-bucket-select");
     const sSel = el("explorer-stage-select");
@@ -932,7 +1077,7 @@
       btnOpenSummary.addEventListener("click", () => {
         const panel = el("summary-sheet-panel");
         if (!panel) return;
-        const willShow = panel.style.display === "none";
+        const willShow = isHiddenDisplay(panel);
         panel.style.display = willShow ? "block" : "none";
         if (willShow) renderSummarySheetPanel();
       });
@@ -1086,7 +1231,7 @@
     const studyToolsDrawer = el("study-tools-drawer");
     if (btnToggleStudyTools && studyToolsDrawer) {
       btnToggleStudyTools.addEventListener("click", () => {
-        const isOpen = studyToolsDrawer.style.display !== "none";
+        const isOpen = !isHiddenDisplay(studyToolsDrawer);
         const nextOpen = !isOpen;
         studyToolsDrawer.style.display = nextOpen ? "block" : "none";
         btnToggleStudyTools.setAttribute("aria-expanded", nextOpen ? "true" : "false");
@@ -1104,7 +1249,7 @@
     const collapsibleHeaderZone = el("bd-collapsible-header-zone");
     if (btnToggleCompactHeader && collapsibleHeaderZone) {
       btnToggleCompactHeader.addEventListener("click", () => {
-        const isOpen = collapsibleHeaderZone.style.display !== "none";
+        const isOpen = !isHiddenDisplay(collapsibleHeaderZone);
         const nextOpen = !isOpen;
         collapsibleHeaderZone.style.display = nextOpen ? "block" : "none";
         btnToggleCompactHeader.setAttribute("aria-expanded", nextOpen ? "true" : "false");
@@ -1317,7 +1462,7 @@
     const explorerPanel = el("deck-card-explorer-panel");
     if (btnOpenExplorer && explorerPanel) {
       btnOpenExplorer.addEventListener("click", async () => {
-        const willShow = explorerPanel.style.display === "none";
+        const willShow = isHiddenDisplay(explorerPanel);
         explorerPanel.style.display = willShow ? "block" : "none";
         if (willShow) {
           btnOpenExplorer.classList.add("btn-primary");
@@ -1578,13 +1723,22 @@
     const scratchDrawer = el("bd-scratchpad-drawer");
     const scratchCanvas = el("bd-scratchpad-canvas");
     const btnToggleScratch = el("btn-toggle-scratchpad");
+    const syncScratchpadBackingStore = () => {
+      if (!scratchCanvas || typeof scratchCanvas.getBoundingClientRect !== "function") return;
+      const rect = scratchCanvas.getBoundingClientRect();
+      applyCanvasBackingDims(
+        scratchCanvas,
+        computeScratchpadPixelDims(rect.width, rect.height, resolveDevicePixelRatio())
+      );
+    };
     if (btnToggleScratch && scratchDrawer) {
       btnToggleScratch.addEventListener("click", () => {
-        const nextOpen = scratchDrawer.style.display === "none";
+        const nextOpen = isHiddenDisplay(scratchDrawer);
         scratchDrawer.style.display = nextOpen ? "block" : "none";
         if (nextOpen) {
           const prodD = el("bd-active-production-drawer");
           if (prodD) prodD.style.display = "none";
+          syncScratchpadBackingStore();
         }
       });
     }
@@ -1597,46 +1751,96 @@
     if (scratchCanvas && typeof scratchCanvas.getContext === "function") {
       const ctx2d = scratchCanvas.getContext("2d");
       let drawing = false;
+      let activePointerId = null;
       let recordedStrokes = [];
       let currentStrokePts = [];
-      const toScratchCanvasPoint = (ev) => {
+      let currentDrawPts = [];
+      const redrawScratchStrokes = () => {
+        if (!ctx2d) return;
+        ctx2d.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+        const dpr = typeof window !== "undefined" ? Math.max(1, Number(window.devicePixelRatio) || 1) : 1;
+        ctx2d.lineWidth = 2.6 * dpr;
+        ctx2d.lineCap = "round";
+        ctx2d.lineJoin = "round";
+        ctx2d.strokeStyle = "#1e293b";
+        const drawList = currentDrawPts.length >= 2 ? recordedStrokes.concat([currentDrawPts]) : recordedStrokes;
+        for (let i = 0; i < drawList.length; i += 1) {
+          const stroke = drawList[i];
+          if (!stroke || stroke.length < 2) continue;
+          ctx2d.beginPath();
+          ctx2d.moveTo((stroke[0][0] / 200.0) * scratchCanvas.width, (stroke[0][1] / 200.0) * scratchCanvas.height);
+          for (let j = 1; j < stroke.length; j += 1) {
+            ctx2d.lineTo((stroke[j][0] / 200.0) * scratchCanvas.width, (stroke[j][1] / 200.0) * scratchCanvas.height);
+          }
+          ctx2d.stroke();
+        }
+      };
+      if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+        window.addEventListener("resize", () => {
+          if (scratchDrawer && !isHiddenDisplay(scratchDrawer)) {
+            syncScratchpadBackingStore();
+            redrawScratchStrokes();
+          }
+        });
+      }
+      const toNormalizedCanvasPoint = (ev) => {
         const rect = scratchCanvas.getBoundingClientRect();
-        const scaleX = (scratchCanvas.width || rect.width || 1) / (rect.width || 1);
-        const scaleY = (scratchCanvas.height || rect.height || 1) / (rect.height || 1);
-        return [
-          Math.round((ev.clientX - rect.left) * scaleX),
-          Math.round((ev.clientY - rect.top) * scaleY),
-        ];
+        const w = Math.max(1, rect.width || 320);
+        const h = Math.max(1, rect.height || 140);
+        const nx = Math.max(0, Math.min(200, ((ev.clientX - rect.left) / w) * 200.0));
+        const ny = Math.max(0, Math.min(200, ((ev.clientY - rect.top) / h) * 200.0));
+        return [Math.round(nx * 10) / 10, Math.round(ny * 10) / 10];
+      };
+      const finishPointerStroke = (ev, commitStroke) => {
+        if (!drawing || (activePointerId !== null && ev && ev.pointerId !== undefined && ev.pointerId !== activePointerId)) return;
+        if (commitStroke && currentStrokePts.length >= 2) {
+          recordedStrokes.push(currentStrokePts.slice());
+        }
+        if (activePointerId !== null && typeof scratchCanvas.releasePointerCapture === "function") {
+          try { scratchCanvas.releasePointerCapture(activePointerId); } catch (_e) {}
+        }
+        drawing = false;
+        activePointerId = null;
+        currentStrokePts = [];
+        currentDrawPts = [];
       };
       scratchCanvas.addEventListener("pointerdown", (ev) => {
+        if (ev.isPrimary === false || activePointerId !== null) return;
+        syncScratchpadBackingStore();
         drawing = true;
-        const pt = toScratchCanvasPoint(ev);
+        activePointerId = ev.pointerId !== undefined ? ev.pointerId : null;
+        if (activePointerId !== null && typeof scratchCanvas.setPointerCapture === "function") {
+          try { scratchCanvas.setPointerCapture(activePointerId); } catch (_e) {}
+        }
+        const pt = toNormalizedCanvasPoint(ev);
         currentStrokePts = [pt];
+        currentDrawPts = [pt];
         if (!ctx2d) return;
         ctx2d.beginPath();
-        ctx2d.moveTo(pt[0], pt[1]);
+        ctx2d.moveTo((pt[0] / 200.0) * scratchCanvas.width, (pt[1] / 200.0) * scratchCanvas.height);
       });
       scratchCanvas.addEventListener("pointermove", (ev) => {
         if (!drawing || !ctx2d) return;
-        const pt = toScratchCanvasPoint(ev);
+        if (activePointerId !== null && ev.pointerId !== undefined && ev.pointerId !== activePointerId) return;
+        const pt = toNormalizedCanvasPoint(ev);
         currentStrokePts.push(pt);
-        ctx2d.lineWidth = 2.6;
+        currentDrawPts.push(pt);
+        const dpr = typeof window !== "undefined" ? Math.max(1, Number(window.devicePixelRatio) || 1) : 1;
+        ctx2d.lineWidth = 2.6 * dpr;
         ctx2d.lineCap = "round";
+        ctx2d.lineJoin = "round";
         ctx2d.strokeStyle = "#1e293b";
-        ctx2d.lineTo(pt[0], pt[1]);
+        ctx2d.lineTo((pt[0] / 200.0) * scratchCanvas.width, (pt[1] / 200.0) * scratchCanvas.height);
         ctx2d.stroke();
       });
-      scratchCanvas.addEventListener("pointerup", () => {
-        if (drawing && currentStrokePts.length >= 2) {
-          recordedStrokes.push(currentStrokePts.slice());
-        }
-        drawing = false;
-        currentStrokePts = [];
-      });
+      scratchCanvas.addEventListener("pointerup", (ev) => finishPointerStroke(ev, true));
+      scratchCanvas.addEventListener("pointercancel", (ev) => finishPointerStroke(ev, currentStrokePts.length >= 3));
       const btnClearScratch = el("btn-scratchpad-clear");
       if (btnClearScratch) {
         btnClearScratch.addEventListener("click", () => {
           recordedStrokes = [];
+          currentStrokePts = [];
+          currentDrawPts = [];
           if (ctx2d) ctx2d.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
           const fb = el("bd-scratchpad-feedback");
           if (fb) fb.textContent = "";
@@ -1651,12 +1855,18 @@
           const ch = cjkMatch ? cjkMatch[0] : (rawTxt.trim().charAt(0) || "學");
           const strokeMatch = rawTxt.match(/(\d+)\s*획/);
           const expectedStrokes = strokeMatch ? Number(strokeMatch[1]) : Math.max(1, recordedStrokes.length || 8);
-          const res = await apiPost("/api/v2/commercial/production-eval", {
-            modality: "scratchpad",
-            character: ch,
-            stroke_count: expectedStrokes,
-            user_strokes: recordedStrokes,
-          }).catch(() => null);
+          let res = typeof apiPost === "function"
+            ? await apiPost("/api/v2/commercial/production-eval", {
+                modality: "scratchpad",
+                character: ch,
+                stroke_count: expectedStrokes,
+                user_strokes: recordedStrokes,
+              }).catch(() => null)
+            : null;
+          if (!(res && res.evaluation)) {
+            const guideSpec = buildScratchpadStrokeGuideJs(ch, expectedStrokes);
+            res = { ok: true, evaluation: evaluateScratchpadStrokesJs(guideSpec, recordedStrokes) };
+          }
           const fb = el("bd-scratchpad-feedback");
           if (fb && res && res.evaluation) {
             const evObj = res.evaluation;
@@ -1665,7 +1875,8 @@
             }
             if (typeof revealAnswer === "function") revealAnswer();
             if (typeof applyEvidenceRatingGuard === "function") applyEvidenceRatingGuard();
-            fb.textContent = `✍️ 필순·방향 채점: ${evObj.score_pct}점 (입력 ${evObj.actual_strokes}획 / 기준 ${evObj.expected_strokes}획 · 방향 일치도 ${evObj.direction_similarity_pct || 85.0}% · 판정: ${evObj.verdict})`;
+            const dirPctVal = Number(evObj.direction_similarity_pct ?? 0);
+            fb.textContent = `✍️ 필순·방향 채점: ${evObj.score_pct}점 (입력 ${evObj.actual_strokes}획 / 기준 ${evObj.expected_strokes}획 · 방향 일치도 ${dirPctVal}% · 판정: ${evObj.verdict})`;
           }
         });
       }
@@ -1740,7 +1951,7 @@
 
     if (btnToggleProd && prodDrawer) {
       btnToggleProd.addEventListener("click", () => {
-        const nextOpen = prodDrawer.style.display === "none";
+        const nextOpen = isHiddenDisplay(prodDrawer);
         prodDrawer.style.display = nextOpen ? "block" : "none";
         if (nextOpen) {
           if (scratchDrawer) scratchDrawer.style.display = "none";
@@ -1853,7 +2064,7 @@
 
     if (btnToggleIoBuilder && ioBuilderDrawer) {
       btnToggleIoBuilder.addEventListener("click", () => {
-        ioBuilderDrawer.style.display = ioBuilderDrawer.style.display === "none" ? "block" : "none";
+        ioBuilderDrawer.style.display = isHiddenDisplay(ioBuilderDrawer) ? "block" : "none";
       });
     }
     if (ioBuilderCanvas && typeof ioBuilderCanvas.getContext === "function") {
@@ -2206,6 +2417,8 @@
   }
 
   return {
+    buildScratchpadStrokeGuideJs,
+    evaluateScratchpadStrokesJs,
     renderDeckExplorerPanelDom,
     renderStudyPlanBannerDom,
     renderTapBlockQuizDom,
